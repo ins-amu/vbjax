@@ -19,6 +19,11 @@ def make_grid_shtns(lmax, nlat, nlon, D):
     return sht, phi, theta, gw
 
 
+def make_lm(lmax: int):
+    lm = np.array([(l,m) for m in range(lmax+1) for l in range(lmax+1) if m<=l]).T
+    return lm
+
+
 def make_grid(nlat, nlon):
     "Create grid for SHT, phi latitude, theta longitude."
     points, weights = np.polynomial.legendre.leggauss(nlat)
@@ -122,7 +127,7 @@ def kernel_estimate_shtns(sht, k, x0):
 def make_shtdiff(lmax, nlat, nlon, D, return_L=False):
     "Construct SHT diff implementation in plain NumPy."
     # setup grid
-    lm = np.array([(l,m) for m in range(lmax+1) for l in range(lmax+1) if m<=l]).T
+    lm = make_lm(lmax)
     phi, _, gw = make_grid(nlat, nlon)
     L = []
     for m in range(lmax):
