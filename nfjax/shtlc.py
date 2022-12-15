@@ -124,7 +124,7 @@ def kernel_estimate_shtns(sht, k, x0):
 
 # SHT implementation
 
-def make_shtdiff(lmax, nlat, nlon, D, return_L=False):
+def make_shtdiff(lmax, nlat, nlon, D, return_L=False, np=np):
     "Construct SHT diff implementation in plain NumPy."
     # setup grid
     lm = make_lm(lmax)
