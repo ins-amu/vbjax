@@ -11,6 +11,7 @@ testing different methods, Jax allows
 
 - numpyro: HMC & VI
 - batched eval: efficient parameters sweeps for SBI
+- run notebooks as tests with jupyter execute via dockerfile + gh actions
 
 ## setup
 
