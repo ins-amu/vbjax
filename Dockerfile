@@ -13,9 +13,12 @@ RUN git clone https://bitbucket.org/nschaeff/shtns \
  && make install \
  && python setup.py install --user
 
+RUN pip install notebook
+
 RUN mkdir src
 ADD ./ src/
 WORKDIR src
 
-CMD python -m pytest tests.py
+EXPOSE 8888
+CMD jupyter notebook --ip=0.0.0.0 --allow-root --port=8888
 

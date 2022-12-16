@@ -2,7 +2,10 @@
 
 import numpy as np
 import scipy.special as sp
-import shtns
+try:
+    import shtns
+except ImportError:
+    print('** shtns is not available')
 
 
 # Grid functions
