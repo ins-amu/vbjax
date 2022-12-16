@@ -11,6 +11,7 @@ confection = "*"
 tqdm = "*"
 autograd = "*"
 numpyro = "*"
+sympy = "*"
 
 [dev-packages]
 notebook = "*"
