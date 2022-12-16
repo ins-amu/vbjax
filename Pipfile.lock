@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "1903debea8f3f2e4cc78f91ea3f64fd98de3af467fe42365df9a301f51cdc14a"
+            "sha256": "dca1928ecc87feac5d71ba3c2db06b1fc20559c184f3620704c3ca2e9a9d1bd9"
         },
         "pipfile-spec": 6,
         "requires": {},
@@ -73,6 +73,13 @@
             ],
             "markers": "python_version >= '3.8'",
             "version": "==0.4.1"
+        },
+        "mpmath": {
+            "hashes": [
+                "sha256:604bc21bd22d2322a177c73bdb573994ef76e62edd595d17e00aff24b0667e5c",
+                "sha256:79ffb45cf9f4b101a807595bcb3e72e0396202e0b1d25d689134b48c4216a81a"
+            ],
+            "version": "==1.2.1"
         },
         "multipledispatch": {
             "hashes": [
@@ -242,6 +249,14 @@
             ],
             "markers": "python_version >= '3.6'",
             "version": "==2.4.5"
+        },
+        "sympy": {
+            "hashes": [
+                "sha256:938f984ee2b1e8eae8a07b884c8b7a1146010040fccddc6539c54f401c8f6fcf",
+                "sha256:e32380dce63cb7c0108ed525570092fd45168bdae2faa17e528221ef72e88658"
+            ],
+            "index": "pypi",
+            "version": "==1.11.1"
         },
         "tqdm": {
             "hashes": [
