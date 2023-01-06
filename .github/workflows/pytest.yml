@@ -1,0 +1,16 @@
+name: run pytests
+
+on:
+  push:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: build docker image
+        run: docker build -t nfjax -f cpu.dockerfile .
+
+      - name: run tests in container
+        run: docker run --rm -it -v $PWD:/work -w /work nfjax pytest
+
