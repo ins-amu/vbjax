@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as np
-from ..shtlc import make_shtdiff
+
+from nfjax import make_shtdiff
 
 
 def test_shtdiff():
