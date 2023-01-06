@@ -127,7 +127,7 @@ def kernel_estimate_shtns(sht, k, x0):
 
 # SHT implementation
 
-def make_shtdiff(lmax, nlat, nlon, D, return_L=False, np=np):
+def make_shtdiff_np(lmax, nlat, nlon, D, return_L=False, np=np):
     "Construct SHT diff implementation in plain NumPy."
     # setup grid
     lm = make_lm(lmax)
@@ -151,12 +151,37 @@ def make_shtdiff(lmax, nlat, nlon, D, return_L=False, np=np):
     return (f, L) if return_L else f
 
 
-def make_shtdiff_jax(lmax, nlat, nlon, D):
-    import jax.numpy as jp
+def make_shtdiff(nlat, lmax=None, nlon=None, D=0.0004, return_L=False):
+    "Construct SHT diff implementation with Jax."
+
+    # imports here keeps it readable
+    from numpy.testing import assert_equal
+    import jax.numpy as np
     import jax
-    f, L = make_shtdiff(lmax, nlat, nlon, D, return_L=True)
-    jL = jp.array(L.astype(np.complex64))
-    @jax.jit
-    def f(jx):
-        return jp.fft.irfft(jp.einsum('abc,ca->ba',jL, jp.fft.rfft(jx, axis=1)[:,:lmax]), nlon, axis=1)
-    return f, jL
+
+    # defaults
+    nlon = nlon or 2*nlat
+    lmax = lmax or nlat - 1
+
+    # do some checking
+    assert lmax < nlat
+    assert nlon > nlat
+
+    # reuse numpy impl
+    _, L = make_shtdiff_np(lmax=lmax, nlat=nlat, nlon=nlon, D=D, return_L=True)
+    assert_equal(0, L.imag)
+    L = np.array(L.real.astype('f'))
+
+    # create computational kernel closing over the `L` array
+    def f(x):
+        X = np.fft.rfft(x, axis=1)
+        # can't in-place set w/ Jax so hstack padding
+        X = np.hstack(
+            (np.einsum('abc,ca->ba', L, X[:,:lmax]),
+             np.zeros((X.shape[0], X.shape[1] - lmax), np.complex64)
+            )
+        )
+        y = np.real(np.fft.irfft(X, axis=1))
+        return y
+
+    return (f, L) if return_L else f
