@@ -20,7 +20,7 @@ def jr_dfun(ys, c, p):
     sigm_y0_1  = 2.0 * p.nu_max / (1.0 + np.exp(p.r * (p.v0 - (p.a_1 * p.J * y0))))
     sigm_y0_3  = 2.0 * p.nu_max / (1.0 + np.exp(p.r * (p.v0 - (p.a_3 * p.J * y0))))
 
-    return np.vstack([y3,
+    return np.array([y3,
         y4,
         y5,
         p.A * p.a * sigm_y1_y2 - 2.0 * p.a * y3 - p.a ** 2 * y0,
