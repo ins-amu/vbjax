@@ -18,7 +18,7 @@ jobs:
         run: docker build -t nfjax -f cpu.dockerfile .
 
       - name: run tests in container
-        run: docker run --rm -it -v $PWD:/work -w /work nfjax pytest
+        run: docker run --rm -v $PWD:/work -w /work nfjax pytest
 
       - name: run demo notebook
-        run: docker run --rm -it -v $PWD:/work -w /work nfjax  jupyter execute 60\ First\ field\ in\ numpyro.ipynb
+        run: docker run --rm -v $PWD:/work -w /work nfjax  jupyter execute 60\ First\ field\ in\ numpyro.ipynb
