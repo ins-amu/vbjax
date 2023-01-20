@@ -138,3 +138,35 @@ def make_dde(dt, nh, dfun, unroll=10):
 
 
 
+def make_sdde(dt, nh, dfun, gfun, unroll=10):
+    "Combines semantics of make_dde & make_sde; TODO docstring"
+
+    sqrt_dt = np.sqrt(dt)
+
+    # TODO nh == 0: return make_sde(dt, dfun, gfun) etc
+
+    # gfun is a numerical value or a function f(x,p) -> sig
+    if not hasattr(gfun, '__call__'):
+        sig = gfun
+        gfun = lambda *_: sig
+
+    def step(xt, zt, p):
+        "xt is buffer, zt is (ts[i], zs[i]), p is parameters."
+        t, z_t = zt
+        noise = gfun(x, p) * sqrt_dt * z_t
+        x = xt[:, nh + t]
+        d1 = dfun(xt, x, t, p)
+        xi = x + dt*d1 + noise
+        xt = xt.at[:, nh + t + 1].set(xi)
+        d2 = dfun(xt, xi, t+1, p)
+        nx = x + dt*0.5*(d1 + d2) + noise
+        xt = xt.at[:, nh + t + 1].set(nx)
+        return xt, nx
+
+    @jax.jit
+    def loop(xt, zt, p):
+        "xt is the buffer, zt is (ts, zs), p is parameters."
+        op = lambda xt, tz: step(xt, zt, p)
+        return jax.lax.scan(op, xt, zt, unroll=unroll)[0]
+
+    return step, loop
