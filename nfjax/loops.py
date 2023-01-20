@@ -78,3 +78,52 @@ def make_ode(dt, dfun):
         return jax.lax.scan(op, x0, ts)[1]
 
     return step, loop
+
+
+def make_dde(dt, nh, dfun, unroll=10):
+    """Use a deterministic Heun scheme to integrate `dfun` at a time step `dt`,
+    with maximum time delay (in steps) provided by `nh`.
+
+    - `dfun(xt, x, t p)` computes derivatives of the model
+
+    where
+
+    - `xt` is a buffer of shape (nsvar, nh + ntime)
+    - `x` is the current state variable vector
+    - `t` is the current time index
+    - `p` is the parameter set
+
+    The extra arguments `xt` & `t` enable time delay implementations; see
+    example notebooks.
+
+    This function constructs and returns two functions: step and loop.
+
+    - `step(x, t, p)`: takes one step in time according to the Heun scheme. 
+    - `loop(xt, ts, p)`: iteratively calls `step` for all `z`.
+
+    In both cases, a Jax compatible parameter set `p` is provided, either an array
+    or some pytree compatible structure.
+
+    Indexing out of bounds in Jax is undefined behavior, so if `nh` is not
+    large enough, or the buffer `xt` is not long enough for the delays used
+    by `dfun`, the result will be silently incorrect.
+
+    """
+
+    def step(xt, t, p):
+        x = xt[:, nh + t]
+        d1 = dfun(xt, x, t, p)
+        xi = x + dt*d1
+        xt = xt.at[:, nh + t + 1].set(xi)
+        d2 = dfun(xt, xi, t+1, p)
+        nx = x + dt*0.5*(d1 + d2)
+        xt = xt.at[:, nh + t + 1].set(nx)
+        return xt, nx
+
+    @jax.jit
+    def loop(xt, ts, p):
+        op = lambda xt, t: step(xt, t, p)
+        return jax.lax.scan(op, xt, ts, unroll=unroll)[0]
+
+    return step, loop
+
