@@ -13,6 +13,9 @@ autograd = "*"
 numpyro = "*"
 sympy = "*"
 muse-inference = {git = "https://github.com/marius311/muse_inference.git"}
+panel = "*"
+pandas = "*"
+joblib = "*"
 
 [dev-packages]
 notebook = "*"
