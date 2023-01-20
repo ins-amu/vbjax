@@ -82,7 +82,8 @@ def make_ode(dt, dfun):
 
 def make_dde(dt, nh, dfun, unroll=10):
     """Use a deterministic Heun scheme to integrate `dfun` at a time step `dt`,
-    with maximum time delay (in steps) provided by `nh`.
+    with maximum time delay (in steps) provided by `nh`. If `nh` is zero, this
+    function invokes `make_ode`.
 
     - `dfun(xt, x, t p)` computes derivatives of the model
 
@@ -110,6 +111,14 @@ def make_dde(dt, nh, dfun, unroll=10):
 
     """
 
+    if nh == 0:
+        print('nh==0: using make_ode to avoid overhead')
+        dfun_ = lambda x, p: dfun(x.reshape((-1, 1)), x, 0, p)
+        step, loop = make_ode(dt, dfun_)
+        def loop_(xt, ts, p):
+            return loop(xt[:,0], ts, p).T
+        return step, loop_
+
     def step(xt, t, p):
         x = xt[:, nh + t]
         d1 = dfun(xt, x, t, p)
@@ -126,4 +135,6 @@ def make_dde(dt, nh, dfun, unroll=10):
         return jax.lax.scan(op, xt, ts, unroll=unroll)[0]
 
     return step, loop
+
+
 
