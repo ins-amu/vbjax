@@ -26,3 +26,11 @@ git clone https://bitbucket.org/nschaeff/shtns
 ./configure --enable-python --disable-simd --prefix=/opt/homebrew
 make -j && make install && python setup.py install
 ```
+
+### Pipenv
+
+Some packages that may be used are not in the Pipfile because pipenv
+doesn't manage to install them.
+
+- numba
+- tvb-data & tvb-library
