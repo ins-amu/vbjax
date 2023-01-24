@@ -17,6 +17,16 @@ testing different methods, Jax allows
 
 Use Dockerfile if possible 
 
+### pipenv
+
+pipenv is used to manage the dependencies, so you can install deps in a virtualenv 
+and run Jupyter notebook like so:
+```
+pip install -U pipenv
+pipenv install -d
+pipenv run jupyter notebook
+```
+
 ### installing shtns on mac
 
 In the Python environment,
