@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as np
 
-from nfjax import make_shtdiff
+from vbjax import make_shtdiff
 
 
 def test_shtdiff():

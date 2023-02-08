@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as np
 
-from nfjax import make_sde, make_ode, make_dde
+from vbjax import make_sde, make_ode, make_dde
 
 
 def test_sde():

@@ -17,6 +17,7 @@ panel = "*"
 pandas = "*"
 joblib = "*"
 pipfile = "*"
+funsor = "*"
 
 [dev-packages]
 jupyter = "*"
