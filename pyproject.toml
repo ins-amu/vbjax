@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vbjax"
+version = "0.0.1"
+authors = [
+  { name="Marmaduke Woodman", email="marmaduke.woodman@univ-amu.fr" },
+]
+description = "Virtual brains w/ JAX"
+readme = "README.md"
+requries-python = ">=3.7"
+dependencies = [
+    "numpy",
+    "jax",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/ins-amu/vbjax"
+"Bug Tracker" = "https://github.com/ins-amu/vbjax/issues"
+
+[tool.hatch.build]
+include = [
+    "vbjax/**",
+]
+exclude = [
+    "vbjax/test*/**",
+]
