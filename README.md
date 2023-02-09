@@ -6,14 +6,33 @@ basic plan
   - focus on kernel design parity w/ sparse matrix
 - epi2d, heun, obs2d, scan loop in time
 - explore batching in time for hybrid
+- open ended API with lots of functions
 
 testing different methods, Jax allows
 
-- numpyro: HMC & VI
+- fast gradients for numpyro: HMC & VI among others
 - batched eval: efficient parameters sweeps for SBI
+- extensive accelerator support like GPUs & TPUs
 - run notebooks as tests with jupyter execute via dockerfile + gh actions
 
+which enables new use cases like 
+
+- inference w/ fields
+- designing manifolds instead of guessing
+- neural ODEs for neural mass models
+- automating amortized inference & data features
+- etc
+
 ## setup
+
+The main dependency of this library is Jax.  For different applications
+you may want to also install
+
+- shtns
+- numpyro
+- muse_inference
+- arviz
+- pedantic & confection
 
 ### conda
 
