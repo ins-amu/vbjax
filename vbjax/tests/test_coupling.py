@@ -4,7 +4,13 @@ from vbjax import make_diff_cfun, make_linear_cfun
 
 
 def test_linear_cfun():
-    pass
+    x = np.r_[0.0:1.0:32j]
+    SC = np.r_[0.0:1.0:1024j].reshape((32, 32))
+    cf = make_linear_cfun(SC, a=0.5, b=0.5)
+    gx = cf(x)
+    assert_allclose(gx, 0.5*SC@x+0.5)
+    gx = cf(SC)
+    assert_allclose(gx, 0.5*np.sum(SC*x,axis=1)+0.5)
 
 
 def test_diff_cfun():
@@ -19,3 +25,4 @@ def test_diff_cfun():
     c1 = cfun(x)
     c2 = make_diff_cfun(SC)(x)
     assert_allclose(c1, c2, 1e-5, 1e-5)
+
