@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "hatchling.build"
 
 [project]
 name = "vbjax"
-version = "0.0.1"
+dynamic = ["version"]
 authors = [
   { name="Marmaduke Woodman", email="marmaduke.woodman@univ-amu.fr" },
 ]
@@ -32,3 +32,9 @@ classifiers = [
 include = [
     "vbjax/**",
 ]
+
+[tool.setuptools_scm]
+write_to = "vbjax/_version.py"
+
+[tool.hatch.version]
+path = "vbjax/_version.py"
