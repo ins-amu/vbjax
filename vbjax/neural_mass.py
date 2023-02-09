@@ -1,6 +1,7 @@
 import collections
 import jax.numpy as np
 
+
 JRTheta = collections.namedtuple(
     typename='JRTheta',
     field_names='A B a b v0 nu_max r J a_1 a_2 a_3 a_4 mu I'.split(' '))
@@ -28,3 +29,20 @@ def jr_dfun(ys, c, p):
             - 2.0 * p.a * y4 - p.a ** 2 * y1,
         p.B * p.b * (p.a_4 * p.J * sigm_y0_3) - 2.0 * p.b * y5 - p.b ** 2 * y2,
                      ])
+
+
+BVEPTheta = collections.namedtuple(
+    typename='BVEPTheta',
+    field_names='tau0 I1 eta'
+)
+
+bvep_default_theta = BVEPTheta(
+    tau0=10.0, I1=3.1, eta=-3.5
+)
+
+def bvep_dfun(ys, c, p: BVEPTheta):
+    z, x = ys
+    x2 = x*x
+    dx = 1 - x*x2 - 2*x2 - z + p.I1
+    dz = (1/p.tau0)*(4*(x - p.eta) - z - c)
+    return np.array([dx, dz])
