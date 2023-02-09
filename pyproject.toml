@@ -32,6 +32,3 @@ classifiers = [
 include = [
     "vbjax/**",
 ]
-exclude = [
-    "vbjax/test*/**",
-]
