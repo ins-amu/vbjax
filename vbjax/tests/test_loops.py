@@ -37,4 +37,3 @@ def test_dde():
     xt0 = np.ones((1, 200))
     xt1 = loop(xt0, np.r_[:100], 0.2)
     assert xt1.shape == (1, 200)
-
