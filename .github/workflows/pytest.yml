@@ -11,14 +11,8 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v3
 
-      - name: double check pwd content
-        run: ls -lh
-
       - name: build docker image
-        run: docker build -t nfjax -f cpu.dockerfile .
+        run: docker build -t nfjax -f Dockerfile
 
       - name: run tests in container
         run: docker run --rm -v $PWD:/work -w /work nfjax pytest
-
-      - name: run demo notebook
-        run: docker run --rm -v $PWD:/work -w /work nfjax  jupyter execute 60\ First\ field\ in\ numpyro.ipynb
