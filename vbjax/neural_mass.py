@@ -69,14 +69,14 @@ epi_default_theta = EpiTheta(
 
 EpiState = collections.namedtuple(
     typename='EpiState',
-    field_names='x1 y1 z x2 y2'.split(' '))
+    field_names='x1 y1 z x2 y2 g'.split(' '))
 
 epi_default_state = EpiState(
-    x1=0, x2=-5, z=3, y1=0, y2=0)
+    x1=0.0, x2=-5.0, z=3.0, y1=0.0, y2=0.0, g=0.0)
 
 
 def epi_dfun(ys, c, p):
-    x1, y1, z, x2, y2 = ys
+    x1, y1, z, x2, y2, g = ys
 
     def f1(x1, x2):
         cond = x1 < 0
@@ -92,12 +92,13 @@ def epi_dfun(ys, c, p):
 
         return cond * if_true + (~cond) * if_false
 
-    def g(x1):
-        return 1
+    return np.array([y1 - f1(x1, x2) - z + p.I_rest1 + c,   # dx1
+                     p.y0 - 5 * x1 ** 2 - y1,               # dy1
+                     (1 / p.tau_0) * (4 * (x1 - p.x0) - z), # dz
 
-    return np.array([y1 - f1(x1, x2) - z + p.I_rest1 + c,
-                     p.y0 - 5 * x1 ** 2 - y1,
-                     (1 / p.tau_0) * (4 * (x1 - p.x0) - z),
                      -y2 + x2 - x2 ** 3 + p.I_rest2 +
-                     0.002 * g(x1) - 0.3 * (z - 3.5),
-                     (1 / p.tau_2) * (-y2 + f2(x1, x2))])
+                     0.002 * g - 0.3 * (z - 3.5),       # dx2
+                     (1 / p.tau_2) * (-y2 + f2(x1, x2)),    # dy2
+
+                     -0.01*(g - 0.1*x1)
+                     ])
