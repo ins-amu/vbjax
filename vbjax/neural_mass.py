@@ -102,3 +102,37 @@ def epi_dfun(ys, c, p):
 
                      -0.01*(g - 0.1*x1)
                      ])
+
+# Montbrio-Pazo-Roxin
+
+
+MPRTheta = collections.namedtuple(
+    typename='MPRTheta',
+    field_names='tau I Delta J eta cr cv'.split(' '))
+
+mpr_default_theta = MPRTheta(
+    tau=1.0,
+    I=0.0,
+    Delta=1.0,
+    J=15.0,
+    eta=-5.0,
+    cr=1.0,
+    cv=0.0
+)
+
+MPRState = collections.namedtuple(
+    typename='MPRState',
+    field_names='r V'.split(' '))
+
+mpr_default_state = MPRState(r=0.0, V=-2.0)
+
+def mpr_dfun(ys, c, p):
+    r, V = ys
+
+    I_c = p.cr * c[0] + p.cv * c[1]
+
+    return np.array([
+        (1 / p.tau) * (p.Delta / (np.pi * p.tau) + 2 * r * V),
+        (1 / p.tau) * (V ** 2 + p.eta + p.J * p.tau *
+         r + p.I + I_c - (np.pi ** 2) * (r ** 2) * (p.tau ** 2))
+    ])
