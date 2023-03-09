@@ -124,16 +124,15 @@ MPRState = collections.namedtuple(
     typename='MPRState',
     field_names='r V'.split(' '))
 
-# mpr_default_state = MPRState(r=0, V=-5)
-
+mpr_default_state = MPRState(r=0.0, V=-2.0)
 
 def mpr_dfun(ys, c, p):
     r, V = ys
 
-    cr = c[0]
-    cv = c[1]
+    I_c = p.cr * c[0] + p.cv * c[1]
 
     return np.array([
-        p.Delta / np.pi + 2 * r * V,
-        V ** 2 + p.eta + p.J * r + p.I - (np.pi ** 2) * (r ** 2)
+        (1 / p.tau) * (p.Delta / (np.pi * p.tau) + 2 * r * V),
+        (1 / p.tau) * (V ** 2 + p.eta + p.J * p.Tau *
+         r + p.I + I_c - (np.pi ** 2) * (r ** 2) * (p.tau ** 2))
     ])
