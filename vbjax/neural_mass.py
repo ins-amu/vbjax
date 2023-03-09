@@ -133,6 +133,6 @@ def mpr_dfun(ys, c, p):
 
     return np.array([
         (1 / p.tau) * (p.Delta / (np.pi * p.tau) + 2 * r * V),
-        (1 / p.tau) * (V ** 2 + p.eta + p.J * p.Tau *
+        (1 / p.tau) * (V ** 2 + p.eta + p.J * p.tau *
          r + p.I + I_c - (np.pi ** 2) * (r ** 2) * (p.tau ** 2))
     ])
