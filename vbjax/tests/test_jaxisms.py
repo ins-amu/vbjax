@@ -4,8 +4,17 @@ then probably things elsewhere will also break.
 
 """
 
+import numpy
 import jax
+import jax.dlpack
 import jax.test_util
+
+
+def test_dlpack_numpy():
+    x = numpy.random.randn(10)
+    jx = jax.dlpack.from_dlpack(x.__dlpack__())
+    nx = numpy.from_dlpack(x)
+    numpy.testing.assert_allclose(x, nx)
 
 def test_custom_vjp_simple():
 
