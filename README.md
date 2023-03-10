@@ -2,15 +2,7 @@
 
 `vbjax` is a Jax-based package for working with virtual brain style models.
 
-### conda
+Installs with `pip install vbjax`, or manually install dependencies with
+`pip install numpy scipy jax` or `conda install -y numpy scipy jax`.
 
-The primary dependency `jax` is easily installable with conda, e.g.
-
-```
-curl -LO https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh -p $SCRATCH/conda-vbjax -b
-. $SCRATCH/conda-vbjax/bin/activate
-conda install -y -q jax
-pip install vbjax
-```
-
+Please see various notebooks and unit tests for usage.
