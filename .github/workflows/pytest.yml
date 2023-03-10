@@ -9,9 +9,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: setup python
-        run: sudo apt-get update && sudo apt-get install -y python3-{pip,numpy,scipy}
-      - name: pip install jax
-        run: pip install jax jaxlib pytest
+        run: sudo apt-get update && sudo apt-get install -y python3-pip
+      - name: pip install packages
+        run: pip install numpy scipy jax jaxlib pytest
       - name: run tests
         run: pytest
 
