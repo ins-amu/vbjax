@@ -4,17 +4,24 @@ on:
   push:
 
 jobs:
-  pytest:
+  ubuntu-pip:
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v3
-
       - name: setup python
         run: sudo apt-get update && sudo apt-get install -y python3-{pip,numpy,scipy}
-
-      - name: install jax
+      - name: pip install jax
         run: pip install jax jaxlib pytest
-
       - name: run tests
         run: pytest
+
+  conda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup python
+        run: |
+          curl -s https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh | bash -s -q -p $PWD/conda
+          . conda/bin/activate && conda install numpy scipy jax pytest
+      - name: run tests
+        run: . conda/bin/activate && pytest
