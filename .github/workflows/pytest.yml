@@ -8,11 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      - name: Check out repository code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: build docker image
-        run: docker build -t nfjax -f Dockerfile
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-      - name: run tests in container
-        run: docker run --rm -v $PWD:/work -w /work nfjax pytest
+      - name: run tests
+        run: pytest

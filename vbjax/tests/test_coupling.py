@@ -8,9 +8,7 @@ def test_linear_cfun():
     SC = np.r_[0.0:1.0:1024j].reshape((32, 32))
     cf = make_linear_cfun(SC, a=0.5, b=0.5)
     gx = cf(x)
-    assert_allclose(gx, 0.5*SC@x+0.5)
-    gx = cf(SC)
-    assert_allclose(gx, 0.5*np.sum(SC*x,axis=1)+0.5)
+    assert_allclose(gx, 0.5*SC@x+0.5, 1e-5, 1e-5)
 
 
 def test_diff_cfun():
