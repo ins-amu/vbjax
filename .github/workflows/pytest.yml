@@ -24,7 +24,7 @@ jobs:
       - name: setup python
         run: |
           wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-          bash https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -q -p $PWD/conda
+          bash Miniconda3-latest-Linux-x86_64.sh -q -p $PWD/conda
           . conda/bin/activate && conda install numpy scipy jax pytest
       - name: run tests
         run: . conda/bin/activate && pytest
