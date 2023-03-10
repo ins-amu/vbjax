@@ -15,6 +15,7 @@ dependencies = [
     "numpy",
     "jax",
     "jaxlib",
+    "scipy"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
