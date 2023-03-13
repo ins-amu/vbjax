@@ -38,3 +38,8 @@ def test_custom_vjp_simple():
     jax.grad(bar, [0,1])(3.,4.)
 
     jax.test_util.check_grads(bar, (3.0, 4.0), order=1, modes=('rev',))
+
+
+if __name__ == '__main__':
+    test_dlpack_numpy()
+    test_custom_vjp_simple()
