@@ -14,6 +14,6 @@ Please see various notebooks and unit tests for usage.
 ```
 git clone https://github.com/ins-amu/vbjax
 cd vbjax
-pip install .[test]
+pip install '.[test]'
 pytest
 ```
