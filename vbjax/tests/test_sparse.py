@@ -4,40 +4,37 @@ import jax.test_util
 import jax.dlpack
 import jax.numpy as jnp
 import scipy.sparse
+import vbjax
 
 
-def test_csr_scipy():
-    n = 10
-    A: scipy.sparse.csr_matrix = scipy.sparse.random(n, n, density=0.1).tocsr()
+def _test_spmv(spmv, A, n):
     nx = np.random.randn(n)
     jx = jnp.array(nx)
 
-    @jax.custom_vjp
-    def matvec(x):
-        nb = A @ np.from_dlpack(x)
-        db = jax.dlpack.from_dlpack(nb.__dlpack__())
-        return db
-
-    def matvec_tr(x):
-        nb = A.T @ np.from_dlpack(x)
-        db = jax.dlpack.from_dlpack(nb.__dlpack__())
-        return db
-
-    def matvec_fwd(x):
-        return matvec(x), None
-
-    def matvec_bwd(res, g):
-        return matvec_tr(g),
-
-    matvec.defvjp(matvec_fwd, matvec_bwd)
-
     # test the function itself
-    jb = matvec(jx)
+    jb = spmv(jx)
     nb = A @ nx
     np.testing.assert_allclose(jb, nb, 1e-6, 1e-6)
 
     # now its gradient
-    jax.test_util.check_grads(matvec, (jx,), order=1, modes=('rev',))
+    jax.test_util.check_grads(spmv, (jx,), order=1, modes=('rev',))
+
+
+def test_csr_scipy():
+    n = 10
+    A = scipy.sparse.random(n, n, density=0.1).tocsr()
+    spmv = vbjax.make_spmv(A)
+    _test_spmv(spmv, A, n)
+
+
+def test_csr_scipy_symm():
+    n = 10
+    A = scipy.sparse.random(n, n, density=0.1).tocsr()
+    A += A.T
+    spmv = vbjax.make_spmv(A, is_symmetric=True)
+    _test_spmv(spmv, A, n)
+
 
 if __name__ == '__main__':
     test_csr_scipy()
+    test_csr_scipy_symm()
