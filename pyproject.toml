@@ -25,6 +25,13 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "pytest-xdist",
+  "pytest-benchmark"
+]
+
 [project.urls]
 "Homepage" = "https://github.com/ins-amu/vbjax"
 "Bug Tracker" = "https://github.com/ins-amu/vbjax/issues"
