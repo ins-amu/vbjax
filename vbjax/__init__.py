@@ -5,4 +5,5 @@ from .regmap import make_region_mapping
 from .coupling import make_diff_cfun, make_linear_cfun
 from .connectome import make_conn_latent_mvnorm
 from .sparse import make_spmv
+from .layers import make_dense_layers
 from ._version import __version__
