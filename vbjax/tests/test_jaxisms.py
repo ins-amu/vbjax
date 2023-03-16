@@ -13,7 +13,7 @@ import jax.test_util
 def test_dlpack_numpy():
     x = numpy.random.randn(10)
     jx = jax.dlpack.from_dlpack(x.__dlpack__())
-    nx = numpy.from_dlpack(x)
+    nx = numpy.from_dlpack(jx)
     numpy.testing.assert_allclose(x, nx)
 
 def test_custom_vjp_simple():
