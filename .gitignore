@@ -2,3 +2,7 @@
 __pycache__
 *.swp
 .vscode
+*.ipynb
+*.npz
+hall_of_fame_*
+wiki
