@@ -15,7 +15,8 @@ dependencies = [
     "numpy",
     "jax",
     "jaxlib",
-    "scipy"
+    "scipy",
+    "numpyro",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -26,10 +27,15 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = [
+dev = [
   "pytest",
   "pytest-xdist",
-  "pytest-benchmark"
+  "pytest-benchmark",
+  "twine",
+  "build",
+  "tqdm",
+  "jupyter",
+  "matplotlib",
 ]
 
 [project.urls]
@@ -40,9 +46,6 @@ test = [
 include = [
     "vbjax/**",
 ]
-
-[tool.setuptools_scm]
-write_to = "vbjax/_version.py"
 
 [tool.hatch.version]
 path = "vbjax/_version.py"
