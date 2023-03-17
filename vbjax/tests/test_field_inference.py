@@ -3,6 +3,8 @@ import numpyro
 import jax
 import jax.numpy as jnp
 from numpyro.infer import MCMC, NUTS, SVI, Trace_ELBO
+import pytest
+
 import vbjax
 
 
@@ -30,6 +32,7 @@ def setup_model():
     return x0, xt, logp
 
 
+@pytest.mark.slow
 def test_sht_ode_nuts():
     x0, xt, logp = setup_model()
     nuts_kernel = NUTS(logp)
