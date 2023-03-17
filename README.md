@@ -2,18 +2,28 @@
 
 `vbjax` is a Jax-based package for working with virtual brain style models.
 
-## Usage
-
 Installs with `pip install vbjax`, or manually install dependencies with
 `pip install numpy scipy jax jaxlib` or `conda install -y numpy scipy jax`.
 
-Please see various notebooks and unit tests for usage.
+## Examples
+
+
 
 ## Development
-
 ```
 git clone https://github.com/ins-amu/vbjax
 cd vbjax
-pip install '.[test]'
+pip install '.[dev]'
 pytest
 ```
+
+## Releases
+a release of version `v1.2.3` requires following steps
+- [ ] `git checkout main` tag releases from main for now
+- [ ] edit `_version.py` to have correct release number
+- [ ] `git tag v1.2.3` creates tag from branch
+- [ ] `git push origin v1.2.3` pushes git tag to github
+- [ ] use GitHub UI to create new release
+- [ ] `pip install '.[dev]'` ensures twine & build tools available
+- [ ] `python -m build` builds wheels & source dists
+- [ ] `twine upload dist/*` uploads to PyPI
