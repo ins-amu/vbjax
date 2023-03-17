@@ -7,4 +7,5 @@ from .connectome import make_conn_latent_mvnorm
 from .sparse import make_spmv
 from .layers import make_dense_layers
 from .diagnostics import shrinkage_zscore
+from .embed import embed_neural_flow
 from ._version import __version__

@@ -4,3 +4,5 @@ __pycache__
 .vscode
 *.ipynb
 *.npz
+hall_of_fame_*
+wiki
