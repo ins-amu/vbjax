@@ -6,3 +6,5 @@ __pycache__
 *.npz
 hall_of_fame_*
 wiki
+insference
+dist
