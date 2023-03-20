@@ -1,3 +1,4 @@
+import itertools
 import jax
 import jax.numpy as np
 from jax.example_libraries.optimizers import adam
@@ -79,3 +80,98 @@ def embed_neural_flow(y, embed_dim=3, latent_dim=[256], iters=8000, step_size=0.
     # return embedded data
     return xp, trace, nn_f, p
 
+
+def embed_polynomial(x, y=None, max_order=2):
+    """
+    Embed a dataset using a polynomial basis.
+
+    Parameters
+    ----------
+    x : array
+        The dataset to embed, with shape (n_dim, n_sample).
+    y : array, optional
+        The target data for a polynomial regression, (n_target, n_sample).
+    max_order : int
+        The maximum order of the polynomial basis.
+
+    Returns
+    -------
+    basis : array
+        The polynomial basis, with shape (n_basis, n_sample).
+    coef : array, optional
+        The coefficients of the polynomial regression, with shape (n_basis, n_target).
+        This is only returned if `y` is provided.
+
+    Notes
+    -----
+    The loss can be computed by 
+    >>> np.square(coef.T @ basis - Y).sum()
+
+    """
+
+    n_dim = len(x)
+    n_samp = len(x.T)
+    basis = [np.ones((1, n_samp))]
+
+    # construct columns of A matrix
+    for order in range(1, max_order+1):
+        all_idx = itertools.product(*([range(n_dim)] * order))
+        x_idx = list({tuple(sorted(idx)): None for idx in all_idx}.keys())
+        basis.append(np.prod(x[np.array(x_idx)], axis=1))
+    basis = np.concatenate(basis, axis=0)
+
+    if y is None:
+        return basis
+
+    # compute least square solution
+    coef, *_ = np.linalg.lstsq(basis.T, y.T, rcond=None)
+
+    return basis, coef
+
+
+def embed_gradient(x, n_grads=2, axis=1):
+    """
+    Embed a dataset using repeated `np.gradient` calls to compute
+    derivatives, usually for time series data.
+
+    Parameters
+    ----------
+    x : array
+        The dataset to embed, shape (n_dim, n_time, ...).
+    n_grads : int
+        The number of derivatives to compute.
+
+    Returns
+    -------
+    basis : array
+        The derivative basis, with shape (n_grads, n_dim, n_time, ...).
+
+    """
+    xs = [x]
+    for i in range(n_grads):
+        xs.append(np.gradient(xs[-1], axis=1))
+    return np.array(xs)
+
+
+def embed_autoregress(x, n_lag=3, lag=1):
+    """
+    Embed a dataset as an autoregressive process,
+    usually for time series data.
+
+    Parameters
+    ----------
+    x : array
+        The dataset to embed, shape (n_dim, n_time, ...).
+    n_lag : int
+        The number of lags to use.
+    lag : int, default 1
+        The lag to use.
+
+    Returns
+    -------
+    basis : array
+        The autoregressive basis, with shape (n_lag, n_dim, n_time - lag*n_lag, ...)
+
+    """
+    xs = np.array([x[:, i*lag:(-n_lag+i)*lag] for i in range(n_lag)])
+    return xs
