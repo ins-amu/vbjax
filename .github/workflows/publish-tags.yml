@@ -15,10 +15,10 @@ jobs:
       - name: pip install dependencies
         run: pip install '.[dev]'
       - name: run tests
-        run: pytest
+        run: pytest -m 'not slow'
       - name: build packages
         run: python -m build
       - name: upload packages to pypi
-        run: twine upload -u __token__ -p "$PYPIUPLOAD" dist/*
+        run: twine upload -u __token__ -p "${{ secrets.PYPIUPLOAD }}" dist/*
 
 
