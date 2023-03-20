@@ -81,7 +81,6 @@ def embed_neural_flow(y, embed_dim=3, latent_dim=[256], iters=8000, step_size=0.
     return xp, trace, nn_f, p
 
 
-
 def embed_polynomial(x, y=None, max_order=2):
     """
     Embed a dataset using a polynomial basis.
@@ -128,3 +127,51 @@ def embed_polynomial(x, y=None, max_order=2):
     coef, *_ = np.linalg.lstsq(basis.T, y.T, rcond=None)
 
     return basis, coef
+
+
+def embed_gradient(x, n_grads=2, axis=1):
+    """
+    Embed a dataset using repeated `np.gradient` calls to compute
+    derivatives, usually for time series data.
+
+    Parameters
+    ----------
+    x : array
+        The dataset to embed, shape (n_dim, n_time, ...).
+    n_grads : int
+        The number of derivatives to compute.
+
+    Returns
+    -------
+    basis : array
+        The derivative basis, with shape (n_grads, n_dim, n_time, ...).
+
+    """
+    xs = [x]
+    for i in range(n_grads):
+        xs.append(np.gradient(xs[-1], axis=1))
+    return np.array(xs)
+
+
+def embed_autoregress(x, n_lag=3, lag=1):
+    """
+    Embed a dataset as an autoregressive process,
+    usually for time series data.
+
+    Parameters
+    ----------
+    x : array
+        The dataset to embed, shape (n_dim, n_time, ...).
+    n_lag : int
+        The number of lags to use.
+    lag : int, default 1
+        The lag to use.
+
+    Returns
+    -------
+    basis : array
+        The autoregressive basis, with shape (n_lag, n_dim, n_time - lag*n_lag, ...)
+
+    """
+    xs = np.array([x[:, i*lag:(-n_lag+i)*lag] for i in range(n_lag)])
+    return xs
