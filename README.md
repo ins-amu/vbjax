@@ -27,20 +27,54 @@ for Jax to discover the GPU(s).
 
 Here's an all-to-all connected network with Montbrio-Pazo-Roxin
 mass model dynamics,
+
 ```python
-import jax.random as jr
 import vbjax as vb
+import jax.numpy as np
 
 def network(x, p):
     c = 0.03*x.sum(axis=1)
     return vb.mpr_dfun(x, c, p)
 
 _, loop = vb.make_sde(dt=0.01, dfun=network, gfun=0.1)
-zs = vb.randn(2000, 2, 32)
+zs = vb.randn(500, 2, 32)
 xs = loop(zs[0], zs[1:], vb.mpr_default_theta)
+vb.plot_states(xs, 'rV', jpg='example1', show=True)
 ```
 ![](example1.jpg)
-See [`examples.py`](examples.py) for more examples.
+
+While integrators and mass models tend to be the same across publications, but
+the network model itself varies (regions vs surface, stimulus etc), vbjax allows
+user to focus on defining the `network` and then getting time series.  Because
+the work is done by Jax, this is all auto-differentiable, GPU-able so friendly to
+use with common machine learning algorithms.
+
+Here's a neural field,
+```python
+import jax.numpy as np
+import vbjax as vb
+
+# setup local connectivity
+lmax, nlat, nlon = 16, 32, 64
+lc = vb.make_shtdiff(lmax=lmax, nlat=nlat, nlon=nlon)
+
+# network dynamics
+def net(x, p):
+    c = lc(x[0]), 0.0
+    return vb.mpr_dfun(x, c, p)
+
+# solution + plot
+x0 = vb.randn(2, nlat, nlon)*0.5 + np.r_[0.2,-2.0][:,None,None]
+_, loop = vb.make_sde(0.1, net, 0.2)
+zs = vb.randn(500, 2, nlat, nlon)
+xt = loop(x0, zs, vb.mpr_default_theta._replace(eta=-3.9, cr=5.0))
+vb.make_field_gif(xt[::10], 'example2.gif')
+
+```
+![](example2.gif)
+
+This example shows how the field forms patterns gradually despite the
+noise in the simulation.
 
 ## Development
 ```
