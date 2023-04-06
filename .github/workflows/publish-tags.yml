@@ -1,0 +1,23 @@
+name: build & push tags to pypi
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  ubuntu-pip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup python
+        run: sudo apt-get update && sudo apt-get install -y python3-pip
+      - name: pip install dependencies
+        run: pip install '.[dev]'
+      - name: run tests
+        run: pytest -m 'not slow'
+      - name: build packages
+        run: python -m build
+      - name: upload packages to pypi
+        run: twine upload -u __token__ -p "${{ secrets.PYPIUPLOAD }}" dist/*
+

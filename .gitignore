@@ -1,0 +1,11 @@
+.ipynb_checkpoints
+__pycache__
+*.swp
+.vscode
+*.ipynb
+*.npz
+hall_of_fame_*
+wiki
+insference
+dist
+.cache
