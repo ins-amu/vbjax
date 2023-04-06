@@ -142,7 +142,7 @@ The prebuilt image is the best route:
 ```
 TODO
 ```
-</summary>
+</details>
 
 ## Development
 
