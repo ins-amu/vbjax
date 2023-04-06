@@ -37,6 +37,7 @@ dev = [
   "jupyter",
   "matplotlib",
   "joblib",
+  "grip",
 ]
 
 [project.urls]
