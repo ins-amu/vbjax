@@ -14,6 +14,11 @@ from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_au
 from ._version import __version__
 
 
+def use_many_cores(n):
+    import os
+    os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=%d' % n
+
+
 # some random setup for convenience
 from jax import random
 key = random.PRNGKey(42)

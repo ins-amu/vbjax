@@ -76,7 +76,76 @@ vb.make_field_gif(xt[::10], 'example2.gif')
 This example shows how the field forms patterns gradually despite the
 noise in the simulation.
 
+## HPC usage
+
+We use this on HPC systems, most easily with container images.
+
+<details><summary>CSCS Piz Daint</summary>
+
+Useful modules
+```bash
+module load daint-gpu
+module load cudatoolkit/11.2.0_3.39-2.1__gf93aa1c
+module load TensorFlow
+```
+then install in some Python environment; the default works fine
+```bash
+pip3 install "jax[cuda]==0.3.8" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip3 install "jaxlib==0.3.8+cuda11.cudnn805" -U -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+This provides an older version of JAX unfortunately. 
+
+The Sarus runtime can be used to make use of latest versions of vbjax and jax:
+```bash
+$ module load daint-gpu
+$ module load sarus
+$ sarus pull ghcr.io/ins-amu/vbjax:main
+...
+$ srun -p debug -A ich042 -C gpu --pty sarus run ghcr.io/ins-amu/vbjax:main python3 -c 'import jax; print(jax.numpy.zeros(32).device())'
+...
+gpu:0
+```
+</details>
+
+<details><summary>JSC JUSUF</summary>
+
+A nice module is available to get CUDA libs
+```bash
+module load cuDNN/8.6.0.163-CUDA-11.7
+```
+then you might set up a conda env,
+```bash
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh -b -p ~/conda
+. ~/conda/bin/activate
+conda create -n jax python=3.9 numpy scipy
+source activate jax
+```
+once you have an env, install the CUDA-enabled JAX
+```bash
+pip3 install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
+and check it works
+```bash
+(jax) [woodman1@jsfl02 ~]$ srun -A icei-hbp-2021-0002 -p develgpus --pty python3 -c 'import jax.numpy as np ; print(np.zeros(32).device())'
+gpu:0
+```
+JSC also makes Singularity available, so the prebuilt image can be used
+```
+TODO
+```
+</details>
+
+<details><summary>CEA</summary>
+
+The prebuilt image is the best route:
+```
+TODO
+```
+</summary>
+
 ## Development
+
 ```
 git clone https://github.com/ins-amu/vbjax
 cd vbjax
@@ -84,7 +153,20 @@ pip install '.[dev]'
 pytest
 ```
 
-## Releases
+### Installing SHTns
+
+This library is used for some testing.  It is impossible to install on 
+Windows natively, so WSLx is required.  
+
+On macOS,
+```bash
+brew install fftw
+git clone https://bitbucket.org/nschaeff/shtns
+./configure --enable-python --disable-simd --prefix=/opt/homebrew
+make -j && make install && python setup.py install
+```
+
+### Releases
 a release of version `v1.2.3` requires following steps
 - [ ] `git checkout main`: tag releases from main for now
 - [ ] edit `_version.py` to have correct release number
