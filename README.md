@@ -13,9 +13,14 @@ pip install .[dev]
 The primary additional dependency of vbjax is
 [JAX](github.com/google/jax), which itself depends only on
 NumPy, SciPy & opt-einsum, so it should be safe to add to your
-existing projects.
+existing projects. Check Jax docs for CUDA use, but after the above
+`pip` step,
+```bash
+pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
 
-Container images are available and auto-built w/
+*BUT* because GPU software stack versions make aligning stars look like child's play,
+container images are available and auto-built w/
 [GitHub Actions](.github/workflows/docker-image.yml), so you can use w/ Docker
 ```bash
 docker run --rm -it ghcr.io/ins-amu/vbjax:main python3 -c 'import vbjax; print(vbjax.__version__)'
@@ -49,6 +54,8 @@ user to focus on defining the `network` and then getting time series.  Because
 the work is done by Jax, this is all auto-differentiable, GPU-able so friendly to
 use with common machine learning algorithms.
 
+### Neural field
+
 Here's a neural field,
 ```python
 import jax.numpy as np
@@ -75,6 +82,53 @@ vb.make_field_gif(xt[::10], 'example2.gif')
 
 This example shows how the field forms patterns gradually despite the
 noise in the simulation.
+
+### Fitting an autoregressive process
+
+Here's a 1-lag MVAR
+```python
+import jax
+import jax.numpy as np
+import vbjax as vb
+
+nn = 8
+true_A = vb.randn(nn,nn)
+_, loop = vb.make_sde(1, lambda x,A: -x+(A*x).mean(axis=1), 1)
+x0 = vb.randn(nn)
+zs = vb.randn(1000, nn)
+xt = loop(x0, zs, true_A)
+```
+`xt` and `true_A` are the simulated time series and ground truth
+interaction matrices. 
+
+To fit anything we need a loss function & gradient descent,
+```python
+
+def loss(est_A):
+    return np.sum(np.square(xt - loop(x0, zs, est_A)))
+
+grad_loss = jax.grad(loss)
+est_A = np.ones((nn, nn))*0.3  # wrong
+for i in range(51):
+    est_A = est_A - 0.01*grad_loss(est_A)
+    if i % 10 == 0:
+        print('step', i, 'log loss', np.log(loss(est_A)))
+
+print('mean sq err', np.square(est_A - true_A).mean())
+```
+which prints
+```
+step 0 log loss 5.8016257
+step 10 log loss 3.687574
+step 20 log loss 1.7174681
+step 30 log loss -0.15798996
+step 40 log loss -1.9851608
+step 50 log loss -3.7805486
+mean sq err 8.422789e-05
+```
+This is a pretty simple example but it's meant to show that any model
+you build with vbjax like this is usable with optimization or NumPyro's
+MCMC algorithms.
 
 ## HPC usage
 
