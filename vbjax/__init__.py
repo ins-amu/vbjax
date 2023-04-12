@@ -1,3 +1,18 @@
+
+# default to setting up many cores
+def _use_many_cores():
+    import os, sys
+    import multiprocessing as mp
+    if 'XLA_FLAGS' not in os.environ:
+        n = mp.cpu_count()
+        value = '--xla_force_host_platform_device_count=%d' % n
+        os.environ['XLA_FLAGS'] = value
+    else:
+        sys.stderr.write('XLA_FLAGS already set\n')
+
+_use_many_cores()
+
+# import stuff
 from .loops import make_sde, make_ode, make_dde, make_sdde
 from .shtlc import make_shtdiff
 from .neural_mass import (
@@ -5,7 +20,9 @@ from .neural_mass import (
         MPRState, MPRTheta, mpr_dfun, mpr_default_theta,
         )
 from .regmap import make_region_mapping
-from .coupling import make_diff_cfun, make_linear_cfun
+from .coupling import (
+        make_diff_cfun, make_linear_cfun, make_delayed_coupling
+        )
 from .connectome import make_conn_latent_mvnorm
 from .sparse import make_spmv
 from .layers import make_dense_layers
@@ -13,18 +30,18 @@ from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
 from ._version import __version__
 
-
-def use_many_cores(n):
-    import os
-    os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=%d' % n
-
-
 # some random setup for convenience
 from jax import random
+from jax import numpy as np
 key = random.PRNGKey(42)
 keys = random.split(key, 100)
 def randn(*shape, key=key):
     return random.normal(key, shape)
+
+def randn_connectome(n, key=key):
+    w, l = np.abs(randn(2, n, n, key=key))
+    l = l * 100
+    return w+w.T, l+l.T
 
 # some simple plots
 def plot_states(xs, names=None, jpg=None, show=False):

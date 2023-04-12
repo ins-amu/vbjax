@@ -8,20 +8,45 @@ import jax.numpy as np
 
 
 def make_sde(dt, dfun, gfun):
-    """Use a stochastic Heun scheme to integrate `dfun` & `gfun` at a time step `dt`.
+    """Use a stochastic Heun scheme to integrate autonomous stochastic
+    differential equations (SDEs).
 
-    - `dfun(x, p)` computes drift coefficients of the model
-    - `gfun(x, p)` computes diffusion coefficients.
+    Parameters
+    ==========
+    dt : float
+        Time step
+    dfun : function
+        Function of the form `dfun(x, p)` that computes drift coefficients of
+        the stochastic differential equation.
+    gfun : function or float
+        Function of the form `gfun(x, p)` that computes diffusion coefficients
+        of the stochastic differential equation. If a numerical value is
+        provided, this is used as a constant diffusion coefficient for additive
+        linear SDE.
 
-    As a shortcut, a numerical value can be passed as the `gfun` for additive SDE cases.
+    Returns
+    =======
+    step : function
+        Function of the form `step(x, z_t, p)` that takes one step in time
+        according to the Heun scheme.
+    loop : function
+        Function of the form `loop(x0, zs, p)` that iteratively calls `step`
+        for all `z`.
 
-    This function constructs and returns two functions: step and loop.
-
-    - `step(x, z_t, p)`: takes one step in time according to the Heun scheme. 
-    - `loop(x0, zs, p)`: iteratively calls `step` for all `z`.
+    Notes
+    =====
 
     In both cases, a Jax compatible parameter set `p` is provided, either an array
     or some pytree compatible structure.
+
+    Note that the integrator does not sample normally distributed noise, so this
+    must be provided by the user.
+
+
+    >>> import vbjax as vb
+    >>> _, sde = vb.make_sde(1.0, lambda x, p: -x, 0.1)
+    >>> sde(1.0, vb.randn(4), None)
+    Array([ 0.5093468 ,  0.30794007,  0.07600437, -0.03876263], dtype=float32)
 
     """
 
@@ -50,17 +75,36 @@ def make_sde(dt, dfun, gfun):
 
 
 def make_ode(dt, dfun):
-    """Use a deterministic Heun scheme to integrate `dfun` at a time step `dt`.
+    """Use a Heun scheme to integrate autonomous ordinary differential
+    equations (ODEs).
 
-    - `dfun(x, p)` computes derivatives of the model
+    Parameters
+    ==========
+    dt : float
+        Time step
+    dfun : function
+        Function of the form `dfun(x, p)` that computes derivatives of the
+        ordinary differential equations.
 
-    This function constructs and returns two functions: step and loop.
+    Returns
+    =======
+    step : function
+        Function of the form `step(x, t, p)` that takes one step in time
+        according to the Heun scheme.
+    loop : function
+        Function of the form `loop(x0, ts, p)` that iteratively calls `step`
+        for all time steps `ts`.
 
-    - `step(x, t, p)`: takes one step in time according to the Heun scheme. 
-    - `loop(x0, ts, p)`: iteratively calls `step` for all `z`.
+    Notes
+    =====
 
     In both cases, a Jax compatible parameter set `p` is provided, either an array
     or some pytree compatible structure.
+
+    >>> import vbjax as vb, jax.numpy as np
+    >>> _, ode = vb.make_ode(1.0, lambda x, p: -x)
+    >>> ode(1.0, np.r_[:4], None)
+    Array([0.5   , 0.25  , 0.125 , 0.0625], dtype=float32, weak_type=True)
 
     """
 
@@ -81,66 +125,59 @@ def make_ode(dt, dfun):
 
 
 def make_dde(dt, nh, dfun, unroll=10):
-    """Use a deterministic Heun scheme to integrate `dfun` at a time step `dt`,
-    with maximum time delay (in steps) provided by `nh`. If `nh` is zero, this
-    function invokes `make_ode`.
+    "Invokes make_sdde w/ gfun 0."
+    return make_sdde(dt, nh, dfun, 0, unroll)
 
-    - `dfun(xt, x, t p)` computes derivatives of the model
 
-    where
+def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False):
+    """Use a stochastic Heun scheme to integrate autonomous
+    stochastic delay differential equations (SDEs).
 
-    - `xt` is a buffer of shape (nsvar, nh + ntime)
-    - `x` is the current state variable vector
-    - `t` is the current time index
-    - `p` is the parameter set
+    Parameters
+    ==========
+    dt : float
+        Time step
+    nh : int
+        Maximum delay in time steps.
+    dfun : function
+        Function of the form `dfun(xt, x, t, p)` that computes drift coefficients of
+        the stochastic differential equation.
+    gfun : function or float
+        Function of the form `gfun(x, p)` that computes diffusion coefficients
+        of the stochastic differential equation. If a numerical value is
+        provided, this is used as a constant diffusion coefficient for additive
+        linear SDE.
 
-    The extra arguments `xt` & `t` enable time delay implementations; see
-    example notebooks.
+    Returns
+    =======
+    step : function
+        Function of the form `step((x_t,t), z_t, p)` that takes one step in time
+        according to the Heun scheme.
+    loop : function
+        Function of the form `loop((xs, t), p)` that iteratively calls `step`
+        for each `xs[nh:]` and starting time index `t`.
 
-    This function constructs and returns two functions: step and loop.
+    Notes
+    =====
 
-    - `step(x, t, p)`: takes one step in time according to the Heun scheme. 
-    - `loop(xt, ts, p)`: iteratively calls `step` for all `z`.
+    - A Jax compatible parameter set `p` is provided, either an array
+      or some pytree compatible structure.
+    - The integrator does not sample normally distributed noise, so this
+      must be provided by the user.
+    - The history buffer passed to the user functions, on the corrector
+      stage of the Heun method, does not contain the predictor stage, for
+      performance reasons, unless `zero_delays` is set to `True`.
+      A good compromise can be to set all zero delays to dt.
 
-    In both cases, a Jax compatible parameter set `p` is provided, either an array
-    or some pytree compatible structure.
-
-    Indexing out of bounds in Jax is undefined behavior, so if `nh` is not
-    large enough, or the buffer `xt` is not long enough for the delays used
-    by `dfun`, the result will be silently incorrect.
+    >>> import vbjax as vb, jax.numpy as np
+    >>> _, sdde = vb.make_sdde(1.0, 2, lambda xt, x, t, p: -xt[t-2], 0.0)
+    >>> x,t = sdde(np.ones(6)+10, None)
+    >>> x
+    Array([ 11.,  11.,  11.,   0., -11., -22.], dtype=float32)
 
     """
 
-    if nh == 0:
-        print('nh==0: using make_ode to avoid overhead')
-        dfun_ = lambda x, p: dfun(x.reshape((-1, 1)), x, 0, p)
-        step, loop = make_ode(dt, dfun_)
-        def loop_(xt, ts, p):
-            return loop(xt[:,0], ts, p).T
-        return step, loop_
-
-    def step(xt, t, p):
-        x = xt[:, nh + t]
-        d1 = dfun(xt, x, t, p)
-        xi = x + dt*d1
-        xt = xt.at[:, nh + t + 1].set(xi)
-        d2 = dfun(xt, xi, t+1, p)
-        nx = x + dt*0.5*(d1 + d2)
-        xt = xt.at[:, nh + t + 1].set(nx)
-        return xt, nx
-
-    @jax.jit
-    def loop(xt, ts, p):
-        op = lambda xt, t: step(xt, t, p)
-        return jax.lax.scan(op, xt, ts, unroll=unroll)[0]
-
-    return step, loop
-
-
-
-def make_sdde(dt, nh, dfun, gfun, unroll=10):
-    "Combines semantics of make_dde & make_sde; TODO docstring"
-
+    heun = True
     sqrt_dt = np.sqrt(dt)
 
     # TODO nh == 0: return make_sde(dt, dfun, gfun) etc
@@ -150,23 +187,28 @@ def make_sdde(dt, nh, dfun, gfun, unroll=10):
         sig = gfun
         gfun = lambda *_: sig
 
-    def step(xt, zt, p):
-        "xt is buffer, zt is (ts[i], zs[i]), p is parameters."
-        t, z_t = zt
+    def step(xt_t, z_t, p):
+        xt, t = xt_t
+        x = xt[nh + t]
         noise = gfun(x, p) * sqrt_dt * z_t
-        x = xt[:, nh + t]
         d1 = dfun(xt, x, t, p)
         xi = x + dt*d1 + noise
-        xt = xt.at[:, nh + t + 1].set(xi)
-        d2 = dfun(xt, xi, t+1, p)
-        nx = x + dt*0.5*(d1 + d2) + noise
-        xt = xt.at[:, nh + t + 1].set(nx)
-        return xt, nx
+        if heun:
+            if zero_delays:
+                # severe performance hit (5x+)
+                xt = xt.at[nh + t + 1].set(xi)
+            d2 = dfun(xt, xi, t+1, p)
+            nx = x + dt*0.5*(d1 + d2) + noise
+        else:
+            nx = xi
+        xt = xt.at[nh + t + 1].set(nx)
+        return (xt,t+1), nx
 
     @jax.jit
-    def loop(xt, zt, p):
+    def loop(xt, p, t=0):
         "xt is the buffer, zt is (ts, zs), p is parameters."
-        op = lambda xt, tz: step(xt, zt, p)
-        return jax.lax.scan(op, xt, zt, unroll=unroll)[0]
+        op = lambda xt, tz: step(xt, tz, p)
+        return jax.lax.scan(op, (xt,t), xt[nh:], unroll=unroll)[0]
 
     return step, loop
+

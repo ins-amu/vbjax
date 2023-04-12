@@ -1,8 +1,41 @@
 """
 Predefined couplings of interest for most applications.
+
 """
 
 import jax.numpy as np
+
+
+def make_delayed_coupling(weights, delay_steps, pre, post, nh, isvar):
+    """
+    Construct a dense delayed coupling function. 
+
+    Parameters
+    ==========
+    weights : array
+        Coupling weights.
+    delay_steps : array
+        Number of delay steps per connection i, j.
+
+    ...
+    To be finished
+    ...
+
+    Notes
+    =====
+
+    - This construction assumes a particular layout for the history
+      buffer: xt.shape == (nh+1+nt, nsvar, nnode, ...). 
+
+    """
+    nn = weights.shape[0]
+    nodes = np.tile(np.r_[:nn], (nn, 1))
+    def cfun(t, xt, x, params):
+        dx = xt[nh + t - delay_steps, isvar, nodes]
+        xij = pre(dx, x, params)
+        gx = (weights * xij).sum(axis=1)
+        return post(gx, params)
+    return cfun
 
 
 def make_linear_cfun(SC, a=1.0, b=0.0):

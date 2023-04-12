@@ -5,7 +5,8 @@ import scipy.special as sp
 try:
     import shtns
 except ImportError:
-    print('** shtns is not available')
+    import sys
+    sys.stderr.write('** shtns is not available\n')
 
 
 # Grid functions
