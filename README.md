@@ -4,7 +4,7 @@
 
 ## Installation
 
-Installs with `pip install vbjax`, but you use the source,
+Installs with `pip install vbjax`, but you can use the source,
 ```bash
 git clone https://github.com/ins-amu/vbjax
 cd vbjax

@@ -38,6 +38,8 @@ dev = [
   "matplotlib",
   "joblib",
   "grip",
+  "python-lsp-server[all]",
+  "jedi-language-server",
 ]
 
 [project.urls]
