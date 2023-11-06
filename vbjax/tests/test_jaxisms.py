@@ -9,6 +9,8 @@ import jax
 import jax.dlpack
 import jax.test_util
 
+import vbjax
+
 
 def test_dlpack_numpy():
     x = numpy.random.randn(10)
@@ -40,6 +42,42 @@ def test_custom_vjp_simple():
     jax.test_util.check_grads(bar, (3.0, 4.0), order=1, modes=('rev',))
 
 
-if __name__ == '__main__':
-    test_dlpack_numpy()
-    test_custom_vjp_simple()
+def test_batched_jax_norm():
+    "test how to batch norms of derivatives and Jacobians"
+
+    # this is for neural ode, so make some layers
+    nn_p, nn_f = vbjax.make_dense_layers(3, [13])
+    assert callable(nn_f)
+
+    x = vbjax.randn(100, 3, 50)
+    x00 = x[0,:,0]
+
+    f = lambda x: nn_f(nn_p, x)
+    assert f(x00).shape == (3, 13)  # calling w/ vector doesn't work correctly!
+    assert f(x00.reshape(-1, 1))[:,0].shape == (3, )
+
+    # let's make the shape part of the f
+    f2 = lambda x: nn_f(nn_p, x.reshape(-1, 1)).reshape(-1)
+    assert f2(x00).shape == (3,)
+    # yess
+
+    # this makes the Jacobian behave like we expect
+    J = jax.jacfwd(f2)
+    assert J(x00).shape == (3, 3)
+
+    # then the norms should work as expected
+    nf = lambda x: jax.numpy.linalg.norm(f2(x))
+    nJ = lambda x: jax.numpy.linalg.norm(J(x))
+    assert nf(x00).shape == nJ(x00).shape == ()
+
+    # now vmap that over 50 time points
+    bnf = jax.vmap(nf, 1)
+    assert bnf(x[0,:]).shape == (50,)
+
+    bJf = jax.vmap(nJ, 1)
+    assert bJf(x[0,:]).shape == (50,)
+
+    # and a second over 100 batch elements
+    bbnf = jax.vmap(bnf, 0)
+    bbJf = jax.vmap(bJf, 0)
+    assert bbnf(x).shape == bbJf(x).shape == (100, 50)
