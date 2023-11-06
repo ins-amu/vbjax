@@ -7,7 +7,7 @@ _to_np = lambda x: np.from_dlpack(x)
 _to_jax = lambda x: jax.dlpack.from_dlpack(x.__dlpack__())
 
 
-def make_spmv(A, is_symmetric=False):
+def make_spmv(A, is_symmetric=False, use_scipy=False):
     """
     Make a closure for a general sparse matrix-vector multiplication.
 
@@ -17,6 +17,8 @@ def make_spmv(A, is_symmetric=False):
         Constant sparse matrix.
     is_symmetric : bool, optional, default False
         Whether matrix is symmetric.
+    use_scipy: bool, optional, default False
+        Use scipy.
 
     Returns
     -------
