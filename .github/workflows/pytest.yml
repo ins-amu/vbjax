@@ -14,17 +14,3 @@ jobs:
         run: pip install ".[dev]"
       - name: run tests
         run: pytest
-
-  conda:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: setup python
-        run: |
-          wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-          bash Miniconda3-latest-Linux-x86_64.sh -b -p $PWD/conda
-          . conda/bin/activate && conda install numpy scipy jax pytest
-      - name: pip the rest
-        run: pip install ".[dev]"
-      - name: run tests
-        run: . conda/bin/activate && pytest
