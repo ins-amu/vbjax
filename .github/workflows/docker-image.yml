@@ -1,7 +1,9 @@
-name: build & push Docker image to pypi
+name: build & push Docker image to ghcr
 
 on:
   push:
+    tags:
+      - v*
 
 env:
   REGISTRY: ghcr.io
