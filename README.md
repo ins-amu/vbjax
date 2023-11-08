@@ -200,6 +200,9 @@ TODO
 
 ## Development
 
+New ideas or even documenting tricks (like how Jax works) should go
+into the test suite, and there are some ideas floating there before
+making it into the library itself.
 ```
 git clone https://github.com/ins-amu/vbjax
 cd vbjax

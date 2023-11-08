@@ -14,7 +14,7 @@ def test_sde():
 
 
 def test_ode():
-    f = lambda x,_: -x
+    f = lambda x, _: -x
     dt = 0.1
     _, run = vb.make_ode(dt, f)
     x0 = np.r_[:32].astype('f')
