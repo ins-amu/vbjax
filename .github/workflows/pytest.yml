@@ -11,9 +11,7 @@ jobs:
       - name: setup python
         run: sudo apt-get update && sudo apt-get install -y python3-pip
       - name: pip install jax
-        run: |
-          pip install pytest
-          pip install .
+        run: pip install ".[dev]"
       - name: run tests
         run: pytest
 
@@ -27,6 +25,6 @@ jobs:
           bash Miniconda3-latest-Linux-x86_64.sh -b -p $PWD/conda
           . conda/bin/activate && conda install numpy scipy jax pytest
       - name: pip the rest
-        run: pip install .
+        run: pip install ".[dev]"
       - name: run tests
         run: . conda/bin/activate && pytest
