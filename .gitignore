@@ -9,3 +9,5 @@ wiki
 insference
 dist
 .cache
+.idea
+.benchmarks
