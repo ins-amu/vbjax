@@ -2,6 +2,7 @@ import jax.numpy as np
 from .loops import heun_step
 from .neural_mass import BOLDTheta, bold_dfun
 
+# NB shape here is the input shape of neural activity
 
 def make_timeavg(shape):
     "Make a time average monitor."
@@ -19,9 +20,9 @@ def compute_sarvas_gain(q, r, o, att, Ds=0, Dc=0) -> np.ndarray:
     pass
 
 
-def make_gain(gain, shape):
+def make_gain(gain, shape=None):
     "Make a gain-matrix monitor suitable for sEEG, EEG & MEG."
-    tavg_shape = gain.shape[:1] + shape[1:]
+    tavg_shape = gain.shape[:1] + (shape[1:] if shape else ())
     buf, tavg_step, tavg_sample = make_timeavg(tavg_shape)
     step = lambda b, x: tavg_step(b, gain @ x)
     return buf, step, tavg_sample
@@ -45,12 +46,8 @@ def make_fc(shape, period):
     pass
 
 def make_fft(shape, period):
-    # incremental ft doesn't really exist, do windowed instead
     pass
 
 # TODO sliding window versions of those
 
-# monitors don't have same periods:
-# core loop function takes one step
-# does that enough to produce the largest period?
 # @jax.checkpoint to lower memory usage?

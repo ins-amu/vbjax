@@ -1,4 +1,5 @@
 import numpy
+import jax
 import jax.numpy as np
 import vbjax as vb
 
@@ -43,3 +44,52 @@ def test_bold():
     fmri = b_sample(buf)
     assert fmri.shape == (n,)
 
+
+def test_multiple_periods():
+
+    # setup monitors
+    eeg_gain = vb.randn(64, 32)
+    eeg_buf, eeg_step, eeg_sample = vb.make_gain(eeg_gain)
+    bold_buf, bold_step, bold_sample = vb.make_bold((eeg_gain.shape[1], ),
+                                                0.1, vb.bold_default_theta)
+
+    # our simulation state
+    # TODO may be easier with jax_dataclasses
+    sim = {
+        'eeg_buf': eeg_buf,
+        'bold_buf': bold_buf
+    }
+
+    # outer scan steps from one bold sample to the next
+    def op(sim, T):
+        eeg = []
+        # outer loop does 5 eeg samples for each fmri sample
+        # nb jax unrolls this loop: it can't be too big
+        for t_ in range(5):
+            # this is the inner loop where dt steps occur
+            # but monitors are just accumulating for their averaging
+            for t__ in range(10):
+                t = T*50 + t_*10 + t__ # derp
+                key_t = jax.random.PRNGKey(t)
+                # insert neural dynamics here
+                x = jax.random.normal(key_t, shape=(eeg_gain.shape[1], ))
+                # update monitors
+                sim['eeg_buf'] = eeg_step(sim['eeg_buf'], x)
+                sim['bold_buf'] = bold_step(sim['bold_buf'], np.sin(x)*0.25 + 1.0)
+            # sample the eeg w/ period of 10*dt
+            sim['eeg_buf'], eeg_t = eeg_sample(sim['eeg_buf'])
+            eeg.append(eeg_t)
+
+        # convert to regular array
+        eeg = np.array(eeg)
+
+        # sample fmri w/ period of 5*10*dt
+        fmri = bold_sample(sim['bold_buf'])
+
+        return sim, (eeg, fmri)
+
+    ts = np.r_[:10]
+    sim, (eeg, fmri) = jax.lax.scan(op, sim, ts)
+
+    assert eeg.shape == (ts.size, 5, 64)
+    assert fmri.shape == (ts.size, 32)
