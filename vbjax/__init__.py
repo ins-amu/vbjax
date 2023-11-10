@@ -25,7 +25,7 @@ from .coupling import (
         make_diff_cfun, make_linear_cfun, make_delayed_coupling
         )
 from .connectome import make_conn_latent_mvnorm
-from .sparse import make_spmv
+from .sparse import make_spmv, csr_to_jax_bcoo, make_sg_spmv
 from .layers import make_dense_layers
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress

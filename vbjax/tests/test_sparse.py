@@ -4,7 +4,6 @@ import jax
 import jax.test_util
 import jax.dlpack
 import jax.numpy as jnp
-import jax.experimental.sparse as jsp
 import scipy.sparse
 import vbjax
 import pytest
@@ -38,15 +37,11 @@ def test_csr_scipy_symm():
     _test_spmv(spmv, A, n)
 
 
-def _csr_to_jax_bcoo(A: scipy.sparse.csr_matrix):
-    "Convert CSR format to batched COO format."
-    # first convert CSR to COO
-    coo = A.tocoo()
-    # now convert to batched COO
-    data = jax.numpy.array(coo.data)
-    indices = jax.numpy.array(np.c_[coo.row, coo.col])
-    shape = A.shape
-    return jsp.BCOO((data, indices), shape=shape)
+def test_sg_spmv():
+    n = 100
+    A = scipy.sparse.random(n, n, density=0.1).tocsr()
+    spmv = vbjax.make_sg_spmv(A)
+    _test_spmv(spmv, A, n)
 
 
 def bench_csr_to_bcoo():
@@ -57,7 +52,7 @@ def bench_csr_to_bcoo():
     jb1 = spmv(jx)
 
     # now convert to bcoo
-    jA = _csr_to_jax_bcoo(A)
+    jA = vbjax.csr_to_jax_bcoo(A)
     jspmv = jax.jit(lambda x: jA @ x)
     jb2 = jspmv(jx)
 
