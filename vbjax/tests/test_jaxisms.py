@@ -8,8 +8,8 @@ import numpy
 import jax
 import jax.dlpack
 import jax.test_util
-
-import vbjax
+import jax.numpy as np
+import vbjax as vb
 
 
 def test_dlpack_numpy():
@@ -46,10 +46,10 @@ def test_batched_jax_norm():
     "test how to batch norms of derivatives and Jacobians"
 
     # this is for neural ode, so make some layers
-    nn_p, nn_f = vbjax.make_dense_layers(3, [13])
+    nn_p, nn_f = vb.make_dense_layers(3, [13])
     assert callable(nn_f)
 
-    x = vbjax.randn(100, 3, 50)
+    x = vb.randn(100, 3, 50)
     x00 = x[0,:,0]
 
     f = lambda x: nn_f(nn_p, x)
@@ -135,6 +135,7 @@ def test_loop_dict2():
         'dt': 0.01,
         'coupling': 0.01
     }
+    ts = np.r_[:100]
 
     def loss(params, sim, ts):
         sim = sim.copy()
@@ -147,4 +148,49 @@ def test_loop_dict2():
     v, grads = jloss(params, sim, ts)
     for key, g_key in grads.items():
         assert np.abs(g_key) > 0
-    
+
+
+def test_loop_dict_vmap():
+
+    sim = {
+        'noise': 0.1,
+        'coupling': 0.01,
+        'dt': 0.1,
+        'x': vb.randn(164),
+        'weights': vb.randn(164,164),
+        'eeg_gain': vb.randn(64, 164),
+        'rng': jax.random.PRNGKey(42)
+    }
+
+
+    def step(sim, t):
+        x = sim['x']
+        z = sim['noise'] * jax.random.normal(sim['rng'], shape=x.shape)
+        x = x + sim['dt']*(x - x**3/3 + sim['coupling'] * sim['weights']@x) + z
+        sim['x'] = x
+        eeg = sim['eeg_gain'] @ x
+        return sim, eeg
+
+    def loop(sim, ts):
+        sim, eegs = jax.lax.scan(step, sim, ts)
+        return eegs
+
+    # to vmap we need specific args to vmap over
+    # in simple case this is an array like initial conditions,
+    def loop_x0(x0, sim, ts):
+        sim = sim.copy()
+        sim['x'] = x0
+        return loop(sim, ts)
+
+    ts = np.r_[:100]
+
+    l1 = jax.jit(jax.vmap(lambda x: loop_x0(x, sim, ts)))
+    l2 = jax.jit(lambda x: loop_x0(x, sim, ts))
+    l3 = jax.jit(jax.vmap(lambda x: loop_x0(x, sim, ts), in_axes=1, out_axes=-1))
+
+    a1 = vb.randn(32, 164)
+    a2 = vb.randn(164, 32)
+
+    assert l1(a1).shape == (32, ts.size, 64)
+    assert l2(a2).shape == (ts.size, 64, 32)
+    assert l3(a2).shape == (ts.size, 64, 32)
