@@ -28,18 +28,19 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest",
-  "pytest-xdist",
-  "pytest-benchmark",
-  "twine",
-  "build",
-  "tqdm",
-  "jupyter",
-  "matplotlib",
-  "joblib",
-  "grip",
-  "python-lsp-server[all]",
-  "jedi-language-server",
+    "pytest",
+    "pytest-xdist",
+    "pytest-benchmark",
+    "twine",
+    "build",
+    "tqdm",
+    "jupyter",
+    "matplotlib",
+    "joblib",
+    "grip",
+    "python-lsp-server[all]",
+    "jedi-language-server",
+    "jax-dataclasses",
 ]
 
 [project.urls]

@@ -13,8 +13,9 @@ pip install .[dev]
 The primary additional dependency of vbjax is
 [JAX](github.com/google/jax), which itself depends only on
 NumPy, SciPy & opt-einsum, so it should be safe to add to your
-existing projects. Check Jax docs for CUDA use, but after the above
-`pip` step,
+existing projects.
+
+If you have a CUDA-enabled GPU, you install the requisite dependencies like so
 ```bash
 pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
