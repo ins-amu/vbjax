@@ -105,6 +105,15 @@ def test_loop_dict():
     assert ns2["int"] == 8
 
 
+def _dict_step(sim, t):
+    x = sim['x']
+    z = sim['noise'] * jax.random.normal(sim['rng'], shape=x.shape)
+    f = lambda x: x - x**3/3 + sim['coupling'] * sim['weights']@x
+    x = vb.heun_step(x, f, sim['dt'])
+    sim['x'] = x
+    eeg = sim['eeg_gain'] @ x
+    return sim, eeg
+
 def test_loop_dict2():
 
     # a more complicated example
@@ -119,16 +128,8 @@ def test_loop_dict2():
         'rng': jax.random.PRNGKey(42)
     }
 
-    def step(sim, t):
-        x = sim['x']
-        z = sim['noise'] * jax.random.normal(sim['rng'], shape=x.shape)
-        x = x + sim['dt']*(x - x**3/3 + sim['coupling'] * sim['weights']@x) + z
-        sim['x'] = x
-        eeg = sim['eeg_gain'] @ x
-        return sim, eeg
-        
     def loop(sim, ts):
-        sim, eegs = jax.lax.scan(step, sim, ts)
+        sim, eegs = jax.lax.scan(_dict_step, sim, ts)
         return eegs
 
     params = {
@@ -162,17 +163,8 @@ def test_loop_dict_vmap():
         'rng': jax.random.PRNGKey(42)
     }
 
-
-    def step(sim, t):
-        x = sim['x']
-        z = sim['noise'] * jax.random.normal(sim['rng'], shape=x.shape)
-        x = x + sim['dt']*(x - x**3/3 + sim['coupling'] * sim['weights']@x) + z
-        sim['x'] = x
-        eeg = sim['eeg_gain'] @ x
-        return sim, eeg
-
     def loop(sim, ts):
-        sim, eegs = jax.lax.scan(step, sim, ts)
+        sim, eegs = jax.lax.scan(_dict_step, sim, ts)
         return eegs
 
     # to vmap we need specific args to vmap over

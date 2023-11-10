@@ -7,13 +7,14 @@ def _use_many_cores():
         n = mp.cpu_count()
         value = '--xla_force_host_platform_device_count=%d' % n
         os.environ['XLA_FLAGS'] = value
+        print(f'vbjax ( ˘ ³˘)ノ°ﾟº❍｡ using {n} cores')
     else:
         sys.stderr.write('XLA_FLAGS already set\n')
 
 _use_many_cores()
 
 # import stuff
-from .loops import make_sde, make_ode, make_dde, make_sdde
+from .loops import make_sde, make_ode, make_dde, make_sdde, heun_step
 from .shtlc import make_shtdiff
 from .neural_mass import (
         JRState, JRTheta, jr_dfun, jr_default_theta,

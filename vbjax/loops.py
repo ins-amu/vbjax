@@ -7,6 +7,14 @@ import jax
 import jax.numpy as np
 
 
+def heun_step(x, dfun, dt, *args, add=0):
+    """Use a Heun scheme to step state with a right hand sides dfun(.)
+    and additional forcing term add.
+    """
+    d1 = dfun(x, *args)
+    d2 = dfun(x + dt*d1 + add, *args)
+    return x + dt*0.5*(d1 + d2) + add
+
 def make_sde(dt, dfun, gfun):
     """Use a stochastic Heun scheme to integrate autonomous stochastic
     differential equations (SDEs).
@@ -59,10 +67,7 @@ def make_sde(dt, dfun, gfun):
 
     def step(x, z_t, p):
         noise = gfun(x, p) * sqrt_dt * z_t
-        d1 = dfun(x, p)
-        x1 = x + dt*d1 + noise
-        d2 = dfun(x1, p)
-        return x + dt*0.5*(d1 + d2) + noise
+        return heun_step(x, dfun, dt, p, add=noise)
 
     @jax.jit
     def loop(x0, zs, p):
@@ -109,10 +114,7 @@ def make_ode(dt, dfun):
     """
 
     def step(x, t, p):
-        d1 = dfun(x, p)
-        x1 = x + dt*d1
-        d2 = dfun(x1, p)
-        return x + dt*0.5*(d1 + d2)
+        return heun_step(x, dfun, dt, p)
 
     @jax.jit
     def loop(x0, ts, p):
