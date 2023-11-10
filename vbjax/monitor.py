@@ -36,7 +36,7 @@ def make_bold(shape, dt, p: BOLDTheta):
         return heun_step(sfvq, bold_dfun, dt, x, p)
     def sample(buf):
         s, f, v, q = buf
-        return p.v0 * (p.k1*(1 - q) + p.k2*(1 - q / v) + p.k3*(1 - v))
+        return buf, p.v0 * (p.k1*(1 - q) + p.k2*(1 - q / v) + p.k3*(1 - v))
     return sfvq, step, sample
 
 

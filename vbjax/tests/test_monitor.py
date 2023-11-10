@@ -41,7 +41,7 @@ def test_bold():
     buf = b_step(buf, vb.randn(n))
     buf = b_step(buf, vb.randn(n))
 
-    fmri = b_sample(buf)
+    _, fmri = b_sample(buf)
     assert fmri.shape == (n,)
 
 
@@ -60,36 +60,38 @@ def test_multiple_periods():
         'bold_buf': bold_buf
     }
 
+    # inner scan steps neural dynamics & monitor states
+    def op1(sim, t):
+        key_t = jax.random.PRNGKey(t)
+        # insert neural dynamics here
+        x = jax.random.normal(key_t, shape=(eeg_gain.shape[1],))
+        # update monitors
+        sim['eeg_buf'] = eeg_step(sim['eeg_buf'], x)
+        sim['bold_buf'] = bold_step(sim['bold_buf'], np.sin(x) * 0.25 + 1.0)
+        return sim, x
+
+    # next scan samples eeg monitors
+    def op2(sim, t_):
+        # sample eeg w/ period of 10*dt
+        sim, raw = jax.lax.scan(op1, sim, t_ * 10 + np.r_[:10])
+        sim['eeg_buf'], eeg_t = eeg_sample(sim['eeg_buf'])
+        return sim, (raw, eeg_t)
+
     # outer scan steps from one bold sample to the next
-    def op(sim, T):
-        eeg = []
-        # outer loop does 5 eeg samples for each fmri sample
-        # nb jax unrolls this loop: it can't be too big
-        for t_ in range(5):
-            # this is the inner loop where dt steps occur
-            # but monitors are just accumulating for their averaging
-            for t__ in range(10):
-                t = T*50 + t_*10 + t__ # derp
-                key_t = jax.random.PRNGKey(t)
-                # insert neural dynamics here
-                x = jax.random.normal(key_t, shape=(eeg_gain.shape[1], ))
-                # update monitors
-                sim['eeg_buf'] = eeg_step(sim['eeg_buf'], x)
-                sim['bold_buf'] = bold_step(sim['bold_buf'], np.sin(x)*0.25 + 1.0)
-            # sample the eeg w/ period of 10*dt
-            sim['eeg_buf'], eeg_t = eeg_sample(sim['eeg_buf'])
-            eeg.append(eeg_t)
-
-        # convert to regular array
-        eeg = np.array(eeg)
-
+    def op3(sim, T):
+        # run for 5 samples of eeg
+        sim, (raw, eeg) = jax.lax.scan(op2, sim, T*50 + np.r_[:5])
         # sample fmri w/ period of 5*10*dt
-        fmri = bold_sample(sim['bold_buf'])
-
-        return sim, (eeg, fmri)
+        _, fmri = bold_sample(sim['bold_buf'])
+        return sim, (raw, eeg, fmri)
 
     ts = np.r_[:10]
-    sim, (eeg, fmri) = jax.lax.scan(op, sim, ts)
+    sim, (raw, eeg, fmri) = jax.lax.scan(op3, sim, ts)
 
+    assert raw.shape == (ts.size, 5, 10, 32)
     assert eeg.shape == (ts.size, 5, 64)
     assert fmri.shape == (ts.size, 32)
+
+    # that covers most use cases
+    # metrics like fcd can be at done at fmri time scale
+
