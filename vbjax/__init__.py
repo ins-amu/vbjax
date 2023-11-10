@@ -1,3 +1,4 @@
+print('vbjax ███▒▒▒▒▒▒▒ loading')
 
 # default to setting up many cores
 def _use_many_cores():
@@ -7,9 +8,9 @@ def _use_many_cores():
         n = mp.cpu_count()
         value = '--xla_force_host_platform_device_count=%d' % n
         os.environ['XLA_FLAGS'] = value
-        print(f'vbjax ( ˘ ³˘)ノ°ﾟº❍｡ using {n} cores')
+        print(f'vbjax (ﾉ☉ヮ⚆)ﾉ ⌒*:･ﾟ✧ can haz {n} cores')
     else:
-        sys.stderr.write('XLA_FLAGS already set\n')
+        print('vbjax XLA_FLAGS already set\n')
 
 _use_many_cores()
 
@@ -19,6 +20,7 @@ from .shtlc import make_shtdiff
 from .neural_mass import (
         JRState, JRTheta, jr_dfun, jr_default_theta,
         MPRState, MPRTheta, mpr_dfun, mpr_default_theta,
+        BOLDTheta, compute_bold_theta, bold_default_theta, bold_dfun
         )
 from .regmap import make_region_mapping
 from .coupling import (
@@ -26,6 +28,7 @@ from .coupling import (
         )
 from .connectome import make_conn_latent_mvnorm
 from .sparse import make_spmv, csr_to_jax_bcoo, make_sg_spmv
+from .monitor import make_timeavg, make_bold, make_gain
 from .layers import make_dense_layers
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
@@ -79,3 +82,4 @@ def make_field_gif(xt, gifname, fps=15):
     writer = animation.PillowWriter(fps=fps, bitrate=400)
     ani.save(gifname, writer=writer)
 
+print('vbjax ᕕ(ᐛ)ᕗ ready')
