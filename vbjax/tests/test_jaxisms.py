@@ -103,3 +103,48 @@ def test_loop_dict():
     assert ns["int"] == 3
     assert ns1["int"] == 6
     assert ns2["int"] == 8
+
+
+def test_loop_dict2():
+
+    # a more complicated example
+    batch_size = 32
+    sim = {
+        'noise': 0.1,
+        'coupling': 0.01,
+        'dt': 0.1,
+        'x': vb.randn(164, batch_size),
+        'weights': vb.randn(164,164),
+        'eeg_gain': vb.randn(64, 164),
+        'rng': jax.random.PRNGKey(42)
+    }
+
+    def step(sim, t):
+        x = sim['x']
+        z = sim['noise'] * jax.random.normal(sim['rng'], shape=x.shape)
+        x = x + sim['dt']*(x - x**3/3 + sim['coupling'] * sim['weights']@x) + z
+        sim['x'] = x
+        eeg = sim['eeg_gain'] @ x
+        return sim, eeg
+        
+    def loop(sim, ts):
+        sim, eegs = jax.lax.scan(step, sim, ts)
+        return eegs
+
+    params = {
+        'dt': 0.01,
+        'coupling': 0.01
+    }
+
+    def loss(params, sim, ts):
+        sim = sim.copy()
+        sim.update(params)
+        eegs = loop(sim, ts)
+        return np.sum(np.square(eegs))
+
+    jloss = jax.jit(jax.value_and_grad(loss))
+
+    v, grads = jloss(params, sim, ts)
+    for key, g_key in grads.items():
+        assert np.abs(g_key) > 0
+    
