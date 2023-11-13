@@ -43,6 +43,14 @@ def test_gain():
     numpy.testing.assert_allclose(eeg, gain.sum(axis=1))
 
 
+def test_cov_fc():
+    xs = vb.randn(1000, 16)*2 + 1.0
+    fc, fc_step, fc_sample = vb.make_fc(xs[0].shape)
+    fcol = vb.make_offline(fc_step, fc_sample)
+    _, s_fc = fcol(fc, xs)
+    numpy.testing.assert_allclose(s_fc, np.identity(16), 0.09, 0.09)
+
+
 def test_bold():
     n = 8
     dt = 0.1

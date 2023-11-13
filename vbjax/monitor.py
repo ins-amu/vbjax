@@ -53,10 +53,47 @@ def make_bold(shape, dt, p: BOLDTheta):
     return sfvq, step, sample
 
 
-def make_fc(shape):
+def make_cov(shape):
     # welford online cov estimate yields o(1) backprop memory usage
     # https://github.com/maedoc/tvb-fut/blob/master/lib/github.com/maedoc/tvb-fut/stats.fut#L9
-    pass
+    assert len(shape) == 1, "FC over 1-D vectors for now."
+    cov_shape = shape * 2
+    def new():
+        buf = {'count': 0,
+               'mean': np.zeros(shape),
+               'cov': np.zeros(cov_shape)
+               }
+        return buf
+    def step(buf, x):
+        count, mean, cov = buf['count'], buf['mean'], buf['cov']
+        count = count + 1
+        dx = x - mean
+        mean = mean + dx / count
+        cov = cov + np.outer(dx, dx)
+        # count = count + 1
+        # delta = val - mean
+        # mean = mean + delta / count
+        # delta2 = val - mean
+        # m2 = m2 + delta * delta2
+        return {'count': count,
+                'mean': mean,
+                'cov': cov}
+    def sample(buf):
+        var = buf['cov'] / buf['count']
+        # std = np.sqrt(var)
+        return new(), var
+    return new(), step, sample
+
+
+def make_fc(shape):
+    new_buf, step, cov_sample = make_cov(shape)
+    def fc_sample(buf):
+        buf, cov = cov_sample(buf)
+        # Rij = Cij / sqrt(Cii Cjj)
+        cii = np.diag(cov)
+        return new_buf.copy(), cov / np.sqrt(np.outer(cii, cii))
+    return new_buf.copy(), step, fc_sample
+
 
 def make_fft(shape, period):
     pass
