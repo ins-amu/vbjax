@@ -1,6 +1,19 @@
+import jax
 import jax.numpy as np
 from .loops import heun_step
 from .neural_mass import BOLDTheta, bold_dfun
+
+
+def make_offline(step_fn, sample_fn, *args):
+    "Compute monitor samples in an offline or batch fashion."
+    def op(mon, x):
+        mon = step_fn(mon, x)
+        return mon, None
+    def offline_sample(mon, xs):
+        mon, _ = jax.lax.scan(op, mon, xs)
+        mon, samp = sample_fn(mon)
+        return mon, samp
+    return offline_sample
 
 # NB shape here is the input shape of neural activity
 
@@ -40,7 +53,7 @@ def make_bold(shape, dt, p: BOLDTheta):
     return sfvq, step, sample
 
 
-def make_fc(shape, period):
+def make_fc(shape):
     # welford online cov estimate yields o(1) backprop memory usage
     # https://github.com/maedoc/tvb-fut/blob/master/lib/github.com/maedoc/tvb-fut/stats.fut#L9
     pass

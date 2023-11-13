@@ -17,6 +17,18 @@ def test_timeavg():
     numpy.testing.assert_allclose(ta, 2.0)
 
 
+def test_offline():
+    buf, ta_step, ta_sample = vb.make_timeavg((1,))
+    bufo, _, _ = vb.make_timeavg((1,))
+    ta_off = vb.make_offline(ta_step, ta_sample)
+    xs = vb.randn(20, 100)
+    for j, x_j in enumerate(xs):
+        for i, x_ji in enumerate(x_j):
+            buf = ta_step(buf, x_ji)
+        buf, ta = ta_sample(buf)
+        bufo, tao = ta_off(bufo, x_j)
+        numpy.testing.assert_allclose(tao, ta)
+
 def test_gain():
     gain = vb.randn(4, 4)
     ones = np.ones((4, ))
@@ -50,6 +62,8 @@ def setup_multiple_periods(unroll, checkpoint):
     # setup monitors
     eeg_gain = vb.randn(64, 32)
     eeg_buf, eeg_step, eeg_sample = vb.make_gain(eeg_gain)
+    eeg2_buf, eeg2_step, eeg2_sample = vb.make_gain(eeg_gain)
+    eeg2_offline_sample = vb.make_offline(eeg2_step, eeg2_sample)
     bold_buf, bold_step, bold_sample = vb.make_bold((eeg_gain.shape[1], ),
                                                 0.1, vb.bold_default_theta)
 
@@ -57,6 +71,7 @@ def setup_multiple_periods(unroll, checkpoint):
     # TODO may be easier with jax_dataclasses
     sim = {
         'eeg_buf': eeg_buf,
+        'eeg2_buf': eeg2_buf,
         'bold_buf': bold_buf,
         'freq': 0.1,
     }
@@ -78,26 +93,31 @@ def setup_multiple_periods(unroll, checkpoint):
         sim, raw = jax.lax.scan(op1, sim, t_ * 10 + np.r_[:10],
                                 unroll=10)
         sim['eeg_buf'], eeg_t = eeg_sample(sim['eeg_buf'])
-        return sim, (raw, eeg_t)
+        sim['eeg2_buf'], eeg2_t = eeg2_offline_sample(sim['eeg2_buf'],
+                                                      np.sin(raw * sim['freq']))
+        return sim, (raw, eeg_t, eeg2_t)
 
     # outer scan steps from one bold sample to the next
     def op3(sim, T):
         # run for 5 samples of eeg
-        sim, (raw, eeg) = jax.lax.scan(op2, sim, T*50 + np.r_[:5],
+        sim, (raw, eeg, eeg2) = jax.lax.scan(op2, sim, T*50 + np.r_[:5],
                                        unroll=5 if unroll else 1)
         # sample fmri w/ period of 5*10*dt
         _, fmri = bold_sample(sim['bold_buf'])
-        return sim, (raw, eeg, fmri)
+        return sim, (raw, eeg, eeg2, fmri)
 
     return sim, op3
 
 def test_multiple_periods():
     sim, op3 = setup_multiple_periods(False, False,)
     ts = np.r_[:10]
-    sim, (raw, eeg, fmri) = jax.lax.scan(op3, sim, ts)
+    sim, (raw, eeg, eeg2, fmri) = jax.lax.scan(op3, sim, ts)
     assert raw.shape == (ts.size, 5, 10, 32)
     assert eeg.shape == (ts.size, 5, 64)
+    assert eeg2.shape == (ts.size, 5, 64)
     assert fmri.shape == (ts.size, 32)
+    numpy.testing.assert_allclose(eeg2, eeg, 2e-3, 1e-4)
+
 
 @pytest.mark.parametrize('opts', [
     f'{args} {dev}'

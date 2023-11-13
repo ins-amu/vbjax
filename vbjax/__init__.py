@@ -28,7 +28,7 @@ from .coupling import (
         )
 from .connectome import make_conn_latent_mvnorm
 from .sparse import make_spmv, csr_to_jax_bcoo, make_sg_spmv
-from .monitor import make_timeavg, make_bold, make_gain
+from .monitor import make_timeavg, make_bold, make_gain, make_offline
 from .layers import make_dense_layers
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
