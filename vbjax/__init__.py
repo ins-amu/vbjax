@@ -9,10 +9,12 @@ def _use_many_cores():
         value = '--xla_force_host_platform_device_count=%d' % n
         os.environ['XLA_FLAGS'] = value
         print(f'vbjax (ﾉ☉ヮ⚆)ﾉ ⌒*:･ﾟ✧ can haz {n} cores')
+        return n
     else:
         print('vbjax XLA_FLAGS already set\n')
+        return 1
 
-_use_many_cores()
+cores = _use_many_cores()
 
 # import stuff
 from .loops import make_sde, make_ode, make_dde, make_sdde, heun_step

@@ -61,6 +61,82 @@ While integrators and mass models tend to be the same across publications, but
 the network model itself varies (regions vs surface, stimulus etc), vbjax allows
 user to focus on defining the `network` and then getting time series.
 
+### Parallel parameter space exploration
+
+One of the key tools in use of these models is to run parameter sweeps, which
+can be done easily with vbjax and parallelized with builtin Jax tools. 
+```python
+import jax, jax.numpy as np
+import vbjax as vb
+```
+Let's
+look at the effect of coupling, noise and excitability in a small network model,
+where the `p` parameter is a tuple of coupling scaling, noise scaling and the
+base MPR parameters:
+```python
+def net(x, p):
+    r, v = x
+    k, _, mpr_p = p
+    c = k*r.sum(), k*v.sum()
+    return vb.mpr_dfun(x, c, mpr_p)
+```
+to ensure noise is a parameter we can tune later, we'll define the SDE with
+a dynamic noise scaled by the second element of the parameter tuple `p`,
+```python
+def noise(_, p):
+    _, sigma, _ = p
+    return sigma
+```
+turn that into an SDE, choose network size (8 nodes here), with random initial
+conditions and realize an appropriate sample of noise for SDE integration:
+```python
+_, loop = vb.make_sde(0.01, net, noise)
+n_nodes = 8
+rv0 = vb.randn(2, n_nodes)
+zs = vb.randn(1000, *rv0.shape)
+```
+to run map parameters of interest to some metric of interest, we write a function,
+where we've chosen the standard deviation after a certain time as a index on the steady
+state of the network dynamics,
+```python
+def run(pars, mpr_p=vb.mpr_default_theta):
+    k, sig, eta = pars                      # explored pars
+    p = k, sig, mpr_p._replace(eta=eta)     # set mpr
+    xs = loop(rv0, zs, p)                   # run sim
+    std = xs[400:, 0].std()                 # eval metric
+    return std                              # done
+```
+all that is plain virtual brain equations, but to enable efficient & parallel
+sweeps, we can pull in jax primitives `jax.pmap` to parallelize over compute
+devices (by default, cores of your CPU) and `jax.vmap` to vectorize the function `run`,
+```python
+run_batches = jax.pmap(jax.vmap(run))
+```
+now we run this over a parameter space and plot the results,
+```python
+import pylab as pl
+pl.figure(figsize=(8,2))
+for i, sig_i in enumerate([0.0, 0.2, 0.3, 0.4]):
+    pl.subplot(1, 4, i + 1)
+    log_ks, etas = np.mgrid[-9.0:0.0:16j, -4.0:-6.0:32j]
+    pars = np.c_[np.exp(log_ks.ravel()),np.ones(512)*sig_i, etas.ravel()]
+    pars = pars.reshape((vb.cores, -1, 3))
+    result = run_batches(pars)
+    pl.imshow(result.reshape((16, 32)), vmin=0.2, vmax=0.7)
+    pl.ylabel('k') if i==0 else (), pl.xlabel('eta')
+    pl.title(f'sig = {sig_i:0.1f}')
+pl.show()
+pl.savefig('example3.jpg')
+```
+![](example3.jpg)
+
+Tips
+- If you are using a system like Dask or Slurm, you can then invoke 
+  that `run_batches` function in a distributed setting as required,
+  without needing to manage a per core or per node for loop.
+- On a single GPU, the `jax.pmap` is not needed to map grid elements to GPU
+  threads, it should *just work*.. examples forthcoming :D 
+
 ### Simplest neural field 
 
 Here's a neural field,
