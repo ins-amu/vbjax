@@ -32,6 +32,7 @@ from .monitor import make_timeavg, make_bold, make_gain
 from .layers import make_dense_layers
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
+from .util import to_jax, to_np
 from ._version import __version__
 
 # some random setup for convenience

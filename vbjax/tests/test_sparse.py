@@ -90,7 +90,7 @@ def test_perf_jbcoo(benchmark, n, density_pct, grad, impl, jit):
     if impl == 'scipy': # TODO enum
         spmv1 = vbjax.make_spmv(A)
     elif impl == 'jaxbcoo':
-        jA = _csr_to_jax_bcoo(A)
+        jA = vbjax.csr_to_jax_bcoo(A)
         spmv1 = lambda x: jA @ x
     else:
         raise ValueError(impl)

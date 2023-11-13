@@ -45,7 +45,7 @@ def test_bold():
     assert fmri.shape == (n,)
 
 
-def setup_multiple_periods(unroll):
+def setup_multiple_periods(unroll, checkpoint):
 
     # setup monitors
     eeg_gain = vb.randn(64, 32)
@@ -62,6 +62,7 @@ def setup_multiple_periods(unroll):
     }
 
     # inner scan steps neural dynamics & monitor states
+    @(jax.checkpoint if checkpoint else lambda f: f)
     def op1(sim, t):
         key_t = jax.random.PRNGKey(t)
         # insert neural dynamics here
@@ -75,7 +76,7 @@ def setup_multiple_periods(unroll):
     def op2(sim, t_):
         # sample eeg w/ period of 10*dt
         sim, raw = jax.lax.scan(op1, sim, t_ * 10 + np.r_[:10],
-                                unroll=10 if unroll else 1)
+                                unroll=10)
         sim['eeg_buf'], eeg_t = eeg_sample(sim['eeg_buf'])
         return sim, (raw, eeg_t)
 
@@ -91,30 +92,34 @@ def setup_multiple_periods(unroll):
     return sim, op3
 
 def test_multiple_periods():
-    sim, op3 = setup_multiple_periods()
+    sim, op3 = setup_multiple_periods(False, False,)
     ts = np.r_[:10]
     sim, (raw, eeg, fmri) = jax.lax.scan(op3, sim, ts)
     assert raw.shape == (ts.size, 5, 10, 32)
     assert eeg.shape == (ts.size, 5, 64)
     assert fmri.shape == (ts.size, 32)
 
-@pytest.mark.parametrize('dojit,unroll,grad', [
-    (True,True,True), (False,False,True),
-    (True, True, False), (False, False, False),
-])
-def test_multiple_periods_perf(benchmark, dojit, unroll, grad):
-    sim, op3 = setup_multiple_periods(unroll)
-    ts = np.r_[:100]
-    def run(freq, sim):
-        sim = sim.copy()
-        sim['freq'] = freq
-        sim, (raw, eeg, fmri) = jax.lax.scan(op3, sim, ts,
-                                             unroll=10 if unroll else 1)
-        return np.sum(np.square(eeg))
-    if grad:
-        run = jax.grad(run)
-        assert np.abs(run(0.2,sim)) > 0
-    if dojit:
-        run = jax.jit(run)
-        run(0.2, sim)
-    benchmark(lambda : run(0.2, sim))
+@pytest.mark.parametrize('opts', [
+    f'{args} {dev}'
+    for args in ['jit grad','jit grad ckp','jit','']
+    for dev in 'cpu,gpu'.split(',')])
+def test_multiple_periods_perf(benchmark, opts):
+    opts = opts.split(' ')
+    device = 'cpu' if 'cpu' in opts else 'gpu'
+    unroll = 'unroll' in opts
+    with jax.default_device(jax.devices(device)[0]):
+        sim, op3 = setup_multiple_periods(unroll, 'ckp' in opts)
+        ts = np.r_[:100]
+        def run(freq, sim):
+            sim = sim.copy()
+            sim['freq'] = freq
+            sim, (raw, eeg, fmri) = jax.lax.scan(op3, sim, ts,
+                                                 unroll=10 if unroll else 1)
+            return np.sum(np.square(eeg))
+        if 'grad' in opts:
+            run = jax.grad(run)
+            assert np.abs(run(0.2,sim)) > 0
+        if 'jit' in opts:
+            run = jax.jit(run)
+            run(0.2, sim)
+        benchmark(lambda : run(0.2, sim))
