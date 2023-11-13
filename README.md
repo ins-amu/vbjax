@@ -116,7 +116,8 @@ check diagnostics like estimated sample size, shrinkage and z-score,
   assert zscore.max() < 1.5
 ```
 Full code is in the [test suite](vbjax/tests/test_field_inference.py), can
-be run `pytest -m slow`, since it takes about 5 minutes to run on GPU, and 12 minutes on single CPU core.
+be run `pytest -m slow`, since it takes about 5 minutes to run on a GPU, 5 min on m1 CPU core and
+12 minutes on an x86_64 CPU core.
 
 ### Fitting an autoregressive process
 
