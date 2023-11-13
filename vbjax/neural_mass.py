@@ -72,6 +72,9 @@ mpr_default_state = MPRState(r=0.0, V=-2.0)
 def mpr_dfun(ys, c, p):
     r, V = ys
 
+    # bound rate to be positive
+    r = r * (r > 0)
+
     I_c = p.cr * c[0] + p.cv * c[1]
 
     return np.array([
