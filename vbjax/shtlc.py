@@ -5,8 +5,7 @@ import scipy.special as sp
 try:
     import shtns
 except ImportError:
-    import sys
-    sys.stderr.write('** shtns is not available\n')
+    print('vbjax ò_ô shtns is not available')
 
 
 # Grid functions

@@ -31,7 +31,15 @@ for Jax to discover the GPU(s).
 
 ## Examples
 
-Here's an all-to-all connected network with Montbrio-Pazo-Roxin
+Here are some examples of simulations which show what you can
+do with the library.  Because they are implemented atop Jax, it
+is easy to take gradients for optimization or MCMC, or do efficient
+GPU parallel batching. Or both ಠ_ರೃ  
+
+### Simple network
+
+Here's the smallest simulation you might want to do: 
+an all-to-all connected network with Montbrio-Pazo-Roxin
 mass model dynamics,
 
 ```python
@@ -51,11 +59,9 @@ vb.plot_states(xs, 'rV', jpg='example1', show=True)
 
 While integrators and mass models tend to be the same across publications, but
 the network model itself varies (regions vs surface, stimulus etc), vbjax allows
-user to focus on defining the `network` and then getting time series.  Because
-the work is done by Jax, this is all auto-differentiable, GPU-able so friendly to
-use with common machine learning algorithms.
+user to focus on defining the `network` and then getting time series.
 
-### Neural field
+### Simplest neural field 
 
 Here's a neural field,
 ```python
@@ -82,7 +88,35 @@ vb.make_field_gif(xt[::10], 'example2.gif')
 ![](example2.gif)
 
 This example shows how the field forms patterns gradually despite the
-noise in the simulation.
+noise in the simulation, due to the effect of local connectivity
+
+
+### MCMC estimation of neural field activity
+
+For MCMC estimates with NumPyro we define a function to compute
+posterior log probability `p(theta | x)`,  
+```python
+  def logp(xt=None):
+      x0h = numpyro.sample('x0h', dist.Normal(jnp.zeros((nlat, nlon)), 1))
+      xth_mu = loop(x0h, ts, k)
+      numpyro.sample('xth', dist.Normal(xth_mu, 1), obs=xt)
+```
+run MCMC w/ NUTS,
+```python
+  mcmc = MCMC(NUTS(logp), num_warmup=500, num_samples=500)
+  mcmc.run(jax.random.PRNGKey(0), xt=xt)
+  x0h = mcmc.get_samples()['x0h']
+```
+check diagnostics like estimated sample size, shrinkage and z-score,
+```python
+  ess = numpyro.diagnostics.effective_sample_size(x0h.reshape((1, 500, -1)))
+  assert ess.min() > 100
+  shrinkage, zscore = vbjax.shrinkage_zscore(x0, x0h, 1)
+  assert shrinkage.min() > 0.7
+  assert zscore.max() < 1.5
+```
+Full code is in the [test suite](vbjax/tests/test_field_inference.py), can
+be run `pytest -m slow`, since it takes about 5 minutes to run on GPU, and 12 minutes on single CPU core.
 
 ### Fitting an autoregressive process
 
@@ -133,7 +167,7 @@ MCMC algorithms.
 
 ## HPC usage
 
-We use this on HPC systems, most easily with container images.
+We use this on HPC systems, most easily with container images.  Open an issue if it doesn't work.
 
 <details><summary>CSCS Piz Daint</summary>
 

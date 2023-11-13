@@ -1,11 +1,8 @@
 import numpy as np
-import jax.dlpack
 import scipy.sparse
+import jax
 import jax.experimental.sparse as jsp
-
-
-_to_np = lambda x: np.from_dlpack(x)
-_to_jax = lambda x: jax.dlpack.from_dlpack(x.__dlpack__())
+import vbjax as vb
 
 
 def make_spmv(A, is_symmetric=False, use_scipy=False):
@@ -30,8 +27,8 @@ def make_spmv(A, is_symmetric=False, use_scipy=False):
     """
     AT = A.T.copy()
     @jax.custom_vjp
-    def matvec(x):          return _to_jax(A @ _to_np(x))
-    def matvec_tr(x):       return _to_jax(AT @ _to_np(x))
+    def matvec(x):          return vb.to_jax(A @ vb.to_np(x))
+    def matvec_tr(x):       return vb.to_jax(AT @ vb.to_np(x))
     def matvec_fwd(x):      return matvec(x), None
     def matvec_bwd(res, g): return matvec(g) if is_symmetric else matvec_tr(g),
     matvec.defvjp(matvec_fwd, matvec_bwd)

@@ -40,3 +40,6 @@ def test_sdde():
         return -xt[t - 5]
     _, sdde = vb.make_sdde(1.0, 5, dfun, 0.01)
     sdde(vb.randn(20)+10, None)
+
+
+# TODO theta method? https://gist.github.com/maedoc/c47acb9d346e31017e05324ffc4582c1
