@@ -125,16 +125,21 @@ def test_multiple_periods():
     for dev in 'cpu,gpu'.split(',')])
 def test_multiple_periods_perf(benchmark, opts):
     opts = opts.split(' ')
-    device = 'cpu' if 'cpu' in opts else 'gpu'
+    device_name = 'cpu' if 'cpu' in opts else 'gpu'
+    try:
+        device = jax.devices(device_name)[0]
+    except RuntimeError: # no gpu
+        return
     unroll = 'unroll' in opts
-    with jax.default_device(jax.devices(device)[0]):
+    with jax.default_device(device):
         sim, op3 = setup_multiple_periods(unroll, 'ckp' in opts)
         ts = np.r_[:100]
         def run(freq, sim):
             sim = sim.copy()
             sim['freq'] = freq
-            sim, (raw, eeg, fmri) = jax.lax.scan(op3, sim, ts,
-                                                 unroll=10 if unroll else 1)
+            sim, (raw, eeg, eeg2, fmri) = jax.lax.scan(
+                op3, sim, ts,
+                unroll=10 if unroll else 1)
             return np.sum(np.square(eeg))
         if 'grad' in opts:
             run = jax.grad(run)
