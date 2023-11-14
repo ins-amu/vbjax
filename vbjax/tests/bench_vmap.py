@@ -1,6 +1,7 @@
 import os
 # for no gpu
 # os.environ['CUDA_VISIBLE_DEVICES']=''
+
 import time
 import jax, jax.numpy as np
 import vbjax as vb
@@ -33,8 +34,8 @@ run_batches = jax.jit(jax.vmap(run, in_axes=1))
 def bench_cpu():
     run_batches_cores = jax.pmap(jax.vmap(run, in_axes=1), in_axes=1)
 
-    for cores in [12]*15:
-        for n in [1, 2]: #[2,4,8,16]:
+    for cores in [8]*10: #[2, 4, 6, 8, 16]:
+        for n in [4]: #[2,4,8,16]:
             log_ks, etas = np.mgrid[-9.0:0.0:1j*n, -5.0:-6.0:36j]
             pars = np.c_[np.exp(log_ks.ravel()),np.ones(log_ks.size)*0.2, etas.ravel()].T.copy()
             pars = pars.reshape((3, cores, -1))
@@ -59,3 +60,7 @@ def bench_gpu():
         toc = time.time()
         iter = 50*log_ks.size*zs.shape[0]
         print(f'{n} {iter/1e6/(toc-tic):0.2f} Miter/s')
+
+
+if __name__ == '__main__':
+    bench_cpu()

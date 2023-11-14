@@ -138,12 +138,18 @@ result = run_batches(pars)
 ```
 
 #### Performance notes
-If we bump the network size to 164 (e.g. Destrieux atlas from FreeSurfer)
-and check efficiency of the Jax code,
 
-- Xeon-2133 uses 88 W to do 5.7 Miter/s = 65 Kiter/W
-- Quadro RTX 5000 uses 200 W to do 26 Miter/s = 130 Kiter/W
-- 
+Is (vb)jax fast?  Single threaded C/C++ code typically reaches 50 to 200 thousand
+iterations per second on a single CPU core, for network sizes of e.g. 164
+(e.g. Destrieux atlas from FreeSurfer).  Let's check efficiency of the Jax code
+for some hardware on my desk:
+
+- Xeon W-2133 (2017 14 nm Skylake) uses 88 W to do 5.7 Miter/s = 65 Kiter/W
+- Quadro RTX 5000 (2018 12 nm Turing) uses 200 W to do 26 Miter/s = 130 Kiter/W
+- M1 Air (2020 5 nm M1) uses 18 W to do 3.7 Miter/s = 205 Kiter/W
+
+You can tweak [this script](vbjax/tests/bench_vmap.py) to see what you might
+expect on your hardware.
 
 #### Distributed
 
