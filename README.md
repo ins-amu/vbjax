@@ -119,8 +119,8 @@ pl.figure(figsize=(8,2))
 for i, sig_i in enumerate([0.0, 0.2, 0.3, 0.4]):
     pl.subplot(1, 4, i + 1)
     log_ks, etas = np.mgrid[-9.0:0.0:16j, -4.0:-6.0:32j]
-    pars = np.c_[np.exp(log_ks.ravel()),np.ones(512)*sig_i, etas.ravel()]
-    pars = pars.reshape((vb.cores, -1, 3))
+    pars = np.c_[np.exp(log_ks.ravel()),np.ones(512)*sig_i, etas.ravel()].T.copy()
+    pars = pars.reshape((3, vb.cores))
     result = run_batches(pars)
     pl.imshow(result.reshape((16, 32)), vmin=0.2, vmax=0.7)
     pl.ylabel('k') if i==0 else (), pl.xlabel('eta')
@@ -129,13 +129,27 @@ pl.show()
 pl.savefig('example3.jpg')
 ```
 ![](example3.jpg)
+On a single GPU, you don't need the `jax.pmap` anymore, because it
+is a single compute device, and `jax.vmap` is enough,
+```python
+run_batches = jax.jit(jax.vmap(run, in_axes=1))
+pars = np.c_[np.exp(log_ks.ravel()),np.ones(512)*sig_i, etas.ravel()].T.copy()
+result = run_batches(pars)
+```
 
-Tips
-- If you are using a system like Dask or Slurm, you can then invoke 
-  that `run_batches` function in a distributed setting as required,
-  without needing to manage a per core or per node for loop.
-- On a single GPU, the `jax.pmap` is not needed to map grid elements to GPU
-  threads, it should *just work*.. examples forthcoming :D 
+#### Performance notes
+If we bump the network size to 164 (e.g. Destrieux atlas from FreeSurfer)
+and check efficiency of the Jax code,
+
+- Xeon-2133 uses 88 W to do 5.7 Miter/s = 65 Kiter/W
+- Quadro RTX 5000 uses 200 W to do 26 Miter/s = 130 Kiter/W
+- 
+
+#### Distributed
+
+If you are using a system like Dask or Slurm, you can then invoke 
+that `run_batches` function in a distributed setting as required,
+without needing to manage a per core or per node for loop.
 
 ### Simplest neural field 
 
