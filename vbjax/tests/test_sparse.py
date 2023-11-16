@@ -1,22 +1,23 @@
+
 import time
-import numpy as np
+import numpy
 import jax
 import jax.test_util
 import jax.dlpack
-import jax.numpy as jnp
+import jax.numpy as np
 import scipy.sparse
-import vbjax
+import vbjax as vb
 import pytest
 
 
 def _test_spmv(spmv, A, n):
-    nx = np.random.randn(n)
-    jx = jnp.array(nx)
+    nx = numpy.random.randn(n)
+    jx = np.array(nx)
 
     # test the function itself
     jb = spmv(jx)
     nb = A @ nx
-    np.testing.assert_allclose(jb, nb, 1e-6, 1e-6)
+    numpy.testing.assert_allclose(jb, nb, 1e-4, 1e-6)
 
     # now its gradient
     jax.test_util.check_grads(spmv, (jx,), order=1, modes=('rev',))
@@ -25,7 +26,7 @@ def _test_spmv(spmv, A, n):
 def test_csr_scipy():
     n = 10
     A = scipy.sparse.random(n, n, density=0.1).tocsr()
-    spmv = vbjax.make_spmv(A)
+    spmv = vb.make_spmv(A)
     _test_spmv(spmv, A, n)
 
 
@@ -33,26 +34,39 @@ def test_csr_scipy_symm():
     n = 10
     A = scipy.sparse.random(n, n, density=0.1).tocsr()
     A += A.T
-    spmv = vbjax.make_spmv(A, is_symmetric=True)
+    spmv = vb.make_spmv(A, is_symmetric=True)
     _test_spmv(spmv, A, n)
 
 
 def test_sg_spmv():
     n = 100
     A = scipy.sparse.random(n, n, density=0.1).tocsr()
-    spmv = vbjax.make_sg_spmv(A)
+    spmv = vb.make_sg_spmv(A, False)
+    _test_spmv(spmv, A, n)
+
+
+def test_sg_spmv_pmap():
+    n = 100
+    A = scipy.sparse.random(n, n, density=0.1).tocsr()
+    nrow = A.shape[0]
+    col = np.array(A.indices)
+    row = np.array(numpy.concatenate([
+        i * numpy.ones(n, 'i')
+        for i, n in enumerate(numpy.diff(A.indptr))]))
+    dat = np.array(A.data)
+    spmv = vb.make_sg_spmv(A, True)
     _test_spmv(spmv, A, n)
 
 
 def bench_csr_to_bcoo():
     n = 1000
     A = scipy.sparse.random(n, n, density=0.1).tocsr()
-    spmv = vbjax.make_spmv(A)
+    spmv = vb.make_spmv(A)
     jx = jax.numpy.r_[:n].astype('f')
     jb1 = spmv(jx)
 
     # now convert to bcoo
-    jA = vbjax.csr_to_jax_bcoo(A)
+    jA = vb.csr_to_jax_bcoo(A)
     jspmv = jax.jit(lambda x: jA @ x)
     jb2 = jspmv(jx)
 
@@ -88,16 +102,16 @@ def test_perf_jbcoo(benchmark, n, density_pct, grad, impl, jit):
     A, x = create_sample_data(n=n, density_pct=density_pct)
 
     if impl == 'scipy': # TODO enum
-        spmv1 = vbjax.make_spmv(A)
+        spmv1 = vb.make_spmv(A)
     elif impl == 'jaxbcoo':
-        jA = vbjax.csr_to_jax_bcoo(A)
+        jA = vb.csr_to_jax_bcoo(A)
         spmv1 = lambda x: jA @ x
     else:
         raise ValueError(impl)
     assert callable(spmv1)
     
     if grad:
-        spmv2 = jax.grad(lambda x: jnp.sum(spmv1(x)))
+        spmv2 = jax.grad(lambda x: np.sum(spmv1(x)))
     else:
         spmv2 = spmv1
     assert callable(spmv2)

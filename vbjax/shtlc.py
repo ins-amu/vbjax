@@ -2,10 +2,11 @@
 
 import numpy as np
 import scipy.special as sp
+import vbjax as vb
 try:
     import shtns
 except ImportError:
-    print('vbjax ò_ô shtns is not available')
+    vb._say('ò_ô shtns is not available')
 
 
 # Grid functions

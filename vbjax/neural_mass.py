@@ -33,18 +33,18 @@ def jr_dfun(ys, c, p):
 
 BVEPTheta = collections.namedtuple(
     typename='BVEPTheta',
-    field_names='tau0 I1 eta'
+    field_names='tau0 I1 x0'
 )
 
 bvep_default_theta = BVEPTheta(
-    tau0=10.0, I1=3.1, eta=-3.5
+    tau0=10.0, I1=3.1, x0=-3.5
 )
 
 def bvep_dfun(ys, c, p: BVEPTheta):
-    z, x = ys
+    x, z = ys
     x2 = x*x
     dx = 1 - x*x2 - 2*x2 - z + p.I1
-    dz = (1/p.tau0)*(4*(x - p.eta) - z - c)
+    dz = (1/p.tau0)*(4*(x - p.x0) - z - c)
     return np.array([dx, dz])
 
 

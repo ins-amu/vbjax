@@ -1,4 +1,7 @@
-print('vbjax ███▒▒▒▒▒▒▒ loading')
+def _say(msg): # TODO use logging
+    print(f'c[vbjax] {msg}')
+
+_say('███▒▒▒▒▒▒▒ loading')
 
 # default to setting up many cores
 def _use_many_cores():
@@ -8,10 +11,10 @@ def _use_many_cores():
         n = mp.cpu_count()
         value = '--xla_force_host_platform_device_count=%d' % n
         os.environ['XLA_FLAGS'] = value
-        print(f'vbjax (ﾉ☉ヮ⚆)ﾉ ⌒*:･ﾟ✧ can haz {n} cores')
+        _say(f'(ﾉ☉ヮ⚆)ﾉ ⌒*:･ﾟ✧ can haz {n} cores')
         return n
     else:
-        print('vbjax XLA_FLAGS already set\n')
+        _say('XLA_FLAGS already set\n')
         return 1
 
 cores = _use_many_cores()
@@ -20,9 +23,10 @@ cores = _use_many_cores()
 from .loops import make_sde, make_ode, make_dde, make_sdde, heun_step
 from .shtlc import make_shtdiff
 from .neural_mass import (
-        JRState, JRTheta, jr_dfun, jr_default_theta,
-        MPRState, MPRTheta, mpr_dfun, mpr_default_theta,
-        BOLDTheta, compute_bold_theta, bold_default_theta, bold_dfun
+    JRState, JRTheta, jr_dfun, jr_default_theta,
+    MPRState, MPRTheta, mpr_dfun, mpr_default_theta,
+    BOLDTheta, compute_bold_theta, bold_default_theta, bold_dfun,
+    BVEPTheta, bvep_default_theta, bvep_dfun,
         )
 from .regmap import make_region_mapping
 from .coupling import (
@@ -45,6 +49,9 @@ key = random.PRNGKey(42)
 keys = random.split(key, 100)
 def randn(*shape, key=key):
     return random.normal(key, shape)
+
+def rand(*shape, key=key):
+    return random.uniform(key, shape)
 
 def randn_connectome(n, key=key):
     w, l = np.abs(randn(2, n, n, key=key))
@@ -86,4 +93,4 @@ def make_field_gif(xt, gifname, fps=15):
     writer = animation.PillowWriter(fps=fps, bitrate=400)
     ani.save(gifname, writer=writer)
 
-print('vbjax ᕕ(ᐛ)ᕗ ready')
+_say('ᕕ(ᐛ)ᕗ ready')
