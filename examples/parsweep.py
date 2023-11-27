@@ -37,9 +37,10 @@ tic = time.time()
 # sweep sigma but just a few values are enough
 sigmas = [0.0, 0.2, 0.3, 0.4]
 results = []
+ng = vb.cores*4 if using_cpu else 32
 for i, sig_i in enumerate(sigmas):
     # create grid of k (on logarithmic scale) and eta
-    log_ks, etas = np.mgrid[-9.0:-2.0:64j, -4.0:-6.0:64j]
+    log_ks, etas = np.mgrid[-9.0:-2.0:1j*ng, -4.0:-6.0:1j*ng]
 
     # reshape grid to big batch of values
     pars = np.c_[

@@ -4,7 +4,7 @@
 
 ## Installation
 
-Installs with `pip install vbjax`, but you can use the source,
+Installs with `pip install "vbjax"`, but you can use the source,
 ```bash
 git clone https://github.com/ins-amu/vbjax
 cd vbjax
@@ -124,34 +124,50 @@ def run(pars, mpr_p=vb.mpr_default_theta):
 ```
 all that is plain virtual brain equations, but to enable efficient & parallel
 sweeps, we can pull in jax primitives `jax.pmap` to parallelize over compute
-devices (by default, cores of your CPU) and `jax.vmap` to vectorize the function `run`,
+devices (by default, cores of the CPU) and `jax.vmap` to vectorize the function `run`,
+*or* just a `jax.vmap` if using a GPU,
 ```python
-run_batches = jax.pmap(jax.vmap(run))
+using_cpu = jax.local_devices()[0].platform == 'cpu'
+if using_cpu:
+    run_batches = jax.pmap(jax.vmap(run, in_axes=1), in_axes=0)
+else:
+    run_batches = jax.vmap(run, in_axes=1)
 ```
-now we run this over a parameter space and plot the results,
+now we run this over a parameter space (adapting for number of cores)
+```python
+# sweep sigma but just a few values are enough
+sigmas = [0.0, 0.2, 0.3, 0.4]
+results = []
+ng = vb.cores*4 if using_cpu else 32
+for i, sig_i in enumerate(sigmas):
+    # create grid of k (on logarithmic scale) and eta
+    log_ks, etas = np.mgrid[-9.0:-2.0:1j*ng, -4.0:-6.0:1j*ng]
+    # reshape grid to big batch of values
+    pars = np.c_[
+        np.exp(log_ks.ravel()),
+        np.ones(log_ks.size)*sig_i,
+        etas.ravel()].T.copy()
+    # cpu w/ pmap expects a chunk for each core
+    if using_cpu:
+        pars = pars.reshape((3, vb.cores, -1)).transpose((1, 0, 2))
+    # now run
+    result = run_batches(pars).block_until_ready()
+    results.append(result)
+```
+and plot the results,
 ```python
 import pylab as pl
 pl.figure(figsize=(8,2))
-for i, sig_i in enumerate([0.0, 0.2, 0.3, 0.4]):
+for i, (sig_i, result) in enumerate(zip(sigmas, results)):
     pl.subplot(1, 4, i + 1)
-    log_ks, etas = np.mgrid[-9.0:0.0:16j, -4.0:-6.0:32j]
-    pars = np.c_[np.exp(log_ks.ravel()),np.ones(512)*sig_i, etas.ravel()].T.copy()
-    pars = pars.reshape((3, vb.cores))
-    result = run_batches(pars)
-    pl.imshow(result.reshape((16, 32)), vmin=0.2, vmax=0.7)
+    pl.imshow(result.reshape(log_ks.shape), vmin=0.2, vmax=0.7)
     pl.ylabel('k') if i==0 else (), pl.xlabel('eta')
     pl.title(f'sig = {sig_i:0.1f}')
 pl.show()
 pl.savefig('example3.jpg')
 ```
 ![](example3.jpg)
-On a single GPU, you don't need the `jax.pmap` anymore, because it
-is a single compute device, and `jax.vmap` is enough,
-```python
-run_batches = jax.jit(jax.vmap(run, in_axes=1))
-pars = np.c_[np.exp(log_ks.ravel()),np.ones(512)*sig_i, etas.ravel()].T.copy()
-result = run_batches(pars)
-```
+A full runnable script is in [`examples/parweep.py`](examples/parweep.py).
 
 #### Performance notes
 
