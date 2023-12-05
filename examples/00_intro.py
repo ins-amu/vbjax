@@ -50,7 +50,7 @@ and the name of the output file.
     :lines: 13
 
 .. figure:: ../../examples/images/example1.jpg
-    :scale: 50 %
+    :scale: 75 %
 
 
 """
