@@ -18,10 +18,10 @@ jobs:
           python-version: 3.x
 
       - name: Install dependencies
-        run: pip install mkdocs  # Replace with the command to install your documentation tool
+        run: pip install sphinx  # Replace with the command to install your documentation tool
 
       - name: Build site
-        run: mkdocs build  # Replace with the command to build your documentation
+        run: make html  # Replace with the command to build your documentation
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
