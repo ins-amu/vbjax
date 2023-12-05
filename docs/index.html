@@ -13,7 +13,8 @@
     <script src="_static/doctools.js?v=888ff710"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Tutorial" href="tutorial.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
@@ -24,6 +25,9 @@
         <li class="right" >
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
+        <li class="right" >
+          <a href="tutorial.html" title="Tutorial"
+             accesskey="N">next</a> |</li>
         <li class="nav-item nav-item-0"><a href="#">vbjax v0.0.10 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Welcome to vbjax’s documentation!</a></li> 
       </ul>
@@ -38,17 +42,64 @@
 <h1>Welcome to vbjax’s documentation!<a class="headerlink" href="#welcome-to-vbjax-s-documentation" title="Link to this heading">¶</a></h1>
 <section id="introduction">
 <h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p><cite>vbjax</cite> is a Jax-based package for working with virtual brain style models.</p>
+</section>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
+<p>Installs with <cite>pip install “vbjax”</cite>, but you can use the source,</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ins-amu/vbjax
+<span class="nb">cd</span><span class="w"> </span>vbjax
+pip<span class="w"> </span>install<span class="w"> </span>.<span class="o">[</span>dev<span class="o">]</span>
+</pre></div>
+</div>
+<p>The primary additional dependency of vbjax is
+[JAX](github.com/google/jax), which itself depends only on
+NumPy, SciPy &amp; opt-einsum, so it should be safe to add to your
+existing projects.</p>
+<section id="gee-pee-you">
+<h3>gee pee you<a class="headerlink" href="#gee-pee-you" title="Link to this heading">¶</a></h3>
+<p><strong>CUDA</strong></p>
+<p>If you have a CUDA-enabled GPU, you install the requisite dependencies like so</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span><span class="s2">&quot;jax[cuda11_pip]&quot;</span><span class="w"> </span>-f<span class="w"> </span>https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+</pre></div>
+</div>
+<p><strong>M1/M2</strong> 🍎</p>
+<p>On newer Apple machines w/ M1 or M2 GPUs, JAX supports using the GPU experimentally
+by installing just two extra packages:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>ml-dtypes<span class="o">==</span><span class="m">0</span>.2.0<span class="w"> </span>jax-metal
+</pre></div>
+</div>
+<p>About a third of vbjax tests fail due to absence of certain operations like n-dim
+scatter/gather &amp; FFTs, and it may not be faster because these CPUs already have
+excellent memory bandwidth &amp; latency hiding.</p>
+<p><strong>CUDA</strong> 🐳</p>
+<p><em>BUT</em> because GPU software stack versions make aligning stars look like child’s play,
+container images are available and auto-built w/
+[GitHub Actions](.github/workflows/docker-image.yml), so you can use w/ Docker</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>ghcr.io/ins-amu/vbjax:main<span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import vbjax; print(vbjax.__version__)&#39;</span>
+</pre></div>
+</div>
+<p>The images are built on Nvidia runtime images, so <cite>–gpus all</cite> is enough
+for Jax to discover the GPU(s).</p>
 <div class="toctree-wrapper compound">
 </div>
-<section id="indices-and-tables">
-<h3>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h3>
+</section>
+</section>
+<section id="tutorial">
+<h2>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
+</ul>
+</div>
 <ul class="simple">
 <li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
 <li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
 <li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
 </ul>
 <section id="module-vbjax.neural_mass">
-<span id="neural-mass"></span><h4>neural_mass<a class="headerlink" href="#module-vbjax.neural_mass" title="Link to this heading">¶</a></h4>
+<span id="neural-mass"></span><h3>neural_mass<a class="headerlink" href="#module-vbjax.neural_mass" title="Link to this heading">¶</a></h3>
 <dl class="py class">
 <dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">vbjax.neural_mass.</span></span><span class="sig-name descname"><span class="pre">BOLDTheta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tau_s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau_f</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">te</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">e0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nu_0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r_0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_tau_s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_tau_f</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_tau_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_alpha</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_e0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta" title="Link to this definition">¶</a></dt>
@@ -412,7 +463,7 @@
 
 </section>
 <section id="module-vbjax.monitor">
-<span id="monitor"></span><h4>monitor<a class="headerlink" href="#module-vbjax.monitor" title="Link to this heading">¶</a></h4>
+<span id="monitor"></span><h3>monitor<a class="headerlink" href="#module-vbjax.monitor" title="Link to this heading">¶</a></h3>
 <dl class="py function">
 <dt class="sig sig-object py" id="vbjax.monitor.compute_sarvas_gain">
 <span class="sig-prename descclassname"><span class="pre">vbjax.monitor.</span></span><span class="sig-name descname"><span class="pre">compute_sarvas_gain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">att</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Dc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="reference internal" href="_modules/vbjax/monitor.html#compute_sarvas_gain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vbjax.monitor.compute_sarvas_gain" title="Link to this definition">¶</a></dt>
@@ -459,7 +510,7 @@
 
 </section>
 <section id="module-vbjax.loops">
-<span id="loops"></span><h4>loops<a class="headerlink" href="#module-vbjax.loops" title="Link to this heading">¶</a></h4>
+<span id="loops"></span><h3>loops<a class="headerlink" href="#module-vbjax.loops" title="Link to this heading">¶</a></h3>
 <p>Functions for building time stepping loops.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="vbjax.loops.heun_step">
@@ -598,7 +649,7 @@ must be provided by the user.</p>
 
 </section>
 <section id="module-vbjax.connectome">
-<span id="connectome"></span><h4>connectome<a class="headerlink" href="#module-vbjax.connectome" title="Link to this heading">¶</a></h4>
+<span id="connectome"></span><h3>connectome<a class="headerlink" href="#module-vbjax.connectome" title="Link to this heading">¶</a></h3>
 <p>Utilities for connectomes.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="vbjax.connectome.make_conn_latent_mvnorm">
@@ -632,7 +683,7 @@ Returned if return_full=True.</p></li>
 
 </section>
 <section id="module-vbjax.layers">
-<span id="layers"></span><h4>layers<a class="headerlink" href="#module-vbjax.layers" title="Link to this heading">¶</a></h4>
+<span id="layers"></span><h3>layers<a class="headerlink" href="#module-vbjax.layers" title="Link to this heading">¶</a></h3>
 <dl class="py function">
 <dt class="sig sig-object py" id="vbjax.layers.make_dense_layers">
 <span class="sig-prename descclassname"><span class="pre">vbjax.layers.</span></span><span class="sig-name descname"><span class="pre">make_dense_layers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">in_dim,</span> <span class="pre">latent_dims=[10],</span> <span class="pre">out_dim=None,</span> <span class="pre">init_scl=0.1,</span> <span class="pre">extra_in=0,</span> <span class="pre">act_fn=&lt;PjitFunction</span> <span class="pre">of</span> <span class="pre">&lt;function</span> <span class="pre">leaky_relu&gt;&gt;,</span> <span class="pre">key=Array([</span> <span class="pre">0,</span> <span class="pre">42],</span> <span class="pre">dtype=uint32)</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vbjax/layers.html#make_dense_layers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vbjax.layers.make_dense_layers" title="Link to this definition">¶</a></dt>
@@ -641,7 +692,7 @@ Returned if return_full=True.</p></li>
 
 </section>
 <section id="module-vbjax.sparse">
-<span id="sparse"></span><h4>sparse<a class="headerlink" href="#module-vbjax.sparse" title="Link to this heading">¶</a></h4>
+<span id="sparse"></span><h3>sparse<a class="headerlink" href="#module-vbjax.sparse" title="Link to this heading">¶</a></h3>
 <dl class="py function">
 <dt class="sig sig-object py" id="vbjax.sparse.csr_to_jax_bcoo">
 <span class="sig-prename descclassname"><span class="pre">vbjax.sparse.</span></span><span class="sig-name descname"><span class="pre">csr_to_jax_bcoo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">csr_matrix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vbjax/sparse.html#csr_to_jax_bcoo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vbjax.sparse.csr_to_jax_bcoo" title="Link to this definition">¶</a></dt>
@@ -678,7 +729,7 @@ support for gradients in Jax.</p>
 
 </section>
 <section id="module-vbjax.util">
-<span id="util"></span><h4>util<a class="headerlink" href="#module-vbjax.util" title="Link to this heading">¶</a></h4>
+<span id="util"></span><h3>util<a class="headerlink" href="#module-vbjax.util" title="Link to this heading">¶</a></h3>
 <dl class="py function">
 <dt class="sig sig-object py" id="vbjax.util.to_jax">
 <span class="sig-prename descclassname"><span class="pre">vbjax.util.</span></span><span class="sig-name descname"><span class="pre">to_jax</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/vbjax/util.html#to_jax"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#vbjax.util.to_jax" title="Link to this definition">¶</a></dt>
@@ -692,7 +743,7 @@ support for gradients in Jax.</p>
 
 </section>
 <section id="module-vbjax.shtlc">
-<span id="shtlc"></span><h4>shtlc<a class="headerlink" href="#module-vbjax.shtlc" title="Link to this heading">¶</a></h4>
+<span id="shtlc"></span><h3>shtlc<a class="headerlink" href="#module-vbjax.shtlc" title="Link to this heading">¶</a></h3>
 <p>SHT based local coupling functions.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="vbjax.shtlc.grid_pairwise_distance">
@@ -785,7 +836,6 @@ support for gradients in Jax.</p>
 </section>
 </section>
 </section>
-</section>
 
 
             <div class="clearer"></div>
@@ -798,8 +848,12 @@ support for gradients in Jax.</p>
     <h3><a href="#">Table of Contents</a></h3>
     <ul>
 <li><a class="reference internal" href="#">Welcome to vbjax’s documentation!</a><ul>
-<li><a class="reference internal" href="#introduction">Introduction</a><ul>
-<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a><ul>
+<li><a class="reference internal" href="#introduction">Introduction</a></li>
+<li><a class="reference internal" href="#installation">Installation</a><ul>
+<li><a class="reference internal" href="#gee-pee-you">gee pee you</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tutorial">Tutorial</a><ul>
 <li><a class="reference internal" href="#module-vbjax.neural_mass">neural_mass</a><ul>
 <li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta"><code class="docutils literal notranslate"><span class="pre">BOLDTheta</span></code></a><ul>
 <li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.alpha"><code class="docutils literal notranslate"><span class="pre">BOLDTheta.alpha</span></code></a></li>
@@ -937,9 +991,12 @@ support for gradients in Jax.</p>
 </ul>
 </li>
 </ul>
-</li>
-</ul>
 
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="tutorial.html"
+                          title="next chapter">Tutorial</a></p>
   </div>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
@@ -971,6 +1028,9 @@ support for gradients in Jax.</p>
         <li class="right" >
           <a href="py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
+        <li class="right" >
+          <a href="tutorial.html" title="Tutorial"
+             >next</a> |</li>
         <li class="nav-item nav-item-0"><a href="#">vbjax v0.0.10 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">Welcome to vbjax’s documentation!</a></li> 
       </ul>
