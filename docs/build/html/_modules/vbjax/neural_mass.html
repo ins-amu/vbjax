@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vbjax.neural_mass &#8212; vbjax v0.0.10 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/nature.css?v=601dbdee" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=03166b9c"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">vbjax v0.0.10 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">vbjax.neural_mass</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for vbjax.neural_mass</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+
+<span class="n">JRTheta</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="n">typename</span><span class="o">=</span><span class="s1">&#39;JRTheta&#39;</span><span class="p">,</span>
+    <span class="n">field_names</span><span class="o">=</span><span class="s1">&#39;A B a b v0 nu_max r J a_1 a_2 a_3 a_4 mu I&#39;</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">))</span>
+
+<span class="n">jr_default_theta</span> <span class="o">=</span> <span class="n">JRTheta</span><span class="p">(</span>
+    <span class="n">A</span><span class="o">=</span><span class="mf">3.25</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="mf">22.0</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">v0</span><span class="o">=</span><span class="mf">5.52</span><span class="p">,</span> <span class="n">nu_max</span><span class="o">=</span><span class="mf">0.0025</span><span class="p">,</span> 
+    <span class="n">r</span><span class="o">=</span><span class="mf">0.56</span><span class="p">,</span> <span class="n">J</span><span class="o">=</span><span class="mf">135.0</span><span class="p">,</span> <span class="n">a_1</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">a_2</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">a_3</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">a_4</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="mf">0.22</span><span class="p">,</span> <span class="n">I</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+
+<span class="n">JRState</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="n">typename</span><span class="o">=</span><span class="s1">&#39;JRState&#39;</span><span class="p">,</span>
+    <span class="n">field_names</span><span class="o">=</span><span class="s1">&#39;y0 y1 y2 y3 y4 y5&#39;</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">))</span>
+    
+<div class="viewcode-block" id="jr_dfun">
+<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.jr_dfun">[docs]</a>
+<span class="k">def</span> <span class="nf">jr_dfun</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">y2</span><span class="p">,</span> <span class="n">y3</span><span class="p">,</span> <span class="n">y4</span><span class="p">,</span> <span class="n">y5</span> <span class="o">=</span> <span class="n">ys</span>
+
+    <span class="n">sigm_y1_y2</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">nu_max</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">r</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">v0</span> <span class="o">-</span> <span class="p">(</span><span class="n">y1</span> <span class="o">-</span> <span class="n">y2</span><span class="p">))))</span>
+    <span class="n">sigm_y0_1</span>  <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">nu_max</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">r</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">v0</span> <span class="o">-</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">a_1</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">J</span> <span class="o">*</span> <span class="n">y0</span><span class="p">))))</span>
+    <span class="n">sigm_y0_3</span>  <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">nu_max</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">r</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">v0</span> <span class="o">-</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">a_3</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">J</span> <span class="o">*</span> <span class="n">y0</span><span class="p">))))</span>
+
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">y3</span><span class="p">,</span>
+        <span class="n">y4</span><span class="p">,</span>
+        <span class="n">y5</span><span class="p">,</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">A</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="n">sigm_y1_y2</span> <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="n">y3</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">a</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">y0</span><span class="p">,</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">A</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">mu</span> <span class="o">+</span> <span class="n">p</span><span class="o">.</span><span class="n">a_2</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">J</span> <span class="o">*</span> <span class="n">sigm_y0_1</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span>
+            <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="n">y4</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">a</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">y1</span><span class="p">,</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">B</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">b</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">a_4</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">J</span> <span class="o">*</span> <span class="n">sigm_y0_3</span><span class="p">)</span> <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">b</span> <span class="o">*</span> <span class="n">y5</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">b</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">y2</span><span class="p">,</span>
+                     <span class="p">])</span></div>
+
+
+
+<span class="n">BVEPTheta</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="n">typename</span><span class="o">=</span><span class="s1">&#39;BVEPTheta&#39;</span><span class="p">,</span>
+    <span class="n">field_names</span><span class="o">=</span><span class="s1">&#39;tau0 I1 x0&#39;</span>
+<span class="p">)</span>
+
+<span class="n">bvep_default_theta</span> <span class="o">=</span> <span class="n">BVEPTheta</span><span class="p">(</span>
+    <span class="n">tau0</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">I1</span><span class="o">=</span><span class="mf">3.1</span><span class="p">,</span> <span class="n">x0</span><span class="o">=-</span><span class="mf">3.5</span>
+<span class="p">)</span>
+
+<div class="viewcode-block" id="bvep_dfun">
+<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.bvep_dfun">[docs]</a>
+<span class="k">def</span> <span class="nf">bvep_dfun</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">BVEPTheta</span><span class="p">):</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">ys</span>
+    <span class="n">x2</span> <span class="o">=</span> <span class="n">x</span><span class="o">*</span><span class="n">x</span>
+    <span class="n">dx</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">x</span><span class="o">*</span><span class="n">x2</span> <span class="o">-</span> <span class="mi">2</span><span class="o">*</span><span class="n">x2</span> <span class="o">-</span> <span class="n">z</span> <span class="o">+</span> <span class="n">p</span><span class="o">.</span><span class="n">I1</span>
+    <span class="n">dz</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">p</span><span class="o">.</span><span class="n">tau0</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">4</span><span class="o">*</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">x0</span><span class="p">)</span> <span class="o">-</span> <span class="n">z</span> <span class="o">-</span> <span class="n">c</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">dx</span><span class="p">,</span> <span class="n">dz</span><span class="p">])</span></div>
+
+
+
+<span class="c1"># Montbrio-Pazo-Roxin</span>
+<span class="n">MPRTheta</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="n">typename</span><span class="o">=</span><span class="s1">&#39;MPRTheta&#39;</span><span class="p">,</span>
+    <span class="n">field_names</span><span class="o">=</span><span class="s1">&#39;tau I Delta J eta cr cv&#39;</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">))</span>
+
+<span class="n">mpr_default_theta</span> <span class="o">=</span> <span class="n">MPRTheta</span><span class="p">(</span>
+    <span class="n">tau</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">I</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">Delta</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">J</span><span class="o">=</span><span class="mf">15.0</span><span class="p">,</span>
+    <span class="n">eta</span><span class="o">=-</span><span class="mf">5.0</span><span class="p">,</span>
+    <span class="n">cr</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">cv</span><span class="o">=</span><span class="mf">0.0</span>
+<span class="p">)</span>
+
+<span class="n">MPRState</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="n">typename</span><span class="o">=</span><span class="s1">&#39;MPRState&#39;</span><span class="p">,</span>
+    <span class="n">field_names</span><span class="o">=</span><span class="s1">&#39;r V&#39;</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">))</span>
+
+<span class="n">mpr_default_state</span> <span class="o">=</span> <span class="n">MPRState</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">V</span><span class="o">=-</span><span class="mf">2.0</span><span class="p">)</span>
+
+<div class="viewcode-block" id="mpr_dfun">
+<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.mpr_dfun">[docs]</a>
+<span class="k">def</span> <span class="nf">mpr_dfun</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">r</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">ys</span>
+
+    <span class="c1"># bound rate to be positive</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="n">I_c</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">cr</span> <span class="o">*</span> <span class="n">c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">p</span><span class="o">.</span><span class="n">cv</span> <span class="o">*</span> <span class="n">c</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+        <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">p</span><span class="o">.</span><span class="n">tau</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">Delta</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">tau</span><span class="p">)</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">V</span><span class="p">),</span>
+        <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">p</span><span class="o">.</span><span class="n">tau</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">V</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">p</span><span class="o">.</span><span class="n">eta</span> <span class="o">+</span> <span class="n">p</span><span class="o">.</span><span class="n">J</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">tau</span> <span class="o">*</span>
+         <span class="n">r</span> <span class="o">+</span> <span class="n">p</span><span class="o">.</span><span class="n">I</span> <span class="o">+</span> <span class="n">I_c</span> <span class="o">-</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">tau</span> <span class="o">**</span> <span class="mi">2</span><span class="p">))</span>
+    <span class="p">])</span></div>
+
+
+
+<span class="n">BOLDTheta</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="n">typename</span><span class="o">=</span><span class="s1">&#39;BOLDTheta&#39;</span><span class="p">,</span>
+    <span class="n">field_names</span><span class="o">=</span><span class="s1">&#39;tau_s,tau_f,tau_o,alpha,te,v0,e0,epsilon,nu_0,&#39;</span>
+                <span class="s1">&#39;r_0,recip_tau_s,recip_tau_f,recip_tau_o,recip_alpha,&#39;</span>
+                <span class="s1">&#39;recip_e0,k1,k2,k3&#39;</span>
+<span class="p">)</span>
+
+<div class="viewcode-block" id="compute_bold_theta">
+<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.compute_bold_theta">[docs]</a>
+<span class="k">def</span> <span class="nf">compute_bold_theta</span><span class="p">(</span>
+        <span class="n">tau_s</span><span class="o">=</span><span class="mf">0.65</span><span class="p">,</span>
+        <span class="n">tau_f</span><span class="o">=</span><span class="mf">0.41</span><span class="p">,</span>
+        <span class="n">tau_o</span><span class="o">=</span><span class="mf">0.98</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="mf">0.32</span><span class="p">,</span>
+        <span class="n">te</span><span class="o">=</span><span class="mf">0.04</span><span class="p">,</span>
+        <span class="n">v0</span><span class="o">=</span><span class="mf">4.0</span><span class="p">,</span>
+        <span class="n">e0</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+        <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+        <span class="n">nu_0</span><span class="o">=</span><span class="mf">40.3</span><span class="p">,</span>
+        <span class="n">r_0</span><span class="o">=</span><span class="mf">25.0</span><span class="p">,</span>
+    <span class="p">):</span>
+    <span class="n">recip_tau_s</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">tau_s</span>
+    <span class="n">recip_tau_f</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">tau_f</span>
+    <span class="n">recip_tau_o</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">tau_o</span>
+    <span class="n">recip_alpha</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">alpha</span>
+    <span class="n">recip_e0</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">e0</span>
+    <span class="n">k1</span> <span class="o">=</span> <span class="mf">4.3</span> <span class="o">*</span> <span class="n">nu_0</span> <span class="o">*</span> <span class="n">e0</span> <span class="o">*</span> <span class="n">te</span>
+    <span class="n">k2</span> <span class="o">=</span> <span class="n">epsilon</span> <span class="o">*</span> <span class="n">r_0</span> <span class="o">*</span> <span class="n">e0</span> <span class="o">*</span> <span class="n">te</span>
+    <span class="n">k3</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">epsilon</span>
+    <span class="k">return</span> <span class="n">BOLDTheta</span><span class="p">(</span><span class="o">**</span><span class="nb">locals</span><span class="p">())</span></div>
+
+
+<span class="n">bold_default_theta</span> <span class="o">=</span> <span class="n">compute_bold_theta</span><span class="p">()</span>
+
+<div class="viewcode-block" id="bold_dfun">
+<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.bold_dfun">[docs]</a>
+<span class="k">def</span> <span class="nf">bold_dfun</span><span class="p">(</span><span class="n">sfvq</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">BOLDTheta</span><span class="p">):</span>
+    <span class="n">s</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">q</span> <span class="o">=</span> <span class="n">sfvq</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_tau_s</span> <span class="o">*</span> <span class="n">s</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_tau_f</span> <span class="o">*</span> <span class="p">(</span><span class="n">f</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">s</span>
+    <span class="n">dv</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_tau_o</span> <span class="o">*</span> <span class="p">(</span><span class="n">f</span> <span class="o">-</span> <span class="n">v</span> <span class="o">**</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_alpha</span><span class="p">)</span>
+    <span class="n">dq</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_tau_o</span> <span class="o">*</span> <span class="p">(</span><span class="n">f</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">e0</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">f</span><span class="p">))</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_e0</span>
+                          <span class="o">-</span> <span class="n">v</span> <span class="o">**</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_alpha</span> <span class="o">*</span> <span class="p">(</span><span class="n">q</span> <span class="o">/</span> <span class="n">v</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">ds</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">dv</span><span class="p">,</span> <span class="n">dq</span><span class="p">])</span></div>
+
+
+
+<span class="c1"># TODO other models</span>
+<span class="c1"># TODO codim3 https://gist.github.com/maedoc/01cea5cad9c833c56349392ee7d9b627</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">vbjax v0.0.10 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">vbjax.neural_mass</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2023, Marmaduke Woodman.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

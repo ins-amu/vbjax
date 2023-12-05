@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vbjax.loops &#8212; vbjax v0.0.10 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/nature.css?v=601dbdee" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=03166b9c"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">vbjax v0.0.10 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">vbjax.loops</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for vbjax.loops</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Functions for building time stepping loops.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+
+<div class="viewcode-block" id="heun_step">
+<a class="viewcode-back" href="../../index.html#vbjax.loops.heun_step">[docs]</a>
+<span class="k">def</span> <span class="nf">heun_step</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">add</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Use a Heun scheme to step state with a right hand sides dfun(.)</span>
+<span class="sd">    and additional forcing term add.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">d1</span> <span class="o">=</span> <span class="n">dfun</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">d2</span> <span class="o">=</span> <span class="n">dfun</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="n">dt</span><span class="o">*</span><span class="n">d1</span> <span class="o">+</span> <span class="n">add</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">x</span> <span class="o">+</span> <span class="n">dt</span><span class="o">*</span><span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">d1</span> <span class="o">+</span> <span class="n">d2</span><span class="p">)</span> <span class="o">+</span> <span class="n">add</span></div>
+
+
+<div class="viewcode-block" id="make_sde">
+<a class="viewcode-back" href="../../index.html#vbjax.loops.make_sde">[docs]</a>
+<span class="k">def</span> <span class="nf">make_sde</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">gfun</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Use a stochastic Heun scheme to integrate autonomous stochastic</span>
+<span class="sd">    differential equations (SDEs).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ==========</span>
+<span class="sd">    dt : float</span>
+<span class="sd">        Time step</span>
+<span class="sd">    dfun : function</span>
+<span class="sd">        Function of the form `dfun(x, p)` that computes drift coefficients of</span>
+<span class="sd">        the stochastic differential equation.</span>
+<span class="sd">    gfun : function or float</span>
+<span class="sd">        Function of the form `gfun(x, p)` that computes diffusion coefficients</span>
+<span class="sd">        of the stochastic differential equation. If a numerical value is</span>
+<span class="sd">        provided, this is used as a constant diffusion coefficient for additive</span>
+<span class="sd">        linear SDE.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    =======</span>
+<span class="sd">    step : function</span>
+<span class="sd">        Function of the form `step(x, z_t, p)` that takes one step in time</span>
+<span class="sd">        according to the Heun scheme.</span>
+<span class="sd">    loop : function</span>
+<span class="sd">        Function of the form `loop(x0, zs, p)` that iteratively calls `step`</span>
+<span class="sd">        for all `z`.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    =====</span>
+
+<span class="sd">    In both cases, a Jax compatible parameter set `p` is provided, either an array</span>
+<span class="sd">    or some pytree compatible structure.</span>
+
+<span class="sd">    Note that the integrator does not sample normally distributed noise, so this</span>
+<span class="sd">    must be provided by the user.</span>
+
+
+<span class="sd">    &gt;&gt;&gt; import vbjax as vb</span>
+<span class="sd">    &gt;&gt;&gt; _, sde = vb.make_sde(1.0, lambda x, p: -x, 0.1)</span>
+<span class="sd">    &gt;&gt;&gt; sde(1.0, vb.randn(4), None)</span>
+<span class="sd">    Array([ 0.5093468 ,  0.30794007,  0.07600437, -0.03876263], dtype=float32)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">sqrt_dt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">dt</span><span class="p">)</span>
+
+    <span class="c1"># gfun is a numerical value or a function f(x,p) -&gt; sig</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">gfun</span><span class="p">,</span> <span class="s1">&#39;__call__&#39;</span><span class="p">):</span>
+        <span class="n">sig</span> <span class="o">=</span> <span class="n">gfun</span>
+        <span class="n">gfun</span> <span class="o">=</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">_</span><span class="p">:</span> <span class="n">sig</span>
+
+    <span class="k">def</span> <span class="nf">step</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">z_t</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="n">noise</span> <span class="o">=</span> <span class="n">gfun</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="n">sqrt_dt</span> <span class="o">*</span> <span class="n">z_t</span>
+        <span class="k">return</span> <span class="n">heun_step</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">add</span><span class="o">=</span><span class="n">noise</span><span class="p">)</span>
+
+    <span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+    <span class="k">def</span> <span class="nf">loop</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">zs</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">op</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">step</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">x</span>
+        <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">zs</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">step</span><span class="p">,</span> <span class="n">loop</span></div>
+
+
+
+<div class="viewcode-block" id="make_ode">
+<a class="viewcode-back" href="../../index.html#vbjax.loops.make_ode">[docs]</a>
+<span class="k">def</span> <span class="nf">make_ode</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">dfun</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Use a Heun scheme to integrate autonomous ordinary differential</span>
+<span class="sd">    equations (ODEs).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ==========</span>
+<span class="sd">    dt : float</span>
+<span class="sd">        Time step</span>
+<span class="sd">    dfun : function</span>
+<span class="sd">        Function of the form `dfun(x, p)` that computes derivatives of the</span>
+<span class="sd">        ordinary differential equations.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    =======</span>
+<span class="sd">    step : function</span>
+<span class="sd">        Function of the form `step(x, t, p)` that takes one step in time</span>
+<span class="sd">        according to the Heun scheme.</span>
+<span class="sd">    loop : function</span>
+<span class="sd">        Function of the form `loop(x0, ts, p)` that iteratively calls `step`</span>
+<span class="sd">        for all time steps `ts`.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    =====</span>
+
+<span class="sd">    In both cases, a Jax compatible parameter set `p` is provided, either an array</span>
+<span class="sd">    or some pytree compatible structure.</span>
+
+<span class="sd">    &gt;&gt;&gt; import vbjax as vb, jax.numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; _, ode = vb.make_ode(1.0, lambda x, p: -x)</span>
+<span class="sd">    &gt;&gt;&gt; ode(1.0, np.r_[:4], None)</span>
+<span class="sd">    Array([0.5   , 0.25  , 0.125 , 0.0625], dtype=float32, weak_type=True)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">step</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">heun_step</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+
+    <span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+    <span class="k">def</span> <span class="nf">loop</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">op</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">step</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">x</span>
+        <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">ts</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">step</span><span class="p">,</span> <span class="n">loop</span></div>
+
+
+
+<div class="viewcode-block" id="make_dde">
+<a class="viewcode-back" href="../../index.html#vbjax.loops.make_dde">[docs]</a>
+<span class="k">def</span> <span class="nf">make_dde</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">nh</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">unroll</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+    <span class="s2">&quot;Invokes make_sdde w/ gfun 0.&quot;</span>
+    <span class="k">return</span> <span class="n">make_sdde</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">nh</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">unroll</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="make_sdde">
+<a class="viewcode-back" href="../../index.html#vbjax.loops.make_sdde">[docs]</a>
+<span class="k">def</span> <span class="nf">make_sdde</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">nh</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">gfun</span><span class="p">,</span> <span class="n">unroll</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">zero_delays</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Use a stochastic Heun scheme to integrate autonomous</span>
+<span class="sd">    stochastic delay differential equations (SDEs).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ==========</span>
+<span class="sd">    dt : float</span>
+<span class="sd">        Time step</span>
+<span class="sd">    nh : int</span>
+<span class="sd">        Maximum delay in time steps.</span>
+<span class="sd">    dfun : function</span>
+<span class="sd">        Function of the form `dfun(xt, x, t, p)` that computes drift coefficients of</span>
+<span class="sd">        the stochastic differential equation.</span>
+<span class="sd">    gfun : function or float</span>
+<span class="sd">        Function of the form `gfun(x, p)` that computes diffusion coefficients</span>
+<span class="sd">        of the stochastic differential equation. If a numerical value is</span>
+<span class="sd">        provided, this is used as a constant diffusion coefficient for additive</span>
+<span class="sd">        linear SDE.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    =======</span>
+<span class="sd">    step : function</span>
+<span class="sd">        Function of the form `step((x_t,t), z_t, p)` that takes one step in time</span>
+<span class="sd">        according to the Heun scheme.</span>
+<span class="sd">    loop : function</span>
+<span class="sd">        Function of the form `loop((xs, t), p)` that iteratively calls `step`</span>
+<span class="sd">        for each `xs[nh:]` and starting time index `t`.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    =====</span>
+
+<span class="sd">    - A Jax compatible parameter set `p` is provided, either an array</span>
+<span class="sd">      or some pytree compatible structure.</span>
+<span class="sd">    - The integrator does not sample normally distributed noise, so this</span>
+<span class="sd">      must be provided by the user.</span>
+<span class="sd">    - The history buffer passed to the user functions, on the corrector</span>
+<span class="sd">      stage of the Heun method, does not contain the predictor stage, for</span>
+<span class="sd">      performance reasons, unless `zero_delays` is set to `True`.</span>
+<span class="sd">      A good compromise can be to set all zero delays to dt.</span>
+
+<span class="sd">    &gt;&gt;&gt; import vbjax as vb, jax.numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; _, sdde = vb.make_sdde(1.0, 2, lambda xt, x, t, p: -xt[t-2], 0.0)</span>
+<span class="sd">    &gt;&gt;&gt; x,t = sdde(np.ones(6)+10, None)</span>
+<span class="sd">    &gt;&gt;&gt; x</span>
+<span class="sd">    Array([ 11.,  11.,  11.,   0., -11., -22.], dtype=float32)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">heun</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">sqrt_dt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">dt</span><span class="p">)</span>
+
+    <span class="c1"># TODO nh == 0: return make_sde(dt, dfun, gfun) etc</span>
+
+    <span class="c1"># gfun is a numerical value or a function f(x,p) -&gt; sig</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">gfun</span><span class="p">,</span> <span class="s1">&#39;__call__&#39;</span><span class="p">):</span>
+        <span class="n">sig</span> <span class="o">=</span> <span class="n">gfun</span>
+        <span class="n">gfun</span> <span class="o">=</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">_</span><span class="p">:</span> <span class="n">sig</span>
+
+    <span class="k">def</span> <span class="nf">step</span><span class="p">(</span><span class="n">xt_t</span><span class="p">,</span> <span class="n">z_t</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+        <span class="n">xt</span><span class="p">,</span> <span class="n">t</span> <span class="o">=</span> <span class="n">xt_t</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">xt</span><span class="p">[</span><span class="n">nh</span> <span class="o">+</span> <span class="n">t</span><span class="p">]</span>
+        <span class="n">noise</span> <span class="o">=</span> <span class="n">gfun</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="n">sqrt_dt</span> <span class="o">*</span> <span class="n">z_t</span>
+        <span class="n">d1</span> <span class="o">=</span> <span class="n">dfun</span><span class="p">(</span><span class="n">xt</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+        <span class="n">xi</span> <span class="o">=</span> <span class="n">x</span> <span class="o">+</span> <span class="n">dt</span><span class="o">*</span><span class="n">d1</span> <span class="o">+</span> <span class="n">noise</span>
+        <span class="k">if</span> <span class="n">heun</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">zero_delays</span><span class="p">:</span>
+                <span class="c1"># severe performance hit (5x+)</span>
+                <span class="n">xt</span> <span class="o">=</span> <span class="n">xt</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">nh</span> <span class="o">+</span> <span class="n">t</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xi</span><span class="p">)</span>
+            <span class="n">d2</span> <span class="o">=</span> <span class="n">dfun</span><span class="p">(</span><span class="n">xt</span><span class="p">,</span> <span class="n">xi</span><span class="p">,</span> <span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+            <span class="n">nx</span> <span class="o">=</span> <span class="n">x</span> <span class="o">+</span> <span class="n">dt</span><span class="o">*</span><span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">d1</span> <span class="o">+</span> <span class="n">d2</span><span class="p">)</span> <span class="o">+</span> <span class="n">noise</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">nx</span> <span class="o">=</span> <span class="n">xi</span>
+        <span class="n">xt</span> <span class="o">=</span> <span class="n">xt</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">nh</span> <span class="o">+</span> <span class="n">t</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">nx</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">xt</span><span class="p">,</span><span class="n">t</span><span class="o">+</span><span class="mi">1</span><span class="p">),</span> <span class="n">nx</span>
+
+    <span class="nd">@jax</span><span class="o">.</span><span class="n">jit</span>
+    <span class="k">def</span> <span class="nf">loop</span><span class="p">(</span><span class="n">xt</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="s2">&quot;xt is the buffer, zt is (ts, zs), p is parameters.&quot;</span>
+        <span class="n">op</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">xt</span><span class="p">,</span> <span class="n">tz</span><span class="p">:</span> <span class="n">step</span><span class="p">(</span><span class="n">xt</span><span class="p">,</span> <span class="n">tz</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">jax</span><span class="o">.</span><span class="n">lax</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="p">(</span><span class="n">xt</span><span class="p">,</span><span class="n">t</span><span class="p">),</span> <span class="n">xt</span><span class="p">[</span><span class="n">nh</span><span class="p">:],</span> <span class="n">unroll</span><span class="o">=</span><span class="n">unroll</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">step</span><span class="p">,</span> <span class="n">loop</span></div>
+
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">vbjax v0.0.10 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">vbjax.loops</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2023, Marmaduke Woodman.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>
