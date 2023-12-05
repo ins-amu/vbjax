@@ -27,4 +27,4 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           deploy_key: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./vbjax/docs/build/html  # Replace with the path to your documentation build directory
+          publish_dir: ../docs/build/html  # Replace with the path to your documentation build directory
