@@ -42,7 +42,7 @@
 
 
 <div class="viewcode-block" id="make_offline">
-<a class="viewcode-back" href="../../index.html#vbjax.monitor.make_offline">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.monitor.make_offline">[docs]</a>
 <span class="k">def</span> <span class="nf">make_offline</span><span class="p">(</span><span class="n">step_fn</span><span class="p">,</span> <span class="n">sample_fn</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
     <span class="s2">&quot;Compute monitor samples in an offline or batch fashion.&quot;</span>
     <span class="k">def</span> <span class="nf">op</span><span class="p">(</span><span class="n">mon</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
@@ -58,7 +58,7 @@
 <span class="c1"># NB shape here is the input shape of neural activity</span>
 
 <div class="viewcode-block" id="make_timeavg">
-<a class="viewcode-back" href="../../index.html#vbjax.monitor.make_timeavg">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.monitor.make_timeavg">[docs]</a>
 <span class="k">def</span> <span class="nf">make_timeavg</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
     <span class="s2">&quot;Make a time average monitor.&quot;</span>
     <span class="n">new</span> <span class="o">=</span> <span class="k">lambda</span> <span class="p">:</span> <span class="p">{</span><span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="p">),</span> <span class="s1">&#39;n&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
@@ -72,7 +72,7 @@
 
 
 <div class="viewcode-block" id="compute_sarvas_gain">
-<a class="viewcode-back" href="../../index.html#vbjax.monitor.compute_sarvas_gain">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.monitor.compute_sarvas_gain">[docs]</a>
 <span class="k">def</span> <span class="nf">compute_sarvas_gain</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="n">att</span><span class="p">,</span> <span class="n">Ds</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">Dc</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
     <span class="c1"># https://gist.github.com/maedoc/add7c3206f81d59105753a04f7c1fcf4</span>
     <span class="k">pass</span></div>
@@ -80,7 +80,7 @@
 
 
 <div class="viewcode-block" id="make_gain">
-<a class="viewcode-back" href="../../index.html#vbjax.monitor.make_gain">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.monitor.make_gain">[docs]</a>
 <span class="k">def</span> <span class="nf">make_gain</span><span class="p">(</span><span class="n">gain</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="s2">&quot;Make a gain-matrix monitor suitable for sEEG, EEG &amp; MEG.&quot;</span>
     <span class="n">tavg_shape</span> <span class="o">=</span> <span class="n">gain</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">if</span> <span class="n">shape</span> <span class="k">else</span> <span class="p">())</span>
@@ -91,7 +91,7 @@
 
 
 <div class="viewcode-block" id="make_bold">
-<a class="viewcode-back" href="../../index.html#vbjax.monitor.make_bold">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.monitor.make_bold">[docs]</a>
 <span class="k">def</span> <span class="nf">make_bold</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">BOLDTheta</span><span class="p">):</span>
     <span class="s2">&quot;Make a BOLD fMRI monitor.&quot;</span>
     <span class="n">sfvq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">4</span><span class="p">,)</span> <span class="o">+</span> <span class="n">shape</span><span class="p">)</span>
@@ -106,7 +106,7 @@
 
 
 <div class="viewcode-block" id="make_cov">
-<a class="viewcode-back" href="../../index.html#vbjax.monitor.make_cov">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.monitor.make_cov">[docs]</a>
 <span class="k">def</span> <span class="nf">make_cov</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
     <span class="c1"># welford online cov estimate yields o(1) backprop memory usage</span>
     <span class="c1"># https://github.com/maedoc/tvb-fut/blob/master/lib/github.com/maedoc/tvb-fut/stats.fut#L9</span>
@@ -141,7 +141,7 @@
 
 
 <div class="viewcode-block" id="make_fc">
-<a class="viewcode-back" href="../../index.html#vbjax.monitor.make_fc">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.monitor.make_fc">[docs]</a>
 <span class="k">def</span> <span class="nf">make_fc</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
     <span class="n">new_buf</span><span class="p">,</span> <span class="n">step</span><span class="p">,</span> <span class="n">cov_sample</span> <span class="o">=</span> <span class="n">make_cov</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
     <span class="k">def</span> <span class="nf">fc_sample</span><span class="p">(</span><span class="n">buf</span><span class="p">):</span>
@@ -154,7 +154,7 @@
 
 
 <div class="viewcode-block" id="make_fft">
-<a class="viewcode-back" href="../../index.html#vbjax.monitor.make_fft">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.monitor.make_fft">[docs]</a>
 <span class="k">def</span> <span class="nf">make_fft</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">period</span><span class="p">):</span>
     <span class="k">pass</span></div>
 

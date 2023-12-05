@@ -34,14 +34,14 @@ extensions = ['sphinx.ext.todo',
               'sphinx.ext.viewcode',
               'sphinx.ext.autodoc',
               'sphinx.ext.githubpages',
-              # 'sphinxcontrib.plantuml',
+              'sphinx.ext.autosectionlabel',
               'sphinx.ext.inheritance_diagram',
               'sphinx.ext.coverage',
               'sphinx.ext.napoleon',
               'sphinx.ext.imgmath',
-              'sphinx.ext.mathjax',
-              #   'sphinx.ext.autosectionlabel'
+              'sphinx.ext.mathjax'
               ]
+              # 'sphinxcontrib.plantuml',
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

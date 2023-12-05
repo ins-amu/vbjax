@@ -76,6 +76,7 @@ for Jax to discover the GPU(s).
 
 Tutorial
 ########
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

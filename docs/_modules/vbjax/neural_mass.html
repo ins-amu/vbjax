@@ -52,7 +52,7 @@
     <span class="n">field_names</span><span class="o">=</span><span class="s1">&#39;y0 y1 y2 y3 y4 y5&#39;</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">))</span>
     
 <div class="viewcode-block" id="jr_dfun">
-<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.jr_dfun">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.neural_mass.jr_dfun">[docs]</a>
 <span class="k">def</span> <span class="nf">jr_dfun</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
     <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">y2</span><span class="p">,</span> <span class="n">y3</span><span class="p">,</span> <span class="n">y4</span><span class="p">,</span> <span class="n">y5</span> <span class="o">=</span> <span class="n">ys</span>
 
@@ -81,7 +81,7 @@
 <span class="p">)</span>
 
 <div class="viewcode-block" id="bvep_dfun">
-<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.bvep_dfun">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.neural_mass.bvep_dfun">[docs]</a>
 <span class="k">def</span> <span class="nf">bvep_dfun</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">BVEPTheta</span><span class="p">):</span>
     <span class="n">x</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">ys</span>
     <span class="n">x2</span> <span class="o">=</span> <span class="n">x</span><span class="o">*</span><span class="n">x</span>
@@ -113,7 +113,7 @@
 <span class="n">mpr_default_state</span> <span class="o">=</span> <span class="n">MPRState</span><span class="p">(</span><span class="n">r</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">V</span><span class="o">=-</span><span class="mf">2.0</span><span class="p">)</span>
 
 <div class="viewcode-block" id="mpr_dfun">
-<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.mpr_dfun">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.neural_mass.mpr_dfun">[docs]</a>
 <span class="k">def</span> <span class="nf">mpr_dfun</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
     <span class="n">r</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">ys</span>
 
@@ -138,7 +138,7 @@
 <span class="p">)</span>
 
 <div class="viewcode-block" id="compute_bold_theta">
-<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.compute_bold_theta">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.neural_mass.compute_bold_theta">[docs]</a>
 <span class="k">def</span> <span class="nf">compute_bold_theta</span><span class="p">(</span>
         <span class="n">tau_s</span><span class="o">=</span><span class="mf">0.65</span><span class="p">,</span>
         <span class="n">tau_f</span><span class="o">=</span><span class="mf">0.41</span><span class="p">,</span>
@@ -165,7 +165,7 @@
 <span class="n">bold_default_theta</span> <span class="o">=</span> <span class="n">compute_bold_theta</span><span class="p">()</span>
 
 <div class="viewcode-block" id="bold_dfun">
-<a class="viewcode-back" href="../../index.html#vbjax.neural_mass.bold_dfun">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.neural_mass.bold_dfun">[docs]</a>
 <span class="k">def</span> <span class="nf">bold_dfun</span><span class="p">(</span><span class="n">sfvq</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">BOLDTheta</span><span class="p">):</span>
     <span class="n">s</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">q</span> <span class="o">=</span> <span class="n">sfvq</span>
     <span class="n">ds</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_tau_s</span> <span class="o">*</span> <span class="n">s</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">recip_tau_f</span> <span class="o">*</span> <span class="p">(</span><span class="n">f</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>

@@ -44,7 +44,7 @@
 
 
 <div class="viewcode-block" id="make_spmv">
-<a class="viewcode-back" href="../../index.html#vbjax.sparse.make_spmv">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.sparse.make_spmv">[docs]</a>
 <span class="k">def</span> <span class="nf">make_spmv</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">is_symmetric</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_scipy</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Make a closure for a general sparse matrix-vector multiplication.</span>
@@ -77,7 +77,7 @@
 
 
 <div class="viewcode-block" id="csr_to_jax_bcoo">
-<a class="viewcode-back" href="../../index.html#vbjax.sparse.csr_to_jax_bcoo">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.sparse.csr_to_jax_bcoo">[docs]</a>
 <span class="k">def</span> <span class="nf">csr_to_jax_bcoo</span><span class="p">(</span><span class="n">A</span><span class="p">:</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csr_matrix</span><span class="p">)</span> <span class="p">:</span>
     <span class="s2">&quot;Convert CSR format to batched COO format.&quot;</span>
     <span class="c1"># first convert CSR to COO</span>
@@ -95,7 +95,7 @@
     <span class="k">return</span> <span class="n">out</span>
 
 <div class="viewcode-block" id="make_sg_spmv">
-<a class="viewcode-back" href="../../index.html#vbjax.sparse.make_sg_spmv">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.sparse.make_sg_spmv">[docs]</a>
 <span class="k">def</span> <span class="nf">make_sg_spmv</span><span class="p">(</span><span class="n">A</span><span class="p">:</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csr_matrix</span><span class="p">,</span>
                  <span class="n">use_pmap</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                  <span class="n">sharding</span><span class="p">:</span> <span class="n">jax</span><span class="o">.</span><span class="n">sharding</span><span class="o">.</span><span class="n">PositionalSharding</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>

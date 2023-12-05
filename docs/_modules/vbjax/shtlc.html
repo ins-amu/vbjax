@@ -49,7 +49,7 @@
 <span class="c1"># Grid functions</span>
 
 <div class="viewcode-block" id="make_grid_shtns">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.make_grid_shtns">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.make_grid_shtns">[docs]</a>
 <span class="k">def</span> <span class="nf">make_grid_shtns</span><span class="p">(</span><span class="n">lmax</span><span class="p">,</span> <span class="n">nlat</span><span class="p">,</span> <span class="n">nlon</span><span class="p">,</span> <span class="n">D</span><span class="p">):</span>
     <span class="s2">&quot;Create shtns object and grid as in `make_grid`.&quot;</span>
     <span class="n">sht</span> <span class="o">=</span> <span class="n">shtns</span><span class="o">.</span><span class="n">sht</span><span class="p">(</span><span class="n">lmax</span><span class="p">)</span>
@@ -64,7 +64,7 @@
 
 
 <div class="viewcode-block" id="make_lm">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.make_lm">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.make_lm">[docs]</a>
 <span class="k">def</span> <span class="nf">make_lm</span><span class="p">(</span><span class="n">lmax</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
     <span class="n">lm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="n">l</span><span class="p">,</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">lmax</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">lmax</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span><span class="o">&lt;=</span><span class="n">l</span><span class="p">])</span><span class="o">.</span><span class="n">T</span>
     <span class="k">return</span> <span class="n">lm</span></div>
@@ -72,7 +72,7 @@
 
 
 <div class="viewcode-block" id="make_grid">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.make_grid">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.make_grid">[docs]</a>
 <span class="k">def</span> <span class="nf">make_grid</span><span class="p">(</span><span class="n">nlat</span><span class="p">,</span> <span class="n">nlon</span><span class="p">):</span>
     <span class="s2">&quot;Create grid for SHT, phi latitude, theta longitude.&quot;</span>
     <span class="n">points</span><span class="p">,</span> <span class="n">weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polynomial</span><span class="o">.</span><span class="n">legendre</span><span class="o">.</span><span class="n">leggauss</span><span class="p">(</span><span class="n">nlat</span><span class="p">)</span>
@@ -84,7 +84,7 @@
 
 
 <div class="viewcode-block" id="grid_pairwise_distance">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.grid_pairwise_distance">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.grid_pairwise_distance">[docs]</a>
 <span class="k">def</span> <span class="nf">grid_pairwise_distance</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">):</span>
     <span class="s2">&quot;Compute pairwise distances on grid.  Memory intensive for large grids.&quot;</span>
     <span class="n">phi1</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;f&#39;</span><span class="p">)[:,</span><span class="kc">None</span><span class="p">]</span>
@@ -99,7 +99,7 @@
 
 
 <div class="viewcode-block" id="randn_relaxed">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.randn_relaxed">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.randn_relaxed">[docs]</a>
 <span class="k">def</span> <span class="nf">randn_relaxed</span><span class="p">(</span><span class="n">sht</span><span class="p">):</span>
     <span class="s2">&quot;For shtns sht return random spatial array captured by sht.&quot;</span>
     <span class="k">return</span> <span class="n">sht</span><span class="o">.</span><span class="n">synth</span><span class="p">(</span><span class="n">sht</span><span class="o">.</span><span class="n">analys</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="o">*</span><span class="n">sht</span><span class="o">.</span><span class="n">spat_array</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span></div>
@@ -112,7 +112,7 @@
 <span class="c1"># Kernel functions</span>
 
 <div class="viewcode-block" id="kernel_diff">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.kernel_diff">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.kernel_diff">[docs]</a>
 <span class="k">def</span> <span class="nf">kernel_diff</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="n">l</span><span class="p">):</span>
     <span class="s2">&quot;Compute diffusion kernel, l in shtns order.&quot;</span>
     <span class="k">return</span> <span class="n">D</span> <span class="o">*</span> <span class="n">l</span> <span class="o">*</span> <span class="p">(</span><span class="n">l</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span></div>
@@ -120,7 +120,7 @@
 
 
 <div class="viewcode-block" id="kernel_dist_origin">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.kernel_dist_origin">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.kernel_dist_origin">[docs]</a>
 <span class="k">def</span> <span class="nf">kernel_dist_origin</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">):</span>
     <span class="s2">&quot;Compute distance to origin on grid.&quot;</span>
     <span class="n">phi1</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[:,</span><span class="kc">None</span><span class="p">]</span>
@@ -135,7 +135,7 @@
 
 
 <div class="viewcode-block" id="kernel_sh_normalized">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.kernel_sh_normalized">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.kernel_sh_normalized">[docs]</a>
 <span class="k">def</span> <span class="nf">kernel_sh_normalized</span><span class="p">(</span><span class="n">sht</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
     <span class="n">K</span> <span class="o">=</span> <span class="n">sht</span><span class="o">.</span><span class="n">analys</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
     <span class="n">auc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">K</span><span class="p">))</span>
@@ -144,7 +144,7 @@
 
 
 <div class="viewcode-block" id="kernel_laplace">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.kernel_laplace">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.kernel_laplace">[docs]</a>
 <span class="k">def</span> <span class="nf">kernel_laplace</span><span class="p">(</span><span class="n">sht</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">size</span><span class="p">):</span>
     <span class="s2">&quot;Compute spatial &amp; spectral coefficients for Laplacian kernel.&quot;</span>
     <span class="n">ds</span> <span class="o">=</span> <span class="n">kernel_dist_origin</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span>
@@ -153,7 +153,7 @@
 
 
 <div class="viewcode-block" id="kernel_gaussian">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.kernel_gaussian">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.kernel_gaussian">[docs]</a>
 <span class="k">def</span> <span class="nf">kernel_gaussian</span><span class="p">(</span><span class="n">sht</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">size</span><span class="p">):</span>
     <span class="s2">&quot;Compute spatial &amp; spectral coefficients for Gaussian kernel.&quot;</span>
     <span class="n">ds</span> <span class="o">=</span> <span class="n">kernel_dist_origin</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span>
@@ -162,7 +162,7 @@
 
 
 <div class="viewcode-block" id="kernel_mexican_hat">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.kernel_mexican_hat">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.kernel_mexican_hat">[docs]</a>
 <span class="k">def</span> <span class="nf">kernel_mexican_hat</span><span class="p">(</span><span class="n">sht</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">size</span><span class="p">):</span>
     <span class="s2">&quot;Compute spatial &amp; spectral coefficients for Mexican hat kernel.&quot;</span>
     <span class="n">ds</span> <span class="o">=</span> <span class="n">kernel_dist_origin</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span>
@@ -172,7 +172,7 @@
 
 
 <div class="viewcode-block" id="kernel_conv_prep">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.kernel_conv_prep">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.kernel_conv_prep">[docs]</a>
 <span class="k">def</span> <span class="nf">kernel_conv_prep</span><span class="p">(</span><span class="n">sht</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
     <span class="s2">&quot;Prepares evaluated kernel for SHT convolution.&quot;</span>
     <span class="c1"># Driscoll &amp; Healy 1994, Theorem 1</span>
@@ -183,7 +183,7 @@
 
 
 <div class="viewcode-block" id="kernel_estimate_shtns">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.kernel_estimate_shtns">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.kernel_estimate_shtns">[docs]</a>
 <span class="k">def</span> <span class="nf">kernel_estimate_shtns</span><span class="p">(</span><span class="n">sht</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">x0</span><span class="p">):</span>
     <span class="s2">&quot;Estimate effective kernel for kernel k with state x0 for shtns object sht.&quot;</span>
     <span class="c1"># uses finite differences</span>
@@ -205,7 +205,7 @@
 <span class="c1"># SHT implementation</span>
 
 <div class="viewcode-block" id="make_shtdiff_np">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.make_shtdiff_np">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.make_shtdiff_np">[docs]</a>
 <span class="k">def</span> <span class="nf">make_shtdiff_np</span><span class="p">(</span><span class="n">lmax</span><span class="p">,</span> <span class="n">nlat</span><span class="p">,</span> <span class="n">nlon</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">return_L</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">np</span><span class="o">=</span><span class="n">np</span><span class="p">):</span>
     <span class="s2">&quot;Construct SHT diff implementation in plain NumPy.&quot;</span>
     <span class="c1"># setup grid</span>
@@ -232,7 +232,7 @@
 
 
 <div class="viewcode-block" id="make_shtdiff">
-<a class="viewcode-back" href="../../index.html#vbjax.shtlc.make_shtdiff">[docs]</a>
+<a class="viewcode-back" href="../../modules.html#vbjax.shtlc.make_shtdiff">[docs]</a>
 <span class="k">def</span> <span class="nf">make_shtdiff</span><span class="p">(</span><span class="n">nlat</span><span class="p">,</span> <span class="n">lmax</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">nlon</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">D</span><span class="o">=</span><span class="mf">0.0004</span><span class="p">,</span> <span class="n">return_L</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
     <span class="s2">&quot;Construct SHT diff implementation with Jax.&quot;</span>
 
