@@ -13,6 +13,7 @@ dist
 .benchmarks
 
 .DS_Store
-#build/
+build/
+_build/
 dist/
 *.egg-info/

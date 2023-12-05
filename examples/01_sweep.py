@@ -1,10 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """ 
 **Example 2**: Consider a network of coupled Montbrio model nodes and sweep
 over the parameters of the model.
 
 Starting with a few imports
 
-.. literalinclude:: ../../examples/01_sweep.py
+.. literalinclude:: ../examples/01_sweep.py
     :start-after: example-st\u0061rt
     :lines: 1-6
     :caption: 
@@ -13,31 +16,31 @@ This example shows how to use the `vbjax` library to simulate a network of
 Montbrio model nodes. The network is defined by the function `network` which
 takes as arguments the state of the network and the parameters of the model.
 
-.. literalinclude:: ../../examples/01_sweep.py
+.. literalinclude:: ../examples/01_sweep.py
     :start-after: example-st\u0061rt
     :lines: 9-13
 
 The function noise is used to generate the noise term of the stochastic
 
-.. literalinclude:: ../../examples/01_sweep.py
+.. literalinclude:: ../examples/01_sweep.py
     :start-after: example-st\u0061rt
     :lines: 16-18
 
 The function run is used to simulate the network for a given set of parameters.
 
-.. literalinclude:: ../../examples/01_sweep.py
+.. literalinclude:: ../examples/01_sweep.py
     :start-after: example-st\u0061rt
     :lines: 21-26
 
 Then prepare the simulation
 
-.. literalinclude:: ../../examples/01_sweep.py
+.. literalinclude:: ../examples/01_sweep.py
     :start-after: example-st\u0061rt
     :lines: 30
 
 define the number of nodes in the network.
 
-.. literalinclude:: ../../examples/01_sweep.py
+.. literalinclude:: ../examples/01_sweep.py
     :start-after: example-st\u0061rt
     :lines: 31-35
 
@@ -47,17 +50,17 @@ Otherwise, the simulation is parallelized over the GPU using `jax.vmap`.
 
 then we prepare the network and the noise samples
 
-.. literalinclude:: ../../examples/01_sweep.py
+.. literalinclude:: ../examples/01_sweep.py
     :start-after: example-st\u0061rt
     :lines: 37-39
 
 The rest run the simulation on set of parameters and plot the results.
 
-.. literalinclude:: ../../examples/01_sweep.py
+.. literalinclude:: ../examples/01_sweep.py
     :start-after: example-st\u0061rt
     :lines: 44-75
 
-.. figure:: ../../examples/images/sweep.png
+.. figure:: ../examples/images/sweep.png
     :scale: 100 %
 
 
