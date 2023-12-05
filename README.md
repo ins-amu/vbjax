@@ -167,7 +167,7 @@ pl.show()
 pl.savefig('example3.jpg')
 ```
 ![](example3.jpg)
-A full runnable script is in [`examples/parweep.py`](examples/parweep.py).
+A full runnable script is in [`examples/parsweep.py`](examples/parsweep.py).
 
 #### Performance notes
 
