@@ -6,6 +6,7 @@ jax
 jaxlib 
 scipy 
 numpyro 
+cloud_sptheme
 # pytest
 # pytest-xdist
 # pytest-benchmark
