@@ -2,6 +2,7 @@ import pylab as pl
 import vbjax as vb
 import jax
 import jax.numpy as jp
+import tqdm
 
 n = 5
 
@@ -49,14 +50,38 @@ for i, cond in enumerate(conditions):
     pl.xlabel('time (au)')
 pl.tight_layout()
 
+# let's try to optimize 
+
+xs_c0 = loop(x0, ts, (conditions[0], p))
+xs_c1 = loop(x0, ts, (conditions[1], p))
+xs_c2 = loop(x0, ts, (conditions[2], p))
+
+def loss(Bhat):
+    p_hat = vb.DCMTheta(A=A, B=Bhat, C=C)
+    xs_hat_c0 = loop(x0, ts, (conditions[0], p_hat))
+    xs_hat_c1 = loop(x0, ts, (conditions[1], p_hat))
+    xs_hat_c2 = loop(x0, ts, (conditions[2], p_hat))
+    sse = lambda x,y: jp.sum(jp.square(x-y))
+    return sse(xs_hat_c0, xs_c0) + sse(xs_hat_c1, xs_c1) + sse(xs_hat_c2, xs_c2)
+
+vgloss = jax.jit(jax.value_and_grad(loss))
+Bhat = jp.zeros((n, n, 2)) + 1e-3
+print('initial loss', vgloss(Bhat)[0])
+for i in (pbar := tqdm.trange(9000)):
+    v, g = vgloss(Bhat)
+    Bhat = Bhat - 1e-2*g
+    if i%10 == 0:
+        pbar.set_description(f'v {v:0.2f} nh {jp.linalg.norm(g):0.2f}')
+print('final loss', vgloss(Bhat)[0])
 
 # now let's invert the model for B
 import numpyro
 import numpyro.distributions as dist
 from numpyro.infer import MCMC, NUTS
 
+Bhat0 = Bhat
 def logp(xs_c0, xs_c1, xs_c2):
-    Bhat = numpyro.sample('Bhat', dist.Normal(jp.zeros(B.shape), 1))
+    Bhat = numpyro.sample('Bhat', dist.Normal(Bhat0, 0.1))
     p_hat = vb.DCMTheta(A=A, B=Bhat, C=C)
     xs_hat_c0 = loop(x0, ts, (conditions[0], p_hat))
     xs_hat_c1 = loop(x0, ts, (conditions[1], p_hat))
@@ -77,10 +102,12 @@ mcmc.run(rng_key,
 Bhat = mcmc.get_samples()['Bhat'].mean(axis=0)
 
 pl.figure()
-pl.subplot(221); pl.imshow(B[...,0])
-pl.subplot(222); pl.imshow(B[...,1])
-pl.subplot(223); pl.imshow(Bhat[...,0])
-pl.subplot(224); pl.imshow(Bhat[...,1])
+pl.subplot(321); pl.imshow(B[...,0])
+pl.subplot(322); pl.imshow(B[...,1])
+pl.subplot(323); pl.imshow(Bhat0[...,0])
+pl.subplot(324); pl.imshow(Bhat0[...,1])
+pl.subplot(325); pl.imshow(Bhat[...,0])
+pl.subplot(326); pl.imshow(Bhat[...,1])
 pl.suptitle('B vs Bhat')
 
 
