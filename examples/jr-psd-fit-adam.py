@@ -20,7 +20,7 @@ def model(state, parameters):
     return vb.jr_dfun(state, 0, parameters)
 
 # define a function to run the simulation & compute Welch PSD
-def run_sim_psd(parameters):
+def run_sim_psd(parameters, rng_key):
 
     # here we are choosing 4 parameters to optimize, but
     # it's best to look at the paper to select the best ones for your study
@@ -31,7 +31,7 @@ def run_sim_psd(parameters):
     ntime = int(60e3 / dt)
     initial_state = jp.ones((6, 1))
     _, loop = vb.make_sde(dt=dt, dfun=model, gfun=1e-4)
-    noise = vb.randn(ntime, *initial_state.shape)
+    noise = vb.randn(ntime, *initial_state.shape, key=rng_key)
     parameters = vb.jr_default_theta._replace(A=A, B=B, a=a, b=b)
     states = loop(initial_state, noise, parameters)
     lfp = states[:, 1] - states[:, 0]
@@ -55,7 +55,8 @@ parameters = [
     (3.25, 22.0, 0.1, 0.05),
     (3.31, 22.5, 0.11, 0.049),
     ]
-psds = [run_sim_psd(_) for _ in parameters]
+rng_keys = jax.random.split(jax.random.PRNGKey(1106), 2)
+psds = [run_sim_psd(p, k) for p, k in zip(parameters, rng_keys)]
 
 # show those psds
 pl.figure()
@@ -74,27 +75,25 @@ pl.title('Example Simulated Welch PSD on 60s Jansen-Rit')
 # - the first simulated PSD above as the "data" to fit
 # - PSD values in the band of 0 to 80 Hz
 
-def loss(opt_params):
-    flo = 0
-    fhi = 80
-
-    _, sim_psd = run_sim_psd(opt_params)
-    freq_mask = (ftfreq > flo)*(ftfreq < fhi)
-    #sim_psd = sim_psd[freq_mask]
-
-    # here we're using the 1st simulated example above as a target
-    # but this would be replaced by some data
+def loss_for_key(opt_params, rng_key):
+    _, sim_psd = run_sim_psd(opt_params, rng_key)
     _, target_psd = psds[0]
-    #target_psd = target_psd[freq_mask]
-
     return jp.sum(jp.square(sim_psd - target_psd))
+
+rng_keys = jax.random.split(jax.random.PRNGKey(1106), 32)
+
+def loss(opt_params):
+    losses = jax.vmap(lambda k: loss_for_key(opt_params, k))(rng_keys)
+    assert losses.size == 32
+    return jp.mean(losses)
+
 
 # we start with a guess
 init_params = 3.2, 22.1, 0.11, 0.051
 print('loss on true', loss(parameters[0]))
 print('initial loss', loss(init_params))
 # choose learning rate / optimizer step size
-lr = 1e-5
+lr = 1e-8
 # create the optimizer (it returns 3 functions)
 opt_init, opt_step, opt_get = jopt.adam(lr)
 # create optimizer state
@@ -106,11 +105,9 @@ trace_loss = []
 for i in (pbar := tqdm.trange(501)):
     v, g = vgloss(opt_get(opt))
     trace_loss.append(v)
-    g = jax.tree_map(lambda g: jp.clip(g, -1, 1), g) # clip stablizes optimization
     ng = jp.linalg.norm(jp.array(g))
     opt = opt_step(i, g, opt)
-    if i % 10 == 0:
-        pbar.set_description(f'loss {v:0.3f} ||g|| {ng:0.3f}')
+    pbar.set_description(f'loss {v:0.3f} ||g|| {ng:0.3f}')
 final_params = opt_get(opt)
 print('final params', final_params)
 
