@@ -5,7 +5,8 @@ numpy
 jax 
 jaxlib 
 scipy 
-numpyro 
+numpyro
+numpydoc 
 cloud_sptheme
 # pytest
 # pytest-xdist
