@@ -1,5 +1,6 @@
 import pylab as pl
 import vbjax as vb
+import jax
 import jax.numpy as jp
 
 n = 5
@@ -22,9 +23,10 @@ B = B.at[2,3,1].set(-3)
 # second condition shifts node 5 fixed point up by 0.5
 C = C.at[4, 1].set(0.5)
 
+p = vb.DCMTheta(A=A, B=B, C=C)
 
-def dcm(x, u):
-    p = vb.DCMTheta(A=A, B=B, C=C)
+def dcm(x, up):
+    u, p = up
     return vb.dcm_dfun(x, u, p)
 
 _, loop = vb.make_ode(0.2, dcm)
@@ -40,11 +42,46 @@ titles = 'rest,osc 1 2,fast osc 3 4 shift 5'.split(',')
 pl.figure(figsize=(8, 8))
 for i, cond in enumerate(conditions):
     pl.subplot(1, 3, i + 1)
-    xs = loop(x0, ts, cond)
+    xs = loop(x0, ts, (cond, p))
     pl.plot(xs + jp.r_[:n], 'k')
     pl.grid(1)
     pl.title(titles[i])
     pl.xlabel('time (au)')
 pl.tight_layout()
+
+
+# now let's invert the model for B
+import numpyro
+import numpyro.distributions as dist
+from numpyro.infer import MCMC, NUTS
+
+def logp(xs_c0, xs_c1, xs_c2):
+    Bhat = numpyro.sample('Bhat', dist.Normal(jp.zeros(B.shape), 1))
+    p_hat = vb.DCMTheta(A=A, B=Bhat, C=C)
+    xs_hat_c0 = loop(x0, ts, (conditions[0], p_hat))
+    xs_hat_c1 = loop(x0, ts, (conditions[1], p_hat))
+    xs_hat_c2 = loop(x0, ts, (conditions[2], p_hat))
+    numpyro.sample('xs_hat_c0', dist.Normal(xs_hat_c0, 0.1), obs=xs_c0)
+    numpyro.sample('xs_hat_c1', dist.Normal(xs_hat_c1, 0.1), obs=xs_c1)
+    numpyro.sample('xs_hat_c2', dist.Normal(xs_hat_c2, 0.1), obs=xs_c2)
+
+nuts_kernel = NUTS(logp)
+mcmc = MCMC(nuts_kernel, num_warmup=500, num_samples=500)
+rng_key = jax.random.PRNGKey(1106)
+mcmc.run(rng_key,
+         xs_c0=loop(x0, ts, (conditions[0], p)),
+         xs_c1=loop(x0, ts, (conditions[1], p)),
+         xs_c2=loop(x0, ts, (conditions[2], p)),
+         )
+
+Bhat = mcmc.get_samples()['Bhat'].mean(axis=0)
+
+pl.figure()
+pl.subplot(221); pl.imshow(B[...,0])
+pl.subplot(222); pl.imshow(B[...,1])
+pl.subplot(223); pl.imshow(Bhat[...,0])
+pl.subplot(224); pl.imshow(Bhat[...,1])
+pl.suptitle('B vs Bhat')
+
 
 pl.show()
