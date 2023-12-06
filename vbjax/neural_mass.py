@@ -125,5 +125,15 @@ def bold_dfun(sfvq, x, p: BOLDTheta):
     return np.array([ds, df, dv, dq])
 
 
+DCMTheta = collections.namedtuple(typename='DCMTheta',
+                                  field_names='A,B,C')
+
+def dcm_dfun(x, u, p: DCMTheta):
+    """Implements the classical bilinear DCM
+    \\dot{x} = (A + sum_j u_j B_j ) x + C u
+    """
+    return (p.A + np.sum(u * p.B,axis=-1)) @ x + p.C @ u
+
+
 # TODO other models
 # TODO codim3 https://gist.github.com/maedoc/01cea5cad9c833c56349392ee7d9b627

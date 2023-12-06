@@ -26,7 +26,7 @@ from .neural_mass import (
     JRState, JRTheta, jr_dfun, jr_default_theta,
     MPRState, MPRTheta, mpr_dfun, mpr_default_theta,
     BOLDTheta, compute_bold_theta, bold_default_theta, bold_dfun,
-    BVEPTheta, bvep_default_theta, bvep_dfun,
+    BVEPTheta, bvep_default_theta, bvep_dfun, DCMTheta, dcm_dfun,
         )
 from .regmap import make_region_mapping
 from .coupling import (
