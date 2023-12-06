@@ -1,3 +1,21 @@
 numpydoc
 vbjax
 setuptools_scm
+numpy 
+jax 
+jaxlib 
+scipy 
+numpyro 
+# pytest
+# pytest-xdist
+# pytest-benchmark
+# twine
+# build
+# tqdm
+# jupyter
+# matplotlib
+# joblib
+# grip
+# python-lsp-server
+# jedi-language-server
+# jax-dataclasses
