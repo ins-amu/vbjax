@@ -25,7 +25,7 @@ def run_sim_psd(parameters, rng_key):
 
     # here we are choosing 4 parameters to optimize, but
     # it's best to look at the paper to select the best ones for your study
-    A, B, a, b, lsig = parameters 
+    A, B, a, b, v0, r, J, lsig = parameters 
 
     # do a short simulation
     dt = 2.0 # ms == 500 Hz sampling frequency
@@ -56,9 +56,9 @@ Pz = np.load('Sebastien_Spectrum_Pz.npy')
 
 # run sim for two example parameters
 parameters = jp.array([
-    (3.25, 22.0, 0.1, 0.05, -8.0),
-    (3.25, 22.0, 0.1, 0.05, -7.0),
-    (3.31, 22.5, 0.11, 0.049, -8.0),
+    (3.25, 22.0, 0.1, 0.05, 5.52, 0.56, 135.0, -8.0),
+    (3.25, 22.0, 0.1, 0.05, 5.52, 0.56, 135.0, -7.0),
+    (3.31, 22.5, 0.11, 0.049, 5.59, 0.55, 130.0, -8.0),
     ])
 rng_keys = jax.random.split(jax.random.PRNGKey(1106), len(parameters))
 psds = [run_sim_psd(p, k) for p, k in zip(parameters, rng_keys)]
@@ -76,10 +76,6 @@ pl.legend([str(_) for _ in parameters])
 pl.ylabel('PSD')
 pl.xlabel('Hz')
 pl.title('Example Simulated Welch PSD on 60s Jansen-Rit')
-
-# sbi requires sampling parameter space
-param_lo = jp.r_[3.0, 20.0, 0.05, 0.01, -9.0]
-param_hi = jp.r_[3.5, 25.0, 0.2, 0.1, -5.0]
 
 # as a first fit, we'll use 
 # - sum square error as a loss function
@@ -102,18 +98,18 @@ pvloss = jax.pmap(jax.vmap(loss, in_axes=(1,0)))
 
 # do a search for best params
 rounds = 5000
-round_size = 16
-zs = vb.randn(rounds, 5, round_size)
+round_size = 64
+zs = vb.randn(rounds, parameters.shape[1], round_size)
 rng_keys = jax.random.split(jax.random.PRNGKey(1106), rounds*round_size).reshape(rounds, round_size, 2)
 bsf_params = jp.array(parameters[0])*1.3
 bsf = vloss(bsf_params[:,None], rng_keys[0,:1]).min()
-sdseq = 0.2/2**np.r_[:20]
+sdseq = 0.5/2**np.r_[:20]
 tik = time.time()
 for i in (pbar := tqdm.trange(rounds)):
     sd = sdseq[i//2000]
     p = bsf_params[:,None]*(1 + sd*zs[i])
-    pp = p.reshape(5, vb.cores, -1).transpose(1, 0, 2)
-    v = pvloss(pp, rng_keys[i].reshape(vb.cores,-1,2)).ravel()
+    pp = p.reshape(parameters.shape[1], vb.cores, -1).transpose(1, 0, 2)
+    v = pvloss(pp, rng_keys[i].reshape(vb.cores, -1, 2)).ravel()
     imin = jp.argmin(v)
     if v[imin] < bsf:
         bsf = v[imin]
@@ -124,9 +120,9 @@ print('final params', bsf_params)
 
 # now show the opt sim fc found
 pl.figure()
-_, bsf_psd = run_sim_psd(bsf_params)
-pl.semilogy(ftfreq[:175], target_psd)
-pl.semilogy(ftfreq[:175], bsf_psd[:175])
+_, bsf_psd = run_sim_psd(bsf_params, rng_keys[0,0])
+pl.plot(ftfreq[:175], lognorm(target_psd))
+pl.plot(ftfreq[:175], lognorm(bsf_psd[:175]))
 pl.xlim([0, 50])
 pl.grid(1)
 pl.legend(('Target', 'Fit'))
