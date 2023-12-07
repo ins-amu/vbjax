@@ -1,4 +1,4 @@
-__version__ = 'v0.0.10'
+__version__ = 'v0.0.11'
 
 if __name__ == '__main__':
     print(__version__)
@@ -6,8 +6,12 @@ if __name__ == '__main__':
     _, cmd, *args = sys.argv
     print(cmd, args)
     if cmd == 'tag':
-        os.system(f'git add vbjax/_version.py')
-        os.system(f'git commit -m "bump version"')
-        os.system(f'git tag {__version__}')
-        os.system(f'git push -u origin main')
-        os.system(f'git push -u origin {__version__}')
+        import subprocess
+        def do(cmd):
+            print(cmd)
+            subprocess.check_call(cmd.split(' '))
+        do(f'/usr/bin/git add vbjax/_version.py')
+        do(f'/usr/bin/git commit -m bump-version')
+        do(f'/usr/bin/git push -u origin main')
+        do(f'/usr/bin/git tag {__version__}')
+        do(f'/usr/bin/git push -u origin {__version__}')
