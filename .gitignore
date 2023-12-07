@@ -11,3 +11,9 @@ dist
 .cache
 .idea
 .benchmarks
+
+.DS_Store
+build/
+_build/
+dist/
+*.egg-info/
