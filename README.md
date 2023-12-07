@@ -4,12 +4,18 @@
 
 ## Installation
 
-Installs with `pip install "vbjax"`, but you can use the source,
+Installs with `pip install "vbjax"`, but for the latest features, 
+you can use the source,
 ```bash
 git clone https://github.com/ins-amu/vbjax
 cd vbjax
-pip install .[dev]
+pip install -e ".[dev]"
 ```
+You're encouraged to have the source handy to consult and change, but you can also just
+```bash
+pip install git+https://github.com/ins-amu/vbjax
+```
+
 The primary additional dependency of vbjax is
 [JAX](github.com/google/jax), which itself depends only on
 NumPy, SciPy & opt-einsum, so it should be safe to add to your

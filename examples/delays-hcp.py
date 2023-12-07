@@ -45,8 +45,12 @@ def dfun(buf, rv, t: int, p):
     crv = (Wt * buf[t - lags, :, ix_lag_from]).sum(axis=1).T
     return vb.mpr_dfun(rv, k*crv, mpr_theta)
 
+def rgt0(rv, p):
+    r, v = rv
+    return jp.array([ r*(r>0), v ])
+
 # compile dfun w/ heun sdde for running a chunk
-_, run_chunk = vb.make_sdde(dt, max_lag, dfun, gfun=1e-3, unroll=4)
+_, run_chunk = vb.make_sdde(dt, max_lag, dfun, gfun=1e-3, unroll=4, adhoc=rgt0)
 
 # we'll run chunk of time this long
 chunk_len = 1000
