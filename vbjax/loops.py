@@ -193,6 +193,7 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
 
     heun = True
     sqrt_dt = np.sqrt(dt)
+    nh = int(nh)
 
     # TODO nh == 0: return make_sde(dt, dfun, gfun) etc
 
@@ -225,9 +226,53 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     def loop(buf, p, t=0):
         "xt is the buffer, zt is (ts, zs), p is parameters."
         op = lambda xt, tz: step(xt, tz, p)
+        print(nh)
         dWt = buf[nh:]
         (buf, _), nxs = jax.lax.scan(op, (buf, t), dWt, unroll=unroll)
         return buf, nxs
 
     return step, loop
 
+
+def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=True):
+    """
+    Helper function to lower memory usage for longer simulations with time delays.
+    WIP
+
+    Takes a function
+
+        run_chunk(buf, params) -> (buf, chunk_states)
+
+    and returns another
+
+        continue_chunk(buf, params, rng_key) -> (buf, chunk_states)
+
+    The continue_chunk function wraps run_chunk and manages
+    moving the latest states to the first part of buf and filling
+    the rest with samples from N(0,1) if required.
+
+    """
+    from vbjax import randn
+
+    # need to be compile time constants for dynamic_*
+    i0 = chunk_len - 1
+    i1 = max_lag + 1
+
+    @jax.jit
+    def continue_chunk(buf, p, key):
+        get, set = jax.lax.dynamic_slice, jax.lax.dynamic_update_slice
+        # buf = buf.at[:max_lag+1].set( buf[-(max_lag+1):] )
+        buf = set(buf, get(buf, (i0,0,0), (i1,n_svar,n_from)), (0,0,0))
+
+        # now fill the rest of the buffer with N(0,1) samples if stochastic
+        # buf = buf.at[max_lag+1:].set( vb.randn(chunk_len-1, 2, n_from, key=key) )
+        if stochastic:
+            fill_val = randn(i0,n_svar,n_from, key=key)
+            buf = set(buf, fill_val, (i1,0,0))
+        else:
+            # leave the buf since gfun() returns zero
+            pass
+
+        buf, rv = run_chunk(buf, p)
+        return buf, rv
+    return continue_chunk

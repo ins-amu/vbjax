@@ -45,6 +45,7 @@ def test_sg_spmv():
     _test_spmv(spmv, A, n)
 
 
+@pytest.mark.skipif(jax.local_devices()[0].platform == 'gpu', reason='skip gpu')
 def test_sg_spmv_pmap():
     n = 100
     A = scipy.sparse.random(n, n, density=0.1).tocsr()
