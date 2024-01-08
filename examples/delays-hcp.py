@@ -54,7 +54,9 @@ def rgt0(rv, p):
 chunk_len = int(10 / dt) # 10 ms
 buf = jp.zeros((max_lag + chunk_len, 2, n_from))
 buf = buf.at[:max_lag+1].add( jp.r_[0.1,-2.0].reshape(2,1) )
-buf = buf.at[max_lag+1:].set( vb.randn(chunk_len-1, 2, n_from) )
+
+# don't provide random numbers w/ make_continuation
+# buf = buf.at[max_lag+1:].set( vb.randn(chunk_len-1, 2, n_from) )
 
 # pack parameters (could/should be dict / dataclass)
 k = 0.01
@@ -66,7 +68,7 @@ def _check(buf):
     buf, rv = run_chunk(buf, p)
     assert buf.shape[0] == (max_lag + chunk_len)
     assert rv.shape == (chunk_len, 2, n_from)
-_check()
+_check(buf)
 
 # jit the buffer updates
 cont_chunk = vb.make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar=2, stochastic=True)
