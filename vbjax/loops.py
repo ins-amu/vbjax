@@ -13,9 +13,9 @@ def heun_step(x, dfun, dt, *args, add=0, adhoc=None):
     """
     adhoc = adhoc or (lambda x,*args: x)
     d1 = dfun(x, *args)
-    xi = adhoc(x + dt*d1 + add, *args)
+    xi = adhoc(x, dt*d1 + add, *args)
     d2 = dfun(xi, *args)
-    nx = adhoc(x + dt*0.5*(d1 + d2) + add, *args)
+    nx = adhoc(x, dt*0.5*(d1 + d2) + add, *args)
     return nx
 
 def make_sde(dt, dfun, gfun, adhoc=None):
@@ -72,8 +72,8 @@ def make_sde(dt, dfun, gfun, adhoc=None):
         gfun = lambda *_: sig
 
     def step(x, z_t, p):
-        noise = gfun(x, p) * sqrt_dt * z_t
-        return heun_step(x, dfun, dt, p, add=noise, adhoc=adhoc)
+        noise = gfun(x, p) * sqrt_dt * z_t[:2,:]
+        return heun_step(x, dfun, dt, p, z_t, add=noise, adhoc=adhoc)
 
     @jax.jit
     def loop(x0, zs, p):
@@ -85,7 +85,7 @@ def make_sde(dt, dfun, gfun, adhoc=None):
     return step, loop
 
 
-def make_ode(dt, dfun, adhoc=None):
+def make_ode(dt, dfun, adhoc=None, stim=False):
     """Use a Heun scheme to integrate autonomous ordinary differential
     equations (ODEs).
 
@@ -123,7 +123,10 @@ def make_ode(dt, dfun, adhoc=None):
     """
 
     def step(x, t, p):
-        return heun_step(x, dfun, dt, p, adhoc=adhoc)
+        if stim:
+            return heun_step(x, dfun, dt, p, t, adhoc=adhoc)
+        else:
+            return heun_step(x, dfun, dt, p, adhoc=adhoc)
 
     @jax.jit
     def loop(x0, ts, p):
@@ -260,6 +263,7 @@ def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=
 
     @jax.jit
     def continue_chunk(buf, p, key):
+        buf, rv = run_chunk(buf, p)
         get, set = jax.lax.dynamic_slice, jax.lax.dynamic_update_slice
         # buf = buf.at[:max_lag+1].set( buf[-(max_lag+1):] )
         buf = set(buf, get(buf, (i0,0,0), (i1,n_svar,n_from)), (0,0,0))
@@ -273,6 +277,6 @@ def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=
             # leave the buf since gfun() returns zero
             pass
 
-        buf, rv = run_chunk(buf, p)
+        
         return buf, rv
     return continue_chunk
