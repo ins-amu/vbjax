@@ -30,7 +30,7 @@ from .neural_mass import (
         )
 from .regmap import make_region_mapping
 from .coupling import (
-        make_diff_cfun, make_linear_cfun, make_delayed_coupling
+        make_diff_cfun, make_linear_cfun, make_delay_helper, delay_apply,
         )
 from .connectome import make_conn_latent_mvnorm
 from .sparse import make_spmv, csr_to_jax_bcoo, make_sg_spmv

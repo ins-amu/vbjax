@@ -28,55 +28,37 @@ npz = np.load(npz_fname)
 
 # load one connectome
 W, L = jp.array(npz['070-DesikanKilliany'][:,0])
-n_to, n_from = W.shape
 
-# setup aux vars for delays
+# setup delays
 dt = 0.1
-v_c = 10.0 # m/s
-lags = jp.floor(L / v_c / dt).astype('i')
-ix_lag_from = jp.tile(jp.r_[:n_from], (n_to, 1))
-max_lag = lags.max() + 1
-print(max_lag)
-Wt = jp.log(1+W.T[:,:,None]) # enable bcast for crv
+dh = vb.make_delay_helper( jp.log(W+1), L, dt=dt)
 
+# define parameters
+from collections import namedtuple
+Params = namedtuple('Params', 'dh theta k')
 
-def dfun(buf, rv, t: int, p):
-    # we could close over the vars or pass in like so:
-    Wt, lags, ix_lag_from, mpr_theta, k = p
-    crv = (Wt * buf[t - lags, :, ix_lag_from]).sum(axis=1).T
-    return vb.mpr_dfun(rv, k*crv, mpr_theta)
+# define our model
+def dfun(buf, rv, t: int, p: Params):
+    crv = vb.delay_apply(p.dh, t, buf)                  # compute delay coupling
+    return vb.mpr_dfun(rv, p.k*crv, p.theta)        # compute dynamics
 
-def rgt0(rv, p):
+def ensure_r_positive(rv, _):
     r, v = rv
     return jp.array([ r*(r>0), v ])
 
 # buf should cover all delays + noise for time steps to take
 chunk_len = int(10 / dt) # 10 ms
-buf = jp.zeros((max_lag + chunk_len, 2, n_from))
-buf = buf.at[:max_lag+1].add( jp.r_[0.1,-2.0].reshape(2,1) )
+buf = jp.zeros((dh.max_lag + chunk_len, 2, dh.n_from))
+buf = buf.at[:dh.max_lag+1].add( jp.r_[0.1,-2.0].reshape(2,1) )
 
-# don't provide random numbers w/ make_continuation
-# buf = buf.at[max_lag+1:].set( vb.randn(chunk_len-1, 2, n_from) )
-
-# pack parameters (could/should be dict / dataclass)
-k = 0.01
-p = Wt, lags, ix_lag_from, vb.mpr_default_theta, k
-
-# compile & run our loop & check outputs
-_, run_chunk = vb.make_sdde(dt, max_lag, dfun, gfun=1e-3, unroll=10, adhoc=rgt0)
-def _check(buf):
-    buf, rv = run_chunk(buf, p)
-    assert buf.shape[0] == (max_lag + chunk_len)
-    assert rv.shape == (chunk_len, 2, n_from)
-_check(buf)
-
-# jit the buffer updates
-cont_chunk = vb.make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar=2, stochastic=True)
+# compile model and enable continuations
+_, run_chunk = vb.make_sdde(dt, dh.max_lag, dfun, gfun=1e-3, unroll=10, adhoc=ensure_r_positive)
+cont_chunk = vb.make_continuation(run_chunk, chunk_len, dh.max_lag, dh.n_from, n_svar=2, stochastic=True)
 
 # setup time avg and bold monitors
-ta_buf, ta_step, ta_samp = vb.make_timeavg((2, n_from))
+ta_buf, ta_step, ta_samp = vb.make_timeavg((2, dh.n_from))
 ta_samp = vb.make_offline(ta_step, ta_samp)
-bold_buf, bold_step, bold_samp = vb.make_bold((2, n_from), dt, vb.bold_default_theta)
+bold_buf, bold_step, bold_samp = vb.make_bold((2, dh.n_from), dt, vb.bold_default_theta)
 bold_samp = vb.make_offline(bold_step, bold_samp)
 
 # run chunk w/ monitors
@@ -93,7 +75,8 @@ def run_one_second(bufs, key):
     return jax.lax.scan(chunk_ta_bold, bufs, keys)
 
 # pack buffers and run it one minute
-bufs = p, buf, ta_buf, bold_buf
+params = Params(dh, vb.mpr_default_theta, 0.01)
+bufs = params, buf, ta_buf, bold_buf
 ta, bold = [], []
 keys = jax.random.split(jax.random.PRNGKey(42), 60)
 for i, key in enumerate(tqdm.tqdm(keys)):
