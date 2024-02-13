@@ -4,6 +4,7 @@ Functions for building time stepping loops.
 """
 
 import jax
+import jax.tree_util
 import jax.numpy as np
 
 
@@ -13,10 +14,34 @@ def heun_step(x, dfun, dt, *args, add=0, adhoc=None):
     """
     adhoc = adhoc or (lambda x,*args: x)
     d1 = dfun(x, *args)
-    xi = adhoc(x + dt*d1 + add, *args)
+    if add:
+        xi = jax.tree_map(lambda x,d,a: x + dt*d + a, x, d1, add)
+    else:
+        xi = jax.tree_map(lambda x,d: x + dt*d, x, d1)
+    xi = adhoc(xi, *args)
     d2 = dfun(xi, *args)
-    nx = adhoc(x + dt*0.5*(d1 + d2) + add, *args)
+    if add:
+        nx = jax.tree_map(lambda x,d1,d2,a: x + dt*0.5*(d1 + d2) + a, x, d1, d2, add)
+    else:
+        nx = jax.tree_map(lambda x,d1,d2: x + dt*0.5*(d1 + d2), x, d1, d2)
+    nx = adhoc(nx, *args)
     return nx
+
+
+def _compute_noise(gfun, x, p, sqrt_dt, z_t):
+    g = gfun(x, p)
+    try: # maybe g & z_t are just arrays
+        noise = g * sqrt_dt * z_t
+    except TypeError: # one of them is a pytree
+        if isinstance(g, float): # z_t is a pytree, g is a scalar
+            noise = jax.tree_map(lambda z: g * sqrt_dt * z, z_t)
+        # otherwise, both must be pytrees and they must match
+        elif not jax.tree_util.tree_all(jax.tree_util.tree_structure(g) == 
+                                        jax.tree_util.tree_structure(z_t)):
+            raise ValueError("gfun and z_t must have the same pytree structure.")
+        else:
+            noise = jax.tree_map(lambda g,z: g * sqrt_dt * z, g, z_t)
+    return noise
 
 def make_sde(dt, dfun, gfun, adhoc=None):
     """Use a stochastic Heun scheme to integrate autonomous stochastic
@@ -72,7 +97,7 @@ def make_sde(dt, dfun, gfun, adhoc=None):
         gfun = lambda *_: sig
 
     def step(x, z_t, p):
-        noise = gfun(x, p) * sqrt_dt * z_t
+        noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
         return heun_step(x, dfun, dt, p, add=noise, adhoc=adhoc)
 
     @jax.jit
@@ -207,27 +232,28 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
 
     def step(buf_t, z_t, p):
         buf, t = buf_t
-        x = buf[nh + t]
-        noise = gfun(x, p) * sqrt_dt * z_t
+        x = jax.tree_map(lambda buf: buf[nh + t], buf)
+        noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
         d1 = dfun(buf, x, nh + t, p)
-        xi = adhoc(x + dt*d1 + noise, p)
+        xi = jax.tree_map(lambda x,d,n: x + dt*d + n, x, d1, noise)
+        xi = adhoc(xi, p)
         if heun:
             if zero_delays:
                 # severe performance hit (5x+)
-                buf = buf.at[nh + t + 1].set(xi)
+                buf = jax.tree_map(lambda buf, xi: buf.at[nh + t + 1].set(xi), buf, xi)
             d2 = dfun(buf, xi, nh + t + 1, p)
-            nx = adhoc(x + dt*0.5*(d1 + d2) + noise, p)
+            nx = jax.tree_map(lambda x,d1,d2,n: x + dt*0.5*(d1 + d2) + n, x, d1, d2, noise)
+            nx = adhoc(nx, p)
         else:
             nx = xi
-        buf = buf.at[nh + t + 1].set(nx)
+        buf = jax.tree_map(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
         return (buf, t+1), nx
 
     @jax.jit
     def loop(buf, p, t=0):
         "xt is the buffer, zt is (ts, zs), p is parameters."
         op = lambda xt, tz: step(xt, tz, p)
-        print(nh)
-        dWt = buf[nh:]
+        dWt = jax.tree_map(lambda b: b[nh:], buf) # buf[nh:]
         (buf, _), nxs = jax.lax.scan(op, (buf, t), dWt, unroll=unroll)
         return buf, nxs
 
