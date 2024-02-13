@@ -7,20 +7,21 @@ import jax
 import jax.tree_util
 import jax.numpy as np
 
+zero = 0
 
-def heun_step(x, dfun, dt, *args, add=0, adhoc=None):
+def heun_step(x, dfun, dt, *args, add=zero, adhoc=None):
     """Use a Heun scheme to step state with a right hand sides dfun(.)
     and additional forcing term add.
     """
     adhoc = adhoc or (lambda x,*args: x)
     d1 = dfun(x, *args)
-    if add:
+    if add is not zero:
         xi = jax.tree_map(lambda x,d,a: x + dt*d + a, x, d1, add)
     else:
         xi = jax.tree_map(lambda x,d: x + dt*d, x, d1)
     xi = adhoc(xi, *args)
     d2 = dfun(xi, *args)
-    if add:
+    if add is not zero:
         nx = jax.tree_map(lambda x,d1,d2,a: x + dt*0.5*(d1 + d2) + a, x, d1, d2, add)
     else:
         nx = jax.tree_map(lambda x,d1,d2: x + dt*0.5*(d1 + d2), x, d1, d2)
