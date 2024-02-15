@@ -141,3 +141,41 @@ def dcm_dfun(x, u, p: DCMTheta):
 
 # TODO other models
 # TODO codim3 https://gist.github.com/maedoc/01cea5cad9c833c56349392ee7d9b627
+
+
+DodyTheta = collections.namedtuple(
+    typename='DodyTheta',
+    field_names='a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg,'
+        'tauSa, tauSg, alpha, beta, ud, k, Vmax, Km, Bd, Ad, tau_Dp')
+
+DodyState = collections.namedtuple(
+    typename='DodyState',
+    field_names='r V u Sa Sg Dp')
+
+DodyCouplings = collections.namedtuple(
+    typename='DodyCouplings',
+    field_names='c_inh, c_exc, c_dopa')
+
+dody_default_theta = DodyTheta(
+    a=0.04, b=5., c=140., ga=12., gg=12.,
+    Delta=1., Eta=18., Iext=0., Ea=0., Eg=-80., tauSa=5., tauSg=5., Sja=0.8, Sjg=1.2,
+    ud=12., alpha=0.013, beta=.4, k=10e4, Vmax=1300., Km=150., Bd=0.2, Ad=1., tau_Dp=500.,
+    )
+
+dody_default_initial_state = DodyState(
+    r=0.0, V=-2.0, u=0.0, Sa=0.0, Sg=0.0, Dp=0.0)
+
+def dody_dfun(y: DodyState, cy: DodyCouplings, p: DodyTheta):
+    r, V, u, Sa, Sg, Dp = y
+    # c_inh = Ci @ r
+    # c_exc = Ce @ r
+    # c_dopa = Cd @ r
+    c_inh, c_exc, c_dopa = cy
+    a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Vmax, Km, Bd, Ad, tau_Dp = p
+    dr = 2. * a * r * V + b * r - ga * Sa * r - gg * Sg * r + (a * Delta) / np.pi
+    dV = a * V**2 + b * V + c + Eta - (np.pi*2 * r**2) / a + (Ad * Dp + Bd) * ga * Sa * (Ea - V) + gg * Sg * (Eg - V) + Iext - u
+    du = alpha * (beta * V - u) + ud * r
+    dSa = -Sa / tauSa + Sja * c_exc
+    dSg = -Sg / tauSg + Sjg * c_inh
+    dDp = (k * c_dopa - Vmax * Dp / (Km + Dp)) / tau_Dp
+    return DodyState(dr, dV, du, dSa, dSg, dDp)

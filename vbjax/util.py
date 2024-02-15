@@ -8,7 +8,7 @@ def to_np(x: jax.numpy.ndarray) -> numpy.ndarray:
         return numpy.array(x)
     return numpy.from_dlpack(x)
 
-def to_jax(x: numpy.ndarray):
+def to_jax(*x: numpy.ndarray):
     "Move NumPy array to JAX via DLPack."
     x_dlp = x.__dlpack__()
     x_jax: jax.numpy.ndarray = jax.dlpack.from_dlpack(x_dlp)
