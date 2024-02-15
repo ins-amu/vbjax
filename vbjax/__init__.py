@@ -24,7 +24,7 @@ from .loops import make_sde, make_ode, make_dde, make_sdde, heun_step, make_cont
 from .shtlc import make_shtdiff
 from .neural_mass import (
     JRState, JRTheta, jr_dfun, jr_default_theta,
-    MPRState, MPRTheta, mpr_dfun, mpr_default_theta,
+    MPRState, MPRTheta, mpr_dfun, mpr_default_theta, mpr_r_positive,
     BOLDTheta, compute_bold_theta, bold_default_theta, bold_dfun,
     BVEPTheta, bvep_default_theta, bvep_dfun, DCMTheta, dcm_dfun,
         )

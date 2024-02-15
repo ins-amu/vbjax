@@ -31,20 +31,19 @@ W, L = jp.array(npz['070-DesikanKilliany'][:,0])
 
 # setup delays
 dt = 0.1
-dh = vb.make_delay_helper( jp.log(W+1), L, dt=dt)
+dh = vb.make_delay_helper( weights=jp.log(W+1), lengths=L, dt=dt)
 
-# define parameters
-from collections import namedtuple
-Params = namedtuple('Params', 'dh theta k')
+# define parameters for dfun
+params = {
+    'dh': dh,
+    'theta': vb.mpr_default_theta,
+    'k': 0.01
+}
 
 # define our model
-def dfun(buf, rv, t: int, p: Params):
-    crv = vb.delay_apply(p.dh, t, buf)                  # compute delay coupling
-    return vb.mpr_dfun(rv, p.k*crv, p.theta)        # compute dynamics
-
-def ensure_r_positive(rv, _):
-    r, v = rv
-    return jp.array([ r*(r>0), v ])
+def dfun(buf, rv, t: int, p):
+    crv = vb.delay_apply(p['dh'], t, buf)                  # compute delay coupling
+    return vb.mpr_dfun(rv, p['k']*crv, p['theta'])        # compute dynamics
 
 # buf should cover all delays + noise for time steps to take
 chunk_len = int(10 / dt) # 10 ms
@@ -52,7 +51,7 @@ buf = jp.zeros((dh.max_lag + chunk_len, 2, dh.n_from))
 buf = buf.at[:dh.max_lag+1].add( jp.r_[0.1,-2.0].reshape(2,1) )
 
 # compile model and enable continuations
-_, run_chunk = vb.make_sdde(dt, dh.max_lag, dfun, gfun=1e-3, unroll=10, adhoc=ensure_r_positive)
+_, run_chunk = vb.make_sdde(dt, dh.max_lag, dfun, gfun=1e-3, unroll=10, adhoc=vb.mpr_r_positive)
 cont_chunk = vb.make_continuation(run_chunk, chunk_len, dh.max_lag, dh.n_from, n_svar=2, stochastic=True)
 
 # setup time avg and bold monitors
@@ -62,25 +61,28 @@ bold_buf, bold_step, bold_samp = vb.make_bold((2, dh.n_from), dt, vb.bold_defaul
 bold_samp = vb.make_offline(bold_step, bold_samp)
 
 # run chunk w/ monitors
-def chunk_ta_bold(bufs, key):
-    p, buf, ta_buf, bold_buf = bufs
-    buf, rv = cont_chunk(buf, p, key)
-    ta_buf, ta = ta_samp(ta_buf, rv)
-    bold_buf, bold = bold_samp(bold_buf, rv)
-    return (p, buf, ta_buf, bold_buf), (ta, bold)
+def chunk_ta_bold(sim, key):
+    sim['buf'], rv = cont_chunk(sim['buf'], sim['params'], key)
+    sim['ta_buf'], ta = ta_samp(sim['ta_buf'], rv)
+    sim['bold_buf'], bold = bold_samp(sim['bold_buf'], rv)
+    return sim, (ta, bold)
 
 @jax.jit
-def run_one_second(bufs, key):
+def run_one_second(sim, key):
     keys = jax.random.split(key, 100) # 100 * 10 ms
-    return jax.lax.scan(chunk_ta_bold, bufs, keys)
+    return jax.lax.scan(chunk_ta_bold, sim, keys)
 
 # pack buffers and run it one minute
-params = Params(dh, vb.mpr_default_theta, 0.01)
-bufs = params, buf, ta_buf, bold_buf
+sim = {
+    'params': params,
+    'buf': buf,
+    'ta_buf': ta_buf,
+    'bold_buf': bold_buf
+}
 ta, bold = [], []
 keys = jax.random.split(jax.random.PRNGKey(42), 60)
 for i, key in enumerate(tqdm.tqdm(keys)):
-    bufs, (ta_i, bold_i) = run_one_second(bufs, key)
+    sim, (ta_i, bold_i) = run_one_second(sim, key)
     ta.append(ta_i)
     bold.append(bold_i)
 ta = jp.array(ta).reshape((-1, 2, 70))

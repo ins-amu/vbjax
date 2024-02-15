@@ -83,6 +83,10 @@ def mpr_dfun(ys, c, p):
          r + p.I + I_c - (np.pi ** 2) * (r ** 2) * (p.tau ** 2))
     ])
 
+def mpr_r_positive(rv, _):
+    r, v = rv
+    return np.array([ r*(r>0), v ])
+
 
 BOLDTheta = collections.namedtuple(
     typename='BOLDTheta',
