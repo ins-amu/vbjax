@@ -128,7 +128,7 @@ def test_dody():
         dy2 = net(y1[i].reshape((6,-1)), (j_Ci, j_Ce, j_Cd, ckk, j_params))
         for j in range(6):
             # print(i, j)
-            np.testing.assert_allclose(dy1[j], dy2[j], atol=1e-2, rtol=0.1)
+            np.testing.assert_allclose(dy1[j], dy2[j], rtol=1e-5, atol=1e-5)
 
     # compare trajectories
     y1_ = y1.reshape((-1, 6, n_nodes))
@@ -140,10 +140,10 @@ def test_dody():
             pl.plot(t1, y1_[:,i], 'k', alpha=0.2)
             pl.plot(t1, j_y2[i], 'r', alpha=0.2)
             pl.grid(1)
-            np.testing.assert_allclose(y1_[:,i], j_y2[i], atol=1e-2, rtol=0.1)
+            np.testing.assert_allclose(y1_[:,i], j_y2[i])
         pl.savefig('dody.png', dpi=300)
     else:
         # don't bother plots just assert all close each var
         for i in range(6):
-            np.testing.assert_allclose(y1_[:,i], j_y2[i], atol=1e-2, rtol=0.1)
+            np.testing.assert_allclose(y1_[:,i], j_y2[i], rtol=1e-5, atol=1e-5)
     
