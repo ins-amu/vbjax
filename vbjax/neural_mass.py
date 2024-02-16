@@ -145,8 +145,7 @@ def dcm_dfun(x, u, p: DCMTheta):
 
 DodyTheta = collections.namedtuple(
     typename='DodyTheta',
-    field_names='a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg,'
-        'tauSa, tauSg, alpha, beta, ud, k, Vmax, Km, Bd, Ad, tau_Dp')
+    field_names='a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Vmax, Km, Bd, Ad, tau_Dp')
 
 DodyState = collections.namedtuple(
     typename='DodyState',
@@ -172,10 +171,12 @@ def dody_dfun(y: DodyState, cy: DodyCouplings, p: DodyTheta):
     # c_dopa = Cd @ r
     c_inh, c_exc, c_dopa = cy
     a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Vmax, Km, Bd, Ad, tau_Dp = p
+
     dr = 2. * a * r * V + b * r - ga * Sa * r - gg * Sg * r + (a * Delta) / np.pi
-    dV = a * V**2 + b * V + c + Eta - (np.pi*2 * r**2) / a + (Ad * Dp + Bd) * ga * Sa * (Ea - V) + gg * Sg * (Eg - V) + Iext - u
+    dV = a * V**2 + b * V + c + Eta - (np.pi**2 * r**2) / a + (Ad * Dp + Bd) * ga * Sa * (Ea - V) + gg * Sg * (Eg - V) + Iext - u
     du = alpha * (beta * V - u) + ud * r
     dSa = -Sa / tauSa + Sja * c_exc
     dSg = -Sg / tauSg + Sjg * c_inh
     dDp = (k * c_dopa - Vmax * Dp / (Km + Dp)) / tau_Dp
+    
     return DodyState(dr, dV, du, dSa, dSg, dDp)
