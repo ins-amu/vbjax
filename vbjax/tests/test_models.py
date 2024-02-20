@@ -106,21 +106,18 @@ def test_dopa():
 
     y1, t1, dw, ckk, params, conn_inhibitor, conn_excitator, conn_dopamine, n_nodes, r0, V0, u0, Sa0, Sg0, Dp0, network, dt, sigma = true_dopa()
 
-    # generalize coupling weights now
-    cws = ckk, ckk, ckk
-
     _, loop = vb.make_sde(dt=dt, dfun=vb.dopa_net_dfun, gfun=sigma)
     j_y0 = jp.array([r0, V0, u0, Sa0, Sg0, Dp0])
-    j_params = vb.DopaTheta(*params)
+    j_params = vb.DopaTheta(*params, wi=ckk, we=ckk, wd=ckk)
     j_Ci, j_Ce, j_Cd = [jp.array(_) for _ in (conn_inhibitor, conn_excitator, conn_dopamine)]
     j_dw = jp.array(dw).reshape(-1, 6, n_nodes)
     assert j_dw.shape == (t1.size, 6, n_nodes)
-    j_y2 = loop(j_y0, j_dw, (j_Ci, j_Ce, j_Cd, cws, j_params))
+    j_y2 = loop(j_y0, j_dw, (j_Ci, j_Ce, j_Cd, j_params))
     
     # compare derivatives
     for i in range(t1.size):
         dy1 = network(y1[i], t1[i], ckk, params).reshape((6, -1))
-        dy2 = vb.dopa_net_dfun(y1[i].reshape((6,-1)), (j_Ci, j_Ce, j_Cd, cws, j_params))
+        dy2 = vb.dopa_net_dfun(y1[i].reshape((6,-1)), (j_Ci, j_Ce, j_Cd, j_params))
         for j in range(6):
             np.testing.assert_allclose(dy1[j], dy2[j], rtol=1e-5, atol=1e-5)
 
