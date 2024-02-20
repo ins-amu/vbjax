@@ -27,7 +27,8 @@ from .neural_mass import (
     MPRState, MPRTheta, mpr_dfun, mpr_default_theta, mpr_r_positive,
     BOLDTheta, compute_bold_theta, bold_default_theta, bold_dfun,
     BVEPTheta, bvep_default_theta, bvep_dfun, DCMTheta, dcm_dfun,
-    DodyCouplings, DodyState, DodyTheta, dody_dfun, dody_default_theta, dody_default_initial_state
+    DopaTheta, dopa_dfun, dopa_default_theta, dopa_default_initial_state,
+    dopa_net_dfun,
         )
 from .regmap import make_region_mapping
 from .coupling import (

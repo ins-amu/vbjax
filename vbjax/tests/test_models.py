@@ -102,33 +102,26 @@ def true_dopa():
     y1, t1, dw = heun_SDE(network,y0,t0,tf,dt,params,ckk,sigma)
     return y1, t1, dw, ckk, params, conn_inhibitor, conn_excitator, conn_dopamine, n_nodes, r0, V0, u0, Sa0, Sg0, Dp0, network, dt, sigma
 
-def test_dody():
+def test_dopa():
 
     y1, t1, dw, ckk, params, conn_inhibitor, conn_excitator, conn_dopamine, n_nodes, r0, V0, u0, Sa0, Sg0, Dp0, network, dt, sigma = true_dopa()
 
-    # now in vbjax
-    def net(y, p):
-        Ci, Ce, Cd, ckk, params = p
-        r = y[0]
-        c_inh = ckk * Ci @ r
-        c_exc = ckk * Ce @ r
-        c_dopa = ckk * Cd @ r
-        return vb.dody_dfun(y, (c_inh, c_exc, c_dopa), params)
+    # generalize coupling weights now
+    cws = ckk, ckk, ckk
 
-    _, loop = vb.make_sde(dt=dt, dfun=net, gfun=sigma)
+    _, loop = vb.make_sde(dt=dt, dfun=vb.dopa_net_dfun, gfun=sigma)
     j_y0 = jp.array([r0, V0, u0, Sa0, Sg0, Dp0])
-    j_params = vb.DodyTheta(*params)
+    j_params = vb.DopaTheta(*params)
     j_Ci, j_Ce, j_Cd = [jp.array(_) for _ in (conn_inhibitor, conn_excitator, conn_dopamine)]
     j_dw = jp.array(dw).reshape(-1, 6, n_nodes)
     assert j_dw.shape == (t1.size, 6, n_nodes)
-    j_y2 = loop(j_y0, j_dw, (j_Ci, j_Ce, j_Cd, ckk, j_params))
+    j_y2 = loop(j_y0, j_dw, (j_Ci, j_Ce, j_Cd, cws, j_params))
     
     # compare derivatives
     for i in range(t1.size):
         dy1 = network(y1[i], t1[i], ckk, params).reshape((6, -1))
-        dy2 = net(y1[i].reshape((6,-1)), (j_Ci, j_Ce, j_Cd, ckk, j_params))
+        dy2 = vb.dopa_net_dfun(y1[i].reshape((6,-1)), (j_Ci, j_Ce, j_Cd, cws, j_params))
         for j in range(6):
-            # print(i, j)
             np.testing.assert_allclose(dy1[j], dy2[j], rtol=1e-5, atol=1e-5)
 
     # compare trajectories
@@ -142,7 +135,7 @@ def test_dody():
             pl.plot(t1, j_y2[i], 'r', alpha=0.2)
             pl.grid(1)
             np.testing.assert_allclose(y1_[:,i], j_y2[i])
-        pl.savefig('dody.png', dpi=300)
+        pl.savefig('dopa.png', dpi=300)
     else:
         # don't bother plots just assert all close each var
         for i in range(6):
