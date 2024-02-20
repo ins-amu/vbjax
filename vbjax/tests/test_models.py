@@ -116,11 +116,12 @@ def test_dody():
         return vb.dody_dfun(y, (c_inh, c_exc, c_dopa), params)
 
     _, loop = vb.make_sde(dt=dt, dfun=net, gfun=sigma)
-    j_y0 = vb.DodyState(r0, V0, u0, Sa0, Sg0, Dp0)
+    j_y0 = jp.array([r0, V0, u0, Sa0, Sg0, Dp0])
     j_params = vb.DodyTheta(*params)
     j_Ci, j_Ce, j_Cd = [jp.array(_) for _ in (conn_inhibitor, conn_excitator, conn_dopamine)]
-    j_dw = vb.DodyState(*jp.array(dw).reshape((-1, 6, n_nodes)).transpose(1,0,2))
-    j_y2: vb.DodyState = loop(j_y0, j_dw, (j_Ci, j_Ce, j_Cd, ckk, j_params))
+    j_dw = jp.array(dw).reshape(-1, 6, n_nodes)
+    assert j_dw.shape == (t1.size, 6, n_nodes)
+    j_y2 = loop(j_y0, j_dw, (j_Ci, j_Ce, j_Cd, ckk, j_params))
     
     # compare derivatives
     for i in range(t1.size):
@@ -145,5 +146,5 @@ def test_dody():
     else:
         # don't bother plots just assert all close each var
         for i in range(6):
-            np.testing.assert_allclose(y1_[:,i], j_y2[i], rtol=1e-5, atol=1e-5)
+            np.testing.assert_allclose(y1_[:,i], j_y2[:,i], rtol=1e-5, atol=1e-5)
     

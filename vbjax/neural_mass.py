@@ -179,4 +179,4 @@ def dody_dfun(y: DodyState, cy: DodyCouplings, p: DodyTheta):
     dSg = -Sg / tauSg + Sjg * c_inh
     dDp = (k * c_dopa - Vmax * Dp / (Km + Dp)) / tau_Dp
     
-    return DodyState(dr, dV, du, dSa, dSg, dDp)
+    return np.array([dr, dV, du, dSa, dSg, dDp])
