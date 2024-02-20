@@ -81,3 +81,4 @@ def sweep_network(init, params, Ci, Ce, Cd,
 if __name__ == '__main__':
 
     # TODO set up an argparser to have a cli e.g. on slurm
+    pass
