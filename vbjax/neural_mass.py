@@ -145,7 +145,7 @@ def dcm_dfun(x, u, p: DCMTheta):
 
 DopaTheta = collections.namedtuple(
     typename='dopaTheta',
-    field_names='a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Vmax, Km, Bd, Ad, tau_Dp')
+    field_names='a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Km, Vmax, Bd, Ad, tau_Dp')
 
 DopaState = collections.namedtuple(
     typename='DopaState',

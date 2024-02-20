@@ -41,10 +41,15 @@ from .monitor import (
 from .layers import make_dense_layers
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
-from .util import to_jax, to_np
+from .util import to_jax, to_np, tuple_meshgrid, tuple_ravel, tuple_shard
 from ._version import __version__
 
 # some random setup for convenience
+import jax
+platform = jax.local_devices()[0].platform
+is_gpu = platform == 'gpu'
+is_cpu = platform == 'cpu'
+
 from jax import random
 from jax import numpy as np
 key = random.PRNGKey(42)
