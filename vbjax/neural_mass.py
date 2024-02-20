@@ -141,3 +141,47 @@ def dcm_dfun(x, u, p: DCMTheta):
 
 # TODO other models
 # TODO codim3 https://gist.github.com/maedoc/01cea5cad9c833c56349392ee7d9b627
+
+
+DopaTheta = collections.namedtuple(
+    typename='dopaTheta',
+    field_names='a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Km, Vmax, Bd, Ad, tau_Dp, wi, we, wd')
+
+DopaState = collections.namedtuple(
+    typename='DopaState',
+    field_names='r V u Sa Sg Dp')
+
+dopa_default_theta = DopaTheta(
+    a=0.04, b=5., c=140., ga=12., gg=12.,
+    Delta=1., Eta=18., Iext=0., Ea=0., Eg=-80., tauSa=5., tauSg=5., Sja=0.8, Sjg=1.2,
+    ud=12., alpha=0.013, beta=.4, k=10e4, Vmax=1300., Km=150., Bd=0.2, Ad=1., tau_Dp=500.,
+    wi=1.e-4, we=1.e-4, wd=1.e-4,
+    )
+
+dopa_default_initial_state = DopaState(
+    r=0.0, V=-2.0, u=0.0, Sa=0.0, Sg=0.0, Dp=0.0)
+
+def dopa_dfun(y, cy, p: DopaTheta):
+    "Adaptive QIF model with dopamine modulation."
+
+    r, V, u, Sa, Sg, Dp = y
+    c_inh, c_exc, c_dopa = cy
+    a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Vmax, Km, Bd, Ad, tau_Dp, *_ = p
+
+    dr = 2. * a * r * V + b * r - ga * Sa * r - gg * Sg * r + (a * Delta) / np.pi
+    dV = a * V**2 + b * V + c + Eta - (np.pi**2 * r**2) / a + (Ad * Dp + Bd) * ga * Sa * (Ea - V) + gg * Sg * (Eg - V) + Iext - u
+    du = alpha * (beta * V - u) + ud * r
+    dSa = -Sa / tauSa + Sja * c_exc
+    dSg = -Sg / tauSg + Sjg * c_inh
+    dDp = (k * c_dopa - Vmax * Dp / (Km + Dp)) / tau_Dp
+    
+    return np.array([dr, dV, du, dSa, dSg, dDp])
+
+def dopa_net_dfun(y, p):
+    "Canonical form for network of dopa nodes."
+    Ci, Ce, Cd, node_params = p
+    r = y[0]
+    c_inh = node_params.wi * Ci @ r
+    c_exc = node_params.we * Ce @ r
+    c_dopa = node_params.wd * Cd @ r
+    return dopa_dfun(y, (c_inh, c_exc, c_dopa), node_params)

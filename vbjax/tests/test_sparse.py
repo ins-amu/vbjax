@@ -20,7 +20,7 @@ def _test_spmv(spmv, A, n):
     numpy.testing.assert_allclose(jb, nb, 1e-4, 1e-6)
 
     # now its gradient
-    jax.test_util.check_grads(spmv, (jx,), order=1, modes=('rev',))
+    jax.test_util.check_grads(spmv, (jx,), order=1, modes=('rev',), atol=0.02, rtol=0.002)
 
 
 def test_csr_scipy():

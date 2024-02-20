@@ -27,6 +27,8 @@ from .neural_mass import (
     MPRState, MPRTheta, mpr_dfun, mpr_default_theta, mpr_r_positive,
     BOLDTheta, compute_bold_theta, bold_default_theta, bold_dfun,
     BVEPTheta, bvep_default_theta, bvep_dfun, DCMTheta, dcm_dfun,
+    DopaTheta, dopa_dfun, dopa_default_theta, dopa_default_initial_state,
+    dopa_net_dfun,
         )
 from .regmap import make_region_mapping
 from .coupling import (
@@ -39,10 +41,15 @@ from .monitor import (
 from .layers import make_dense_layers
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
-from .util import to_jax, to_np
+from .util import to_jax, to_np, tuple_meshgrid, tuple_ravel, tuple_shard
 from ._version import __version__
 
 # some random setup for convenience
+import jax
+platform = jax.local_devices()[0].platform
+is_gpu = platform == 'gpu'
+is_cpu = platform == 'cpu'
+
 from jax import random
 from jax import numpy as np
 key = random.PRNGKey(42)
