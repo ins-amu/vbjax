@@ -109,7 +109,7 @@ def test_dopa():
     _, loop = vb.make_sde(dt=dt, dfun=vb.dopa_net_dfun, gfun=sigma)
 
     j_y0 = jp.array([r0, V0, u0, Sa0, Sg0, Dp0])
-    j_params = vb.DopaTheta(*params, wi=ckk, we=ckk, wd=ckk)
+    j_params = vb.DopaTheta(*params, wi=ckk, we=ckk, wd=ckk, sigma=sigma)
     j_Ci, j_Ce, j_Cd = [jp.array(_) for _ in (conn_inhibitor, conn_excitator, conn_dopamine)]
     j_dw = jp.array(dw).reshape(-1, 6, n_nodes)
     assert j_dw.shape == (t1.size, 6, n_nodes)
