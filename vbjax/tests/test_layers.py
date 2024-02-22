@@ -44,16 +44,18 @@ def test_node_vjp1():
 
     a = 0.1
     (w, b), _ = vb.make_dense_layers(12, [4, 5, 6])
+    # cache = [jp.zeros((1, _.shape[1])) for _ in w[:-1]]
 
     def fwd(args):
         w, b, x = args
         # on fwd pass, we cache the activations
         # since they are required for vjp
-        cache = [x]
+        cache = []
         for i in range(len(w) - 1):
-            x = w[i] @ x + b[i]
             cache.append(x)
+            x = w[i] @ x + b[i]
             x = jp.where(x >= 0, x, a*x)  # leaky_relu
+        cache.append(x)
         x = w[-1] @ x + b[-1]
         return x, cache
 
@@ -95,7 +97,6 @@ def test_node_vjp1():
     gh_w, gh_x, gh_b = my_vjp_mlp(args, cache, gh_x, gh_w, gh_b)
 
     np.testing.assert_allclose(g_x, gh_x, 1e-6, 1e-6)
-    rtol = jp.abs(y).max()
     for i in range(len(w)):
-        np.testing.assert_allclose(g_w[i], gh_w[i], 1e-3, rtol)
-        np.testing.assert_allclose(g_b[i], gh_b[i], 1e-3, rtol)
+        np.testing.assert_allclose(g_w[i], gh_w[i], 1e-6, 1e-6)
+        np.testing.assert_allclose(g_b[i], gh_b[i], 1e-6, 1e-6)
