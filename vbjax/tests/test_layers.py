@@ -2,6 +2,7 @@ import numpy as np
 import vbjax as vb
 import jax
 import jax.numpy as jp
+import pytest
 
 
 def test_make_dense_layers():
@@ -102,12 +103,10 @@ def test_mlp_vjp():
         np.testing.assert_allclose(g_b[i], gh_b[i], 1e-6, 1e-6)
 
 
-def _setup_test_rmlp_vjp():
+def _setup_test_rmlp_vjp(nt=10, D=32, L=5):
     "Similar to above but with recurrent application."
     a = 0.1
-    nt = 10
-    D = 32
-    (w, b), _ = vb.make_dense_layers(D, [D]*5)  # 5*nt matmul
+    (w, b), _ = vb.make_dense_layers(D, [D]*L)  # 5*nt matmul
     cache = [jp.zeros((nt, _.shape[1], 1)) for _ in w]
 
     def mlp(args, t=None, cache=None):
@@ -172,3 +171,21 @@ def test_rmlp_vjp():
     for i in range(len(w)):
         np.testing.assert_allclose(g_w[i], gh_w[i], 1e-6, 1e-6)
         np.testing.assert_allclose(g_b[i], gh_b[i], 1e-6, 1e-6)
+
+
+@pytest.mark.parametrize('use_ad', [True, False])
+def test_rmlp_vjp_perf(benchmark, use_ad):
+    w, b, D, cache, rmlp, rmlp_vjp = _setup_test_rmlp_vjp()
+    args = w, b, jp.ones((D, 1))
+
+    if use_ad:
+        def g():
+            return jax.grad(lambda a: jp.sum(rmlp(a)**2))(args)
+    else:
+        def g():
+            y = rmlp(args, cache)
+            return rmlp_vjp(args, cache, 2*y)
+
+    g = jax.jit(g)
+    g()
+    benchmark(g)
