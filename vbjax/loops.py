@@ -106,7 +106,7 @@ def make_sde(dt, dfun, gfun, adhoc=None):
         def op(x, z):
             x = step(x, z, p)
             return x, x
-        return jax.lax.scan(op, x0, zs)[1]
+        return jax.lax.scan(op, x0, zs)[1]  # TODO expose unroll
 
     return step, loop
 

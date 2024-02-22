@@ -145,7 +145,8 @@ def dcm_dfun(x, u, p: DCMTheta):
 
 DopaTheta = collections.namedtuple(
     typename='dopaTheta',
-    field_names='a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Km, Vmax, Bd, Ad, tau_Dp, wi, we, wd')
+    field_names='a, b, c, ga, gg, Eta, Delta, Iext, Ea, Eg, Sja, Sjg, tauSa, tauSg, alpha, beta, ud, k, Vmax, Km, Bd, Ad, tau_Dp, wi, we, wd, sigma')
+
 
 DopaState = collections.namedtuple(
     typename='DopaState',
@@ -155,11 +156,11 @@ dopa_default_theta = DopaTheta(
     a=0.04, b=5., c=140., ga=12., gg=12.,
     Delta=1., Eta=18., Iext=0., Ea=0., Eg=-80., tauSa=5., tauSg=5., Sja=0.8, Sjg=1.2,
     ud=12., alpha=0.013, beta=.4, k=10e4, Vmax=1300., Km=150., Bd=0.2, Ad=1., tau_Dp=500.,
-    wi=1.e-4, we=1.e-4, wd=1.e-4,
+    wi=1.e-4, we=1.e-4, wd=1.e-4, sigma=1e-3,
     )
 
 dopa_default_initial_state = DopaState(
-    r=0.0, V=-2.0, u=0.0, Sa=0.0, Sg=0.0, Dp=0.0)
+    r=0.03, V=-67.0, u=0.0, Sa=0.0, Sg=0.0, Dp=0.5)
 
 def dopa_dfun(y, cy, p: DopaTheta):
     "Adaptive QIF model with dopamine modulation."
@@ -185,3 +186,20 @@ def dopa_net_dfun(y, p):
     c_exc = node_params.we * Ce @ r
     c_dopa = node_params.wd * Cd @ r
     return dopa_dfun(y, (c_inh, c_exc, c_dopa), node_params)
+
+def dopa_r_positive(y, _):
+    # same as mpr but keep separate name for now
+    y = y.at[0].set( np.where(y[0]<0, 0, y[0]) )
+    return y
+
+def dopa_gfun_mulr(y, p):
+    "Provide a multiplicative r, additive V gfun."
+    r, *_ = y
+    g = np.r_[r, 1, 0, 0, 0, 0] * p.sigma
+    if r.ndim == 2:
+        g = g.reshape((-1, 1))
+    return g
+
+def dopa_gfun_add(y, p):
+    "Provides an additive noise gfun."
+    return p.sigma
