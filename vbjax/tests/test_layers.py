@@ -221,11 +221,14 @@ def _setup_test_ndde_vjp(a=0.1, ctx_len=16, fwd_len=16, dim=32, nff=5):
         if cache is not None:
             cache[-1] = cache[-1].at[t].set(x)
         y = w[-1] @ x + b[-1]
+        if cache is not None:
+            return y, cache
         return y
 
     def mlp_vjp(args, t, cache, g_y, g_w, g_b):  # same as rmlp
         # x only used in forward pass
         w, b, _ = args
+        print('mlp_vjp', g_w[0].shape, g_y.shape)
         g_w[-1] = g_w[-1] + g_y @ cache[-1][t].T
         g_b[-1] = g_b[-1] + g_y
         g_x = w[-1].T @ g_y
@@ -234,43 +237,58 @@ def _setup_test_ndde_vjp(a=0.1, ctx_len=16, fwd_len=16, dim=32, nff=5):
             g_w[i] = g_w[i] + g_x @ cache[i][t].T
             g_b[i] = g_b[i] + g_x
             g_x = w[i].T @ g_x
+        print('mlp_vjp', g_w[0].shape, g_x.shape)
         return g_w, g_b, g_x
 
     # this part is different
-    def ndde(args, cache=None, no_mlp=True):
+    def ndde(args, cache=None):
         w, b, x = args
         assert x.shape == (ctx_len, dim, 1)
         buf = jp.zeros((ctx_len + fwd_len, dim, 1))
         buf = buf.at[:ctx_len].set(x)
-        for t in range(fwd_len):
+        # for t in range(fwd_len):
+
+        def op(c, t):
+            buf, cache = c
             # A neural DDE is similar to recurrent MLP but not Markovian
-            if no_mlp:  # debug
-                y = buf[t:ctx_len+1].sum(axis=0)
+            # x_ = buf[t:ctx_len+t].reshape(-1, 1)
+            x_ = jax.lax.dynamic_slice_in_dim(buf, t, ctx_len)
+            x_ = x_.reshape(-1, 1)
+            if cache is not None:
+                y, cache = mlp((w, b, x_), t, cache)
             else:
-                x_ = buf[t:ctx_len+t].reshape(-1, 1)
-                if cache is not None:
-                    y = mlp((w, b, x_), t, cache)
-                else:
-                    y = mlp((w, b, x_))
-            buf = buf.at[ctx_len+t].set(y)
+                y = mlp((w, b, x_))
+            # buf = buf.at[ctx_len+t].set(y)
+            buf = jax.lax.dynamic_update_index_in_dim(buf, y, ctx_len + t, 0)
+            return (buf, cache), y
+        (buf, cache), _ = jax.lax.scan(op, (buf, cache), jp.r_[:fwd_len])
+        if cache is not None:
+            return buf[ctx_len:], cache
         return buf[ctx_len:]
 
-    def ndde_vjp(args, cache, g_ys, no_mlp=True):
+    def ndde_vjp(args, cache, g_ys):
         w, b, x = args
         g_w = [jp.zeros_like(_) for _ in w]
         g_b = [jp.zeros_like(_) for _ in b]
         assert g_ys.shape == (fwd_len, dim, 1)
         g_buf = jp.zeros((ctx_len + fwd_len, dim, 1))
         g_buf = g_buf.at[ctx_len:].set(g_ys)
-        for t_ in range(fwd_len):
+        # for t_ in range(fwd_len):
+
+        def op(c, t_):
+            g_buf, g_w, g_b = c
             t = fwd_len - t_ - 1
-            g_y = g_buf[ctx_len + t]
-            if no_mlp:
-                g_y = jp.ones((ctx_len, dim, 1))*g_y
-            else:
-                g_w, g_b, g_y = mlp_vjp(args, t, cache, g_y, g_w, g_b)
-                g_y = g_y.reshape((ctx_len, dim, 1))
-            g_buf = g_buf.at[t:ctx_len+t].set(g_y)
+            # g_y = g_buf[ctx_len + t]
+            g_y = jax.lax.dynamic_index_in_dim(g_buf, ctx_len + t)
+            # print(g_w[0].shape, g_y.shape, g_buf.shape)
+            # (128, 128) (1, 32, 1) (8, 32, 1)
+            g_y = g_y[0]
+            g_w, g_b, g_y = mlp_vjp(args, t, cache, g_y, g_w, g_b)
+            g_y = g_y.reshape((ctx_len, dim, 1))
+            # g_buf = g_buf.at[t:ctx_len+t].add(g_y)
+            g_buf = jax.lax.dynamic_update_slice_in_dim(g_buf, g_y, t, 0)
+            return (g_buf, g_w, g_b), t_
+        (g_buf, g_w, g_b), _ = jax.lax.scan(op, (g_buf, g_w, g_b), jp.r_[:fwd_len])
         return g_w, g_b, g_buf[:ctx_len]
 
     return w, b, ctx_len, fwd_len, dim, cache, ndde, ndde_vjp
@@ -279,18 +297,16 @@ def _setup_test_ndde_vjp(a=0.1, ctx_len=16, fwd_len=16, dim=32, nff=5):
 def test_ndde_vjp():
     pytest.skip('does not work yet')
 
-    ctx_len = 16
-    fwd_len = 2
+    ctx_len = 4
+    fwd_len = 4
     w, b, _, _, dim, cache, ndde, ndde_vjp = _setup_test_ndde_vjp(
         ctx_len=ctx_len, fwd_len=fwd_len)
     args = w, b, jp.ones((ctx_len, dim, 1))
 
-    debug = True
+    g_w, g_b, g_x = jax.grad(lambda a: jp.sum(ndde(a)**2))(args)
 
-    g_w, g_b, g_x = jax.grad(lambda a: jp.sum(ndde(a, no_mlp=debug)**2))(args)
-
-    y = ndde(args, cache, no_mlp=debug)
-    gh_w, gh_b, gh_x = ndde_vjp(args, cache, 2*y, no_mlp=debug)
+    y, cache = ndde(args, cache)
+    gh_w, gh_b, gh_x = ndde_vjp(args, cache, 2*y)
 
     np.testing.assert_allclose(g_x, gh_x, 1e-6, 1e-6)
     for i in range(len(w)):
