@@ -5,6 +5,19 @@ import jax.numpy as jp
 import vbjax as vb
 
 
+# TODO can't continue simulations b/c init doesn't vmap w/ params
+# TODO need to run long time tavg and bold
+# TODO allow predefined set of params for e.g. random sample
+# TODO regional parameters?
+# TODO abstract over simulation configuration e.g. noise
+# TODO ISPC impl for benchmark comparison
+# TODO use delays if available
+# TODO implement memory limits & test them
+# TODO memmap raw/tavg/bold direct to file
+# TODO automate inner vs outer loop over parameters
+
+
+
 def sweep_node(init, params, T=10.0, dt=0.01, sigma=1e-3, seed=42, cores=4):
     "Run sweep for single dopa node on params matrix"
 
