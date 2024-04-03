@@ -9,7 +9,7 @@ import jax.numpy as np
 
 zero = 0
 
-def heun_step(x, dfun, dt, *args, add=zero, adhoc=None):
+def heun_step(x, dfun, dt, *args, add=zero, adhoc=None, return_euler=False):
     """Use a Heun scheme to step state with a right hand sides dfun(.)
     and additional forcing term add.
     """
@@ -26,6 +26,8 @@ def heun_step(x, dfun, dt, *args, add=zero, adhoc=None):
     else:
         nx = jax.tree_map(lambda x,d1,d2: x + dt*0.5*(d1 + d2), x, d1, d2)
     nx = adhoc(nx, *args)
+    if return_euler:
+        return xi, nx
     return nx
 
 
@@ -44,7 +46,7 @@ def _compute_noise(gfun, x, p, sqrt_dt, z_t):
             noise = jax.tree_map(lambda g,z: g * sqrt_dt * z, g, z_t)
     return noise
 
-def make_sde(dt, dfun, gfun, adhoc=None):
+def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     """Use a stochastic Heun scheme to integrate autonomous stochastic
     differential equations (SDEs).
 
@@ -63,6 +65,10 @@ def make_sde(dt, dfun, gfun, adhoc=None):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    return_euler: bool, default False
+        Return solution with local Euler estimates.
+    unroll: int, default 10
+        Force unrolls the time stepping loop.
 
     Returns
     =======
@@ -99,14 +105,19 @@ def make_sde(dt, dfun, gfun, adhoc=None):
 
     def step(x, z_t, p):
         noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
-        return heun_step(x, dfun, dt, p, add=noise, adhoc=adhoc)
+        return heun_step(
+            x, dfun, dt, p, add=noise, adhoc=adhoc,
+            return_euler=return_euler)
 
     @jax.jit
     def loop(x0, zs, p):
         def op(x, z):
             x = step(x, z, p)
-            return x, x
-        return jax.lax.scan(op, x0, zs)[1]  # TODO expose unroll
+            if return_euler:
+                ex, x = x
+            return x, (ex, x)
+        _, xs = jax.lax.scan(op, x0, zs, unroll=unroll)
+        return xs
 
     return step, loop
 
