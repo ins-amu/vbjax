@@ -18,7 +18,9 @@ import vbjax as vb
 
 
 
-def sweep_node(init, params, T=10.0, dt=0.01, sigma=1e-3, seed=42, cores=4):
+def sweep_node(init, params, T=10.0, dt=0.001,
+               sigma=1e-3, seed=42, cores=4,
+               tavg=None):
     "Run sweep for single dopa node on params matrix"
 
     # setup grid for parameters
@@ -31,7 +33,7 @@ def sweep_node(init, params, T=10.0, dt=0.01, sigma=1e-3, seed=42, cores=4):
 
     # setup model
     f = lambda x, p: vb.dopa_dfun(x, (0,0,0), p)
-    _, loop = vb.make_sde(dt, f, sigma)
+    _, loop = vb.make_sde(dt, f, sigma, adhoc=vb.dopa_r_positive)
 
     # assume same inits and noise for all params
     key = jax.random.PRNGKey(seed)
@@ -72,7 +74,7 @@ def sweep_network(init, params, Ci, Ce, Cd,
         pravel = vb.tuple_shard(pravel, cores)
 
     # setup model
-    _, loop = vb.make_sde(dt, vb.dopa_net_dfun, sigma)
+    _, loop = vb.make_sde(dt, vb.dopa_net_dfun, sigma, adhoc=vb.dopa_r_positive)
 
     # assume same inits and noise for all params
     key = jax.random.PRNGKey(seed)

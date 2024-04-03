@@ -1,3 +1,5 @@
+import numpy as np
+import matplotlib.pyplot as pl
 import jax.numpy as jp
 import vbjax as vb
 from vbjax.app.dopa import sweep_node, sweep_network
@@ -7,33 +9,41 @@ params = vb.dopa_default_theta
 
 # update params and sweep over Km and Vmax
 params = params._replace(
-    Eta=18.2,
-    Km=jp.r_[100:200:32j],
-    Vmax=jp.r_[1000:2000:32j],
+    Bd=jp.r_[0.2, 0.5, 0.8, 1.0]
     )
 
 # initial conditions
-y0 = jp.array([0.1, -60.0, 0.0, 0.0, 0.0, 0.0])
+y0 = jp.array([0.25, -50.0, 0.0, 0.4, 0.05, 0.0])
 
 # run sweep
-end_time = 256.0
-pkeys, ys = sweep_node(y0, params, T=end_time, cores=4)
+end_time = 30.0
 
-# for large sweeps, ys may not yet be filled with outputs
-ys.block_until_ready()
+# svar names
+svars = 'r V u Sa Sg Dp'.split(' ')
 
-# pkeys provides the names for the extra dims of ys result
-print(pkeys, ys.shape)
+# choose noise per state var; for this scenario
+# put noise in slow variables for "spontaneous" bursts in r,V
+sigma = jp.r_[0, 0, 0, 1e-1, 1e-1, 1e-1]
 
-# now similar for network sweep
-n_nodes = 8
-Ci, Ce, Cd = vb.randn(3, n_nodes, n_nodes)
-pkeys, ys = sweep_network(y0, params, Ci, Ce, Cd, T=end_time, cores=4)
-ys.block_until_ready()
-print(pkeys, ys.shape)
+# run for small dt
+pl.figure(figsize=(10, 8))
 
-# plot some of it
-import matplotlib.pyplot as pl
+for dt in [0.001,]:
+    pkeys, ys = sweep_node(y0, params, dt=dt, sigma=sigma, T=end_time, cores=4)
+    ys.block_until_ready()
+    # plot some of it
+    t = np.r_[:end_time:1j*ys.shape[-2]]
+    for i_svar in range(6):
+        pl.subplot(3, 2, i_svar + 1)
+        kw = {}
+        if i_svar == 2:
+            kw['label'] = [f'Bd={bd:0.2f}' for bd in params.Bd]
+        pl.plot(t, ys[:, :, i_svar].T, **kw)
+        pl.xlabel('time (ms)')
+        pl.ylabel(f"{svars[i_svar]}(t)")
+        pl.grid(1)
 
-pl.plot(ys[0,0,:,0], 'k')
+pl.subplot(3,2,3)
+pl.legend()
+pl.tight_layout()
 pl.show()
