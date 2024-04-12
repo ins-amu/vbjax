@@ -138,10 +138,11 @@ def _setup_test_rmlp_vjp(nt=10, D=32, L=5):
         "Recurrent MLP"
         w, b, x = args
         for t in range(nt):
-            if cache is not None:
-                x = mlp((w, b, x), t, cache)
-            else:
-                x = mlp((w, b, x))
+            x = mlp((w, b, x), t, cache)
+            # if cache is not None:
+            #     x = mlp((w, b, x), t, cache)
+            # else:
+            #     x = mlp((w, b, x))
         #raise ValueError("need to return sequence of x!")
         return x
 
@@ -168,6 +169,109 @@ def test_rmlp_vjp():
     # now our vjp
     y = rmlp(args, cache)
     gh_w, gh_b, gh_x = rmlp_vjp(args, cache, 2*y)
+
+    np.testing.assert_allclose(g_x, gh_x, 1e-6, 1e-6)
+    for i in range(len(w)):
+        np.testing.assert_allclose(g_w[i], gh_w[i], 1e-6, 1e-6)
+        np.testing.assert_allclose(g_b[i], gh_b[i], 1e-6, 1e-6)
+
+
+def _setup_test_node_vjp(nt=10, D=32, L=5):
+    "Similar to rmlp but a w/ Heun so neural ode."
+    a = 0.1
+    (w, b), _ = vb.make_dense_layers(D, [D]*L)  # 5*nt matmul
+    cache = [[jp.zeros((nt, _.shape[1], 1)) for _ in w] for i in (1, 2)]
+
+    def mlp(args, t=None, cache=None):
+        w, b, x = args
+        for i in range(len(w) - 1):
+            if cache is not None:
+                cache[i] = cache[i].at[t].set(x)
+            x = w[i] @ x + b[i]
+            x = jp.where(x >= 0, x, a*x)  # leaky_relu
+        if cache is not None:
+            cache[-1] = cache[-1].at[t].set(x)
+        y = w[-1] @ x + b[-1]
+        return y
+
+    def mlp_vjp(args, t, cache, g_y, g_w, g_b):
+        # x only used in forward pass
+        w, b, _ = args
+        g_w[-1] = g_w[-1] + g_y @ cache[-1][t].T
+        g_b[-1] = g_b[-1] + g_y
+        g_x = w[-1].T @ g_y
+        for i in range(len(w)-2, -1, -1):
+            g_x = jp.where(cache[i+1][t] >= 0, g_x, a*g_x)
+            g_w[i] = g_w[i] + g_x @ cache[i][t].T
+            g_b[i] = g_b[i] + g_x
+            g_x = w[i].T @ g_x
+        return g_w, g_b, g_x
+
+    dt = 0.1
+    no_cache = None, None
+    heun = True
+
+    def node(args, cache=no_cache):
+        "Recurrent MLP"
+        w, b, x = args
+        for t in range(nt):
+            d1 = mlp((w, b, x), t, cache=cache[0])
+            xi = x + dt*d1
+            if heun:
+                # heun requires 2x cache or remat
+                d2 = mlp((w, b, xi), t, cache=cache[1])
+                x = x + dt/2*(d1+d2)
+            else:
+                x = xi
+        return x
+
+    # "smolnode"
+    def node_vjp(args, cache, g_y):
+        w, b, _ = args
+        g_w = [jp.zeros_like(_) for _ in w]
+        g_b = [jp.zeros_like(_) for _ in b]
+        g_x = g_y
+        tr_add = lambda t1,t2: jax.tree.map(jp.add, t1,t2)
+        for _t in range(nt):
+            t = nt - _t - 1
+
+            if heun:
+                g_nx = g_x
+                # nx = x + dt/2*(d1+d2)
+                g_x = g_nx
+                g_d1 = dt/2*g_nx
+                g_d2 = dt/2*g_nx
+                # d2 = mlp(w,b,xi)
+                g_w, g_b, g_xi = mlp_vjp(args, t, cache[1], g_d2, g_w, g_b)
+                # xi = x + dt*d1
+                g_x = g_x + g_xi
+                g_d1 = g_d1 + dt*g_xi
+                # d1 = mlp(w,b,x)
+                _g_w, _g_b, _g_x = mlp_vjp(args, t, cache[0], g_d1, g_w, g_b)
+                g_w = tr_add(g_w, _g_w)
+                g_b = tr_add(g_b, _g_b)
+                g_x = g_x + _g_x
+
+            else:
+                g_d1 = dt*g_x
+                g_w, g_b, g_mlp_x = mlp_vjp(args, t, cache[0], g_d1, g_w, g_b)
+                g_x = g_x + g_mlp_x
+
+        return g_w, g_b, g_x
+
+    return w, b, D, cache, node, node_vjp
+
+
+def test_node_vjp():
+    w, b, D, cache, node, node_vjp = _setup_test_node_vjp()
+    args = w, b, jp.ones((D, 1))
+
+    # jax AD for expected values
+    g_w, g_b, g_x = jax.grad(lambda a: jp.sum(node(a)**2))(args)
+
+    # now our vjp
+    y = node(args, cache)
+    gh_w, gh_b, gh_x = node_vjp(args, cache, 2*y)
 
     np.testing.assert_allclose(g_x, gh_x, 1e-6, 1e-6)
     for i in range(len(w)):
@@ -276,11 +380,11 @@ def _setup_test_ndde_vjp(a=0.1, ctx_len=16, fwd_len=16, dim=32, nff=5):
     return w, b, ctx_len, fwd_len, dim, cache, ndde, ndde_vjp
 
 
-def test_ndde_vjp():
-    pytest.skip('does not work yet')
+def test_ndde1_vjp():
+    # pytest.skip('does not work yet')
 
     ctx_len = 16
-    fwd_len = 2
+    fwd_len = 1
     w, b, _, _, dim, cache, ndde, ndde_vjp = _setup_test_ndde_vjp(
         ctx_len=ctx_len, fwd_len=fwd_len)
     args = w, b, jp.ones((ctx_len, dim, 1))
