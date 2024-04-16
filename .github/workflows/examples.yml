@@ -1,0 +1,16 @@
+name: run pytests
+
+on:
+  push:
+
+jobs:
+  ubuntu-pip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup python
+        run: sudo apt-get update && sudo apt-get install -y python3-pip
+      - name: pip install jax
+        run: pip install -e .
+      - name: run examples
+        run: bash -c 'for f in $(ls examples); do python examples/$f; done'
