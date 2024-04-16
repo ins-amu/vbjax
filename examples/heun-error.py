@@ -48,4 +48,5 @@ for dt in [0.01, 0.001]:
         pl.semilogy(t, hp[:, i], 'g', alpha=0.5)
         pl.axhline(dt, color='g')
 
+pl.savefig(__file__ + '.jpg', dpi=300)
 pl.show()
