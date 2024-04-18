@@ -18,6 +18,8 @@ jobs:
         color: true       # Force color output (SPACK_COLOR=always)
         path: spack       # Where to clone Spack
 
-    - run: spack install py-jax
+    - run: spack install --jobs 2 py-jax py-jaxlib+cuda cuda_arch=89
 
-    - run: spack load py-jax && python -c 'import jax.numpy as jp; print(jp.zeros(8).device)'
+    # TODO: do inside apptainer?
+    
+    - run: eval `spack load --sh   py-jax` && python -c 'import jax.numpy as jp; print(jp.zeros(8).device)'
