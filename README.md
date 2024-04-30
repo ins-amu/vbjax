@@ -147,8 +147,7 @@ sweeps, we can pull in jax primitives `jax.pmap` to parallelize over compute
 devices (by default, cores of the CPU) and `jax.vmap` to vectorize the function `run`,
 *or* just a `jax.vmap` if using a GPU,
 ```python
-using_cpu = jax.local_devices()[0].platform == 'cpu'
-if using_cpu:
+if vb.is_cpu:
     run_batches = jax.pmap(jax.vmap(run, in_axes=1), in_axes=0)
 else:
     run_batches = jax.vmap(run, in_axes=1)
