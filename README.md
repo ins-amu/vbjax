@@ -31,7 +31,7 @@ pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-re
 
 #### M1/M2 🍎
 
-On newer Apple machines w/ M1 or M2 GPUs, JAX supports using the GPU experimentally
+On newer Apple machines w/ M1, M2 or M3 GPUs, JAX supports using the GPU experimentally
 by installing just two extra packages:
 ```
 pip install ml-dtypes==0.2.0 jax-metal
@@ -82,6 +82,20 @@ vb.plot_states(xs, 'rV', jpg='example1', show=True)
 While integrators and mass models tend to be the same across publications, but
 the network model itself varies (regions vs surface, stimulus etc), vbjax allows
 user to focus on defining the `network` and then getting time series.
+
+### Jacobians
+
+Jax makes it easy to compute Jacobians,
+```python
+y0 = jp.r_[0.1, -2.0]
+
+def eig1_tau(tau):
+    theta = vb.mpr_default_theta._replace(tau=tau)
+    J = jax.jacobian(vb.mpr_dfun)(y0, (0.4, 0.), theta)
+    return jp.linalg.eigvals(J)[0]
+
+jax.vmap(eig1_tau)( jp.r_[1.0:2.0:32j] ).real
+```
 
 ### Parallel parameter space exploration
 
