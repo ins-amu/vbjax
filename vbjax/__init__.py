@@ -20,7 +20,7 @@ def _use_many_cores():
 cores = _use_many_cores()
 
 # import stuff
-from .custom_loops import make_sde, make_ode, make_dde, make_sdde, heun_step, make_continuation
+from .loops import make_sde, make_ode, make_dde, make_sdde, heun_step, make_continuation
 from .noise_generator import make_noise_generator, spectral_exponent
 from .shtlc import make_shtdiff
 from .neural_mass import (

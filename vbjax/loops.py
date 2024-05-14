@@ -128,7 +128,7 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     return step, loop
 
 
-def make_ode(dt, dfun, adhoc=None, stim=False):
+def make_ode(dt, dfun, adhoc=None):
     """Use a Heun scheme to integrate autonomous ordinary differential
     equations (ODEs).
 
@@ -166,10 +166,7 @@ def make_ode(dt, dfun, adhoc=None, stim=False):
     """
 
     def step(x, t, p):
-        if stim:
-            return heun_step(x, dfun, dt, p, t, adhoc=adhoc)
-        else:
-            return heun_step(x, dfun, dt, p, adhoc=adhoc)
+        return heun_step(x, dfun, dt, p, adhoc=adhoc)
 
     @jax.jit
     def loop(x0, ts, p):
@@ -307,7 +304,6 @@ def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=
 
     @jax.jit
     def continue_chunk(buf, p, key):
-        buf, rv = run_chunk(buf, p)
         get, set = jax.lax.dynamic_slice, jax.lax.dynamic_update_slice
         # buf = buf.at[:max_lag+1].set( buf[-(max_lag+1):] )
         buf = set(buf, get(buf, (i0,0,0), (i1,n_svar,n_from)), (0,0,0))
@@ -321,6 +317,6 @@ def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=
             # leave the buf since gfun() returns zero
             pass
 
-        
+        buf, rv = run_chunk(buf, p)
         return buf, rv
     return continue_chunk
