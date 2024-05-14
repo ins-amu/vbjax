@@ -20,8 +20,8 @@ def _use_many_cores():
 cores = _use_many_cores()
 
 # import stuff
-from .loops import make_sde, make_ode, make_dde, make_sdde, heun_step, make_continuation
-from .noise_generator import noise_psd
+from .custom_loops import make_sde, make_ode, make_dde, make_sdde, heun_step, make_continuation
+from .noise_generator import make_noise_generator, spectral_exponent
 from .shtlc import make_shtdiff
 from .neural_mass import (
     JRState, JRTheta, jr_dfun, jr_default_theta,
@@ -37,10 +37,12 @@ from .connectome import make_conn_latent_mvnorm
 from .sparse import make_spmv, csr_to_jax_bcoo, make_sg_spmv
 from .monitor import (
     make_timeavg, make_bold, make_gain, make_offline, make_cov, make_fc)
-from .layers import make_dense_layers
+from .layers import make_dense_layers, create_degrees, create_masks, MaskedLayer, MaskedMLP, OutputLayer
+from .ml_models import GaussianMADE
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
 from .util import to_jax, to_np
+from .train_utils import eval_MADE, train_step, log_likelihood, grad_func
 from ._version import __version__
 
 # some random setup for convenience
