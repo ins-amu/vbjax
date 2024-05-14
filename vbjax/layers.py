@@ -30,7 +30,6 @@ def make_dense_layers(in_dim, latent_dims=[10], out_dim=None, init_scl=0.1, extr
     
     return (weights, biases), fwd
 
-
 def create_degrees(key, n_inputs, n_hiddens, input_order, mode):
     """
     Generates a degree for each hidden and input unit. A unit with degree d can only receive input from units with
