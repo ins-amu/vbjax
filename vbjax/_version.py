@@ -1,4 +1,4 @@
-__version__ = 'v0.0.11'
+__version__ = 'v0.0.13'
 
 if __name__ == '__main__':
     print(__version__)
@@ -13,5 +13,5 @@ if __name__ == '__main__':
         do(f'/usr/bin/git add vbjax/_version.py')
         do(f'/usr/bin/git commit -m bump-version')
         do(f'/usr/bin/git push -u origin main')
-        do(f'/usr/bin/git tag {__version__}')
-        do(f'/usr/bin/git push -u origin {__version__}')
+        do(f'/usr/bin/git tag -f {__version__}')
+        do(f'/usr/bin/git push -u origin -f {__version__}')

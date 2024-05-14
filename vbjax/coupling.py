@@ -3,40 +3,32 @@ Predefined couplings of interest for most applications.
 
 """
 
-import jax.numpy as np
+from collections import namedtuple
+import jax.numpy as jp
 
 
-def make_delayed_coupling(weights, delay_steps, pre, post, nh, isvar):
+DelayHelper = namedtuple('DelayHelper', 'Wt lags ix_lag_from max_lag n_to n_from')
+
+def make_delay_helper(weights, lengths, dt=0.1, v_c=10.0) -> DelayHelper:
+    """Construct a helper with auxiliary variables for applying 
+    delays to a buffer.
     """
-    Construct a dense delayed coupling function. 
+    n_to, n_from = weights.shape
+    lags = jp.floor(lengths / v_c / dt).astype('i')
+    ix_lag_from = jp.tile(jp.r_[:n_from], (n_to, 1))
+    max_lag = lags.max() + 1
+    Wt = weights.T[:,:,None] # enable bcast for coupling vars
+    dh = DelayHelper(Wt, lags, ix_lag_from, max_lag, n_to, n_from)
+    return dh
 
-    Parameters
-    ==========
-    weights : array
-        Coupling weights.
-    delay_steps : array
-        Number of delay steps per connection i, j.
-
-    ...
-    To be finished
-    ...
-
-    Notes
-    =====
-
-    - This construction assumes a particular layout for the history
-      buffer: xt.shape == (nh+1+nt, nsvar, nnode, ...). 
-
+def delay_apply(dh: DelayHelper, t, buf):
+    """Apply delays to buffer `buf` at time `t`.
     """
-    nn = weights.shape[0]
-    nodes = np.tile(np.r_[:nn], (nn, 1))
-    def cfun(t, xt, x, params):
-        dx = xt[nh + t - delay_steps, isvar, nodes]
-        xij = pre(dx, x, params)
-        gx = (weights * xij).sum(axis=1)
-        return post(gx, params)
-    return cfun
+    return (dh.Wt * buf[t - dh.lags, :, dh.ix_lag_from]).sum(axis=1).T
 
+# TODO impl sparse delay_apply
+
+# TODO the following are not used: maybe drop them
 
 def make_linear_cfun(SC, a=1.0, b=0.0):
     """Construct a linear coupling function with slope `a` and offset `b`.
@@ -46,15 +38,15 @@ def make_linear_cfun(SC, a=1.0, b=0.0):
         if xj.ndim == 1:  # no delays
             gx = SC @ xj
         elif xj.ndim == 2:  # delays
-            gx = np.sum(SC * xj, axis=1)
+            gx = jp.sum(SC * xj, axis=1)
         return a*gx + b
     return cfun
 
 
 def make_diff_cfun(SC, a=1.0, b=0.0):
     """Construct a linear difference coupling."""
-    nn = np.r_[:SC.shape[0]]
-    diffdiag = np.diag(SC) - SC.sum(axis=1)
+    nn = jp.r_[:SC.shape[0]]
+    diffdiag = jp.diag(SC) - SC.sum(axis=1)
     SC_ = SC.at[nn,nn].set(diffdiag)
     # fix diagonal according to trick
     return make_linear_cfun(SC_, a=a, b=b)

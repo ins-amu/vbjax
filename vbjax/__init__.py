@@ -25,13 +25,15 @@ from .noise_generator import make_noise_generator, spectral_exponent
 from .shtlc import make_shtdiff
 from .neural_mass import (
     JRState, JRTheta, jr_dfun, jr_default_theta,
-    MPRState, MPRTheta, mpr_dfun, mpr_default_theta,
+    MPRState, MPRTheta, mpr_dfun, mpr_default_theta, mpr_r_positive,
     BOLDTheta, compute_bold_theta, bold_default_theta, bold_dfun,
     BVEPTheta, bvep_default_theta, bvep_dfun, DCMTheta, dcm_dfun,
+    DopaTheta, dopa_dfun, dopa_default_theta, dopa_default_initial_state,
+    dopa_net_dfun, dopa_r_positive, dopa_gfun_add, dopa_gfun_mulr,
         )
 from .regmap import make_region_mapping
 from .coupling import (
-        make_diff_cfun, make_linear_cfun, make_delayed_coupling
+        make_diff_cfun, make_linear_cfun, make_delay_helper, delay_apply,
         )
 from .connectome import make_conn_latent_mvnorm
 from .sparse import make_spmv, csr_to_jax_bcoo, make_sg_spmv
@@ -41,11 +43,17 @@ from .layers import make_dense_layers, create_degrees, create_masks, MaskedLayer
 from .ml_models import GaussianMADE
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
-from .util import to_jax, to_np
+from .util import to_jax, to_np, tuple_meshgrid, tuple_ravel, tuple_shard
 from .train_utils import eval_MADE, train_step, log_likelihood, grad_func
+
 from ._version import __version__
 
 # some random setup for convenience
+import jax
+platform = jax.local_devices()[0].platform
+is_gpu = platform == 'gpu'
+is_cpu = platform == 'cpu'
+
 from jax import random
 from jax import numpy as np
 key = random.PRNGKey(42)

@@ -17,6 +17,7 @@ dependencies = [
     "jaxlib",
     "scipy",
     "numpyro",
+    "jax-dataclasses",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -40,7 +41,6 @@ dev = [
     "grip",
     "python-lsp-server[all]",
     "jedi-language-server",
-    "jax-dataclasses",
 ]
 
 [project.urls]

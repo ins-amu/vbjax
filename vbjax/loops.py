@@ -4,21 +4,50 @@ Functions for building time stepping loops.
 """
 
 import jax
+import jax.tree_util
 import jax.numpy as np
 
+zero = 0
+tmap = jax.tree_util.tree_map
 
-def heun_step(x, dfun, dt, *args, add=0, adhoc=None):
+def heun_step(x, dfun, dt, *args, add=zero, adhoc=None, return_euler=False):
     """Use a Heun scheme to step state with a right hand sides dfun(.)
     and additional forcing term add.
     """
     adhoc = adhoc or (lambda x,*args: x)
     d1 = dfun(x, *args)
-    xi = adhoc(x, dt*d1 + add, *args)
+    if add is not zero:
+        xi = tmap(lambda x,d,a: x + dt*d + a, x, d1, add)
+    else:
+        xi = tmap(lambda x,d: x + dt*d, x, d1)
+    xi = adhoc(xi, *args)
     d2 = dfun(xi, *args)
-    nx = adhoc(x, dt*0.5*(d1 + d2) + add, *args)
+    if add is not zero:
+        nx = tmap(lambda x,d1,d2,a: x + dt*0.5*(d1 + d2) + a, x, d1, d2, add)
+    else:
+        nx = tmap(lambda x,d1,d2: x + dt*0.5*(d1 + d2), x, d1, d2)
+    nx = adhoc(nx, *args)
+    if return_euler:
+        return xi, nx
     return nx
 
-def make_sde(dt, dfun, gfun, adhoc=None):
+
+def _compute_noise(gfun, x, p, sqrt_dt, z_t):
+    g = gfun(x, p)
+    try: # maybe g & z_t are just arrays
+        noise = g * sqrt_dt * z_t
+    except TypeError: # one of them is a pytree
+        if isinstance(g, float): # z_t is a pytree, g is a scalar
+            noise = tmap(lambda z: g * sqrt_dt * z, z_t)
+        # otherwise, both must be pytrees and they must match
+        elif not jax.tree_util.tree_all(jax.tree_util.tree_structure(g) == 
+                                        jax.tree_util.tree_structure(z_t)):
+            raise ValueError("gfun and z_t must have the same pytree structure.")
+        else:
+            noise = tmap(lambda g,z: g * sqrt_dt * z, g, z_t)
+    return noise
+
+def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     """Use a stochastic Heun scheme to integrate autonomous stochastic
     differential equations (SDEs).
 
@@ -37,6 +66,10 @@ def make_sde(dt, dfun, gfun, adhoc=None):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    return_euler: bool, default False
+        Return solution with local Euler estimates.
+    unroll: int, default 10
+        Force unrolls the time stepping loop.
 
     Returns
     =======
@@ -72,15 +105,25 @@ def make_sde(dt, dfun, gfun, adhoc=None):
         gfun = lambda *_: sig
 
     def step(x, z_t, p):
-        noise = gfun(x, p) * sqrt_dt * z_t[:2,:]
-        return heun_step(x, dfun, dt, p, z_t, add=noise, adhoc=adhoc)
+        noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
+        return heun_step(
+            x, dfun, dt, p, add=noise, adhoc=adhoc,
+            return_euler=return_euler)
 
     @jax.jit
     def loop(x0, zs, p):
         def op(x, z):
             x = step(x, z, p)
-            return x, x
-        return jax.lax.scan(op, x0, zs)[1]
+            # XXX gets unwieldy, how to improve?
+            if return_euler:
+                ex, x = x
+            else:
+                ex = None
+            return x, (ex, x)
+        _, xs = jax.lax.scan(op, x0, zs, unroll=unroll)
+        if not return_euler:
+            _, xs = xs
+        return xs
 
     return step, loop
 
@@ -210,27 +253,28 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
 
     def step(buf_t, z_t, p):
         buf, t = buf_t
-        x = buf[nh + t]
-        noise = gfun(x, p) * sqrt_dt * z_t
+        x = tmap(lambda buf: buf[nh + t], buf)
+        noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
         d1 = dfun(buf, x, nh + t, p)
-        xi = adhoc(x + dt*d1 + noise, p)
+        xi = tmap(lambda x,d,n: x + dt*d + n, x, d1, noise)
+        xi = adhoc(xi, p)
         if heun:
             if zero_delays:
                 # severe performance hit (5x+)
-                buf = buf.at[nh + t + 1].set(xi)
+                buf = tmap(lambda buf, xi: buf.at[nh + t + 1].set(xi), buf, xi)
             d2 = dfun(buf, xi, nh + t + 1, p)
-            nx = adhoc(x + dt*0.5*(d1 + d2) + noise, p)
+            nx = tmap(lambda x,d1,d2,n: x + dt*0.5*(d1 + d2) + n, x, d1, d2, noise)
+            nx = adhoc(nx, p)
         else:
             nx = xi
-        buf = buf.at[nh + t + 1].set(nx)
+        buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
         return (buf, t+1), nx
 
     @jax.jit
     def loop(buf, p, t=0):
         "xt is the buffer, zt is (ts, zs), p is parameters."
         op = lambda xt, tz: step(xt, tz, p)
-        print(nh)
-        dWt = buf[nh:]
+        dWt = tmap(lambda b: b[nh:], buf) # buf[nh:]
         (buf, _), nxs = jax.lax.scan(op, (buf, t), dWt, unroll=unroll)
         return buf, nxs
 
