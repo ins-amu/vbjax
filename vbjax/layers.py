@@ -103,7 +103,7 @@ def create_masks(degrees):
 class MaskedLayer(nn.Module):
   features: int
   mask: ArrayImpl
-  kernel_init: Callable = lambda key, shape, mask: random.normal(key, shape=shape)*mask
+  kernel_init: Callable = lambda key, shape, mask: random.normal(key, shape=shape)*1e-3*mask
   bias_init: Callable = nn.initializers.zeros_init()
 
   @nn.compact
