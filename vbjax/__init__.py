@@ -40,11 +40,11 @@ from .sparse import make_spmv, csr_to_jax_bcoo, make_sg_spmv
 from .monitor import (
     make_timeavg, make_bold, make_gain, make_offline, make_cov, make_fc)
 from .layers import make_dense_layers, create_degrees, create_masks, MaskedLayer, MaskedMLP, OutputLayer
-from .ml_models import GaussianMADE
+from .ml_models import GaussianMADE, MAF
 from .diagnostics import shrinkage_zscore
 from .embed import embed_neural_flow, embed_polynomial, embed_gradient, embed_autoregress
 from .util import to_jax, to_np, tuple_meshgrid, tuple_ravel, tuple_shard
-from .train_utils import eval_MADE, train_step, log_likelihood, grad_func
+from .train_utils import eval_model, train_step, log_likelihood_MADE, log_likelihood_MAF, grad_func
 
 from ._version import __version__
 
