@@ -4,11 +4,11 @@ from flax import linen as nn
 
 def log_likelihood_MADE(ms, logp, x, *args):
    u = jnp.exp(.5 * logp) * (x - ms)
-   return -0.5 * (x.shape[0] * jnp.log(2 * jnp.pi) + jnp.sum(u ** 2 - logp, axis=1))
+   return -0.5 * (x.shape[1] * jnp.log(2 * jnp.pi) + jnp.sum(u ** 2 - logp, axis=1))
 
 
 def log_likelihood_MAF(u, logdet_dudx, *arg):
-    return -0.5 * u.shape[0] * jnp.log(2 * jnp.pi) - 0.5 * jnp.sum(u ** 2, axis=1) + logdet_dudx
+    return -0.5 * u.shape[1] * jnp.log(2 * jnp.pi) - 0.5 * jnp.sum(u ** 2, axis=1) + logdet_dudx
 
 
 def eval_model(model, params, batch, key, likelihood_fn, shape=None):
