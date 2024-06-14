@@ -4,7 +4,6 @@ from typing import Callable, Sequence, Optional
 from jax._src.prng import PRNGKeyArrayImpl
 import jax.random as random
 from vbjax.layers import MaskedMLP, OutputLayer, create_degrees, create_masks
-from vbjax.loops import make_ode_flax, heun_step
 import jax
 from flax.linen.initializers import zeros
 
