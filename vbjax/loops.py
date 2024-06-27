@@ -264,14 +264,15 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
             nx = adhoc(nx, p)
         else:
             nx = xi
+        # jax.debug.print("buf len is {b}, going to write to {i}", b=buf.shape[0], i=nh+t+1)
         buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
         return (buf, t+1), nx
 
-    @jax.jit
+    # @jax.jit
     def loop(buf, p, t=0):
         "xt is the buffer, zt is (ts, zs), p is parameters."
         op = lambda xt, tz: step(xt, tz, p)
-        dWt = tmap(lambda b: b[nh:], buf) # buf[nh:]
+        dWt = tmap(lambda b: b[nh+1:], buf) # history is buf[nh:], current state is buf[nh], randn samples are buf[nh+1:]
         (buf, _), nxs = jax.lax.scan(op, (buf, t), dWt, unroll=unroll)
         return buf, nxs
 
@@ -305,8 +306,7 @@ def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=
     @jax.jit
     def continue_chunk(buf, p, key):
         get, set = jax.lax.dynamic_slice, jax.lax.dynamic_update_slice
-        # buf = buf.at[:max_lag+1].set( buf[-(max_lag+1):] )
-        buf = set(buf, get(buf, (i0,0,0), (i1,n_svar,n_from)), (0,0,0))
+        buf = np.roll(buf, -i0, axis=0)
 
         # now fill the rest of the buffer with N(0,1) samples if stochastic
         # buf = buf.at[max_lag+1:].set( vb.randn(chunk_len-1, 2, n_from, key=key) )
