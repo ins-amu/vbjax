@@ -157,4 +157,17 @@ class MaskedMLP(nn.Module):
         return x
 
 
+class FourierLayer(nn.Module):
+  kernel_init: Callable = lambda key, shape: jax.random.normal(key, shape=shape)/jnp.sqrt(shape[0])
+  bias_init: Callable = nn.initializers.zeros_init()
 
+  @nn.compact
+  def __call__(self, inputs):
+    kernel = self.param('kernel',
+                        self.kernel_init, # Initialization function
+                        (inputs.shape[-1], 1))  # shape info.
+
+    bias_m = self.param('bias', self.bias_init, (1,))
+    m = jnp.dot(inputs, kernel)
+    m = m + bias_m
+    return m

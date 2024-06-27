@@ -7,7 +7,8 @@ def log_likelihood_MADE(ms, logp, x, *args):
    return -(- 0.5 * (x.shape[1] * jnp.log(2 * jnp.pi) + jnp.sum(u ** 2 - logp, axis=1)))
 
 
-def log_likelihood_MAF(u, logdet_dudx, *arg):
+def log_likelihood_MAF(x, *arg):
+    u, logdet_dudx = x
     return -(- 0.5 * u.shape[1] * jnp.log(2 * jnp.pi) - 0.5 * jnp.sum(u ** 2, axis=1) + logdet_dudx)
 
 def mse_ode(traj, x, *arg):
@@ -35,7 +36,7 @@ def eval_model(model, params, batch, key, loss_fn, shape=None):
   shape = shape if shape else batch.shape
   def eval_model(model):
     output = model(batch)
-    loss = loss_fn(output, batch).mean()
+    loss = loss_fn(output, batch)#.mean()
     u_sample = model.gen(key, shape)
     return loss, u_sample
   return nn.apply(eval_model, model)({'params': params})

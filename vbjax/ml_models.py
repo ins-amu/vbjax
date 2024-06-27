@@ -73,6 +73,7 @@ class MAF(nn.Module):
 
 class Heun_step(nn.Module):
     dfun: Callable
+    dt: float = 1.0
     stvar: Optional[int] = 0
     external_i: Optional[int] = False
     adhoc: Optional[Callable] = None
@@ -80,13 +81,12 @@ class Heun_step(nn.Module):
     @nn.compact
     def __call__(self, x, xs, p, i_ext):
         tmap = jax.tree_util.tree_map
-        dt = 1.
         d1 = self.dfun((x, p), i_ext)
-        xi = tmap(lambda x,d: x + dt*d, x, d1)
+        xi = tmap(lambda x,d: x + self.dt*d, x, d1)
         # xi = tmap(lambda x,d,a: x + dt*d + a, x, d1, stimulus)
 
         d2 = self.dfun((xi, p), i_ext)
-        nx = tmap(lambda x, d1,d2: x + dt*0.5*(d1 + d2), x, d1, d2)
+        nx = tmap(lambda x, d1,d2: x + self.dt*0.5*(d1 + d2), x, d1, d2)
         # nx = tmap(lambda x, d1,d2,a: x + dt*0.5*(d1 + d2) + a, x, d1, d2, stimulus)
         return nx, x
 
@@ -94,6 +94,7 @@ class Heun_step(nn.Module):
 class Integrator(nn.Module):
     dfun: Callable
     step: Callable
+    dt: float = 1.0
     stvar: Optional[int] = 0
     adhoc: Optional[Callable] = None
 
@@ -105,7 +106,7 @@ class Integrator(nn.Module):
                         in_axes=(2, 2, 2),
                         out_axes=2
                         )
-        return STEP(self.dfun, self.stvar, self.adhoc)(c, xs, p, external_i)
+        return STEP(self.dfun, self.dt, self.stvar, self.adhoc)(c, xs, p, external_i)
 
 
 class MLP_Ode(nn.Module):
@@ -113,6 +114,8 @@ class MLP_Ode(nn.Module):
     n_hiddens: Sequence[int]
     act_fn: Callable
     step: Callable
+    dt: float = 1.0
+    additive: bool = False
     kernel_init: Callable = jax.nn.initializers.normal(1e-6)
     bias_init: Callable = jax.nn.initializers.normal(1e-6)
     integrate: Optional[bool] = True
@@ -134,12 +137,17 @@ class MLP_Ode(nn.Module):
                 p = layer(p)
                 p = self.act_fn(p)
             p = self.p_layers[-1](p)
-        x = jnp.c_[x, p, i_ext] if self.i_ext else x
-
+        if self.additive:
+            x = jnp.c_[x, p] if self.i_ext else x
+        else:
+            x = jnp.c_[x, p, i_ext] if self.i_ext else x
+        # jax.debug.print("🤯 {x} 🤯", x=x.shape)
         for layer in self.layers:
             x = layer(x)
             x = self.act_fn(x)
         x = self.output(x)
+        if self.additive:
+            x = x.at[:,1:2].set(x[:,1:2] + i_ext)
         return x
 
     def prepare_stimulus(self, x, external_i, stvar):
@@ -156,7 +164,7 @@ class MLP_Ode(nn.Module):
 
         (x, p), i_ext = inputs if self.i_ext else (inputs, None)
 
-        integrate = Integrator(self.fwd, self.step)
+        integrate = Integrator(self.fwd, self.step, self.dt)
         # initialize carry
         xs = jnp.zeros_like(x)
         # stimulus = self.prepare_stimulus(x, i_ext, self.stvar)
