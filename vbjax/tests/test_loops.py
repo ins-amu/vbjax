@@ -86,12 +86,12 @@ def test_continuation():
     nh = 16
     dt = 0.1
     clen = 30
-    buf = jp.zeros((nh + clen, 2, 1)) + 1.0
+    buf = jp.zeros((nh + 1 + clen, 2, 1)) + 1.0
     p = vb.mpr_default_theta._replace(eta=-1.0)._replace(tau=3.0)
     
     # run it
     _, loop = vb.make_sdde(dt, nh, f, 0.0)
-    cc = vb.make_continuation(loop, buf.shape[0] - nh, nh, 1, 1, stochastic=False)
+    cc = vb.make_continuation(loop, clen, nh, 1, 1, stochastic=False)
     # b, xs = jax.lax.scan(lambda buf,key: cc(buf,p,key), buf, vb.keys[:3])
     xs = []
     for i in range(3):
@@ -102,7 +102,7 @@ def test_continuation():
     xs = np.array(xs)
 
     numpy.testing.assert_allclose(
-        loop(jp.zeros((nh + clen*3, 2, 1)) + 1.0, p)[1][:-2, 1, 0],
+        loop(jp.zeros((nh + 1 + clen*3, 2, 1)) + 1.0, p)[1][:, 1, 0],
         xs.reshape(-1, 2)[:, 1],
         1e-6, 2e-5
     )

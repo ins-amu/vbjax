@@ -300,7 +300,7 @@ def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=
     from vbjax import randn
 
     # need to be compile time constants for dynamic_*
-    i0 = chunk_len - 1
+    i0 = chunk_len
     i1 = max_lag + 1
 
     @jax.jit
