@@ -89,11 +89,11 @@ class Heun_step(nn.Module):
     @nn.compact
     def __call__(self, x, xs, t, *args):
         tmap = jax.tree_util.tree_map
-        d1 = self.dfun(x, xs, *args) if self.p else self.dfun(x)
+        d1 = self.dfun(x, xs, *args) if self.p else self.dfun(x, *args)
         xi = tmap(lambda x,d: x + self.dt*d, x, d1)
         xi = tmap(self.adhoc, xi)
 
-        d2 = self.dfun(xi, xs, *args) if self.p else self.dfun(xi)
+        d2 = self.dfun(xi, xs, *args) if self.p else self.dfun(xi, *args)
         nx = tmap(lambda x, d1,d2: x + self.dt*0.5*(d1 + d2), x, d1, d2)
         nx = tmap(self.adhoc, nx)
         return nx, x
@@ -113,19 +113,17 @@ class Buffer_step(nn.Module):
     def __call__(self, buf, dWt, t, *args):
         t = t[0][0].astype(int) # retrieve time step
         nh = self.nh
-        # jax.debug.print("time step t {x}", x=t)
+
         tmap = jax.tree_util.tree_map
         x = tmap(lambda buf: buf[nh + t], buf)
-        # jax.debug.print('STEP buf shape {x}', x=buf.shape)
-        # jax.debug.print('STEP x shape {x}', x=x.shape)
+
+
         d1 = self.dfun(buf, x, nh + t)
         xi = tmap(lambda x,d,n: x + self.dt * d + n, x, d1, dWt)
         xi = tmap(self.adhoc, xi)
-        # jax.debug.print("time step x {x}", x=x)
-        # jax.debug.print("time step d1 {x}", x=d1)
 
         d2 = self.dfun(buf, xi, nh + t + 1)
-        # jax.debug.print("time step d2 {x}", x=d2)
+
         nx = tmap(lambda x,d1,d2,n: x + self.dt * 0.5*(d1 + d2) + n, x, d1, d2, dWt)
         nx = tmap(self.adhoc, nx)
         buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
@@ -155,31 +153,13 @@ class Integrator(nn.Module):
         return STEP(self.dfun, self.adhoc, self.dt, self.nh, self.p)(c, xs, t_count, *args)
 
 
-class MontBrio(nn.Module):
-    
-    @nn.compact
-    def __call__(self, x, xs, c, p=mpr_default_theta):
-        # jax.debug.print("x shape {x}", x=x.shape)
-        
-        r, V = x[:,:1], x[:,1:]
-        I_c = c
-        # jax.debug.print("r ____ {x}", x=r[0])
-        # jax.debug.print("V ____ {x}", x=V[0])
-        r_dot =  (1 / p.tau) * (p.Delta / (jnp.pi * p.tau) + 2 * r * V)
-        v_dot = (1 / p.tau) * (V ** 2 + p.eta + p.J * p.tau * r + p.I + I_c - (jnp.pi ** 2) * (r ** 2) * (p.tau ** 2))
-        # jax.debug.print("r dot {x}", x=r_dot[0])
-        # jax.debug.print("V dot {x}", x=v_dot[0])
-        return jnp.c_[r_dot, v_dot]
-
 
 class TVB(nn.Module):
     tvb_p: namedtuple
-    dh: DelayHelper
     dfun: Callable
     nst_vars: int
     n_pars: int
-    dfun_pars: defaultdict
-    # g_coupling: float
+    dfun_pars: Optional[defaultdict] = None
     dt: float = 0.1
     integrator: Optional[Callable] = Integrator
     step: Callable = Buffer_step
@@ -192,7 +172,7 @@ class TVB(nn.Module):
     
     def fwd(self, nmm, region_pars, g):
         def tvb_dfun(buf, x, t):
-            coupled_x = self.delay_apply(self.dh, t, buf[...,:self.nst_vars])
+            coupled_x = self.delay_apply(self.tvb_p['dh'], t, buf[...,:self.nst_vars])
             coupling_term = coupled_x[:,:1] # firing rate coupling only for QIF
             # jax.debug.print("coupling {x}", x=coupling_term[0])
             return nmm(x, region_pars, g*coupling_term)
@@ -206,7 +186,7 @@ class TVB(nn.Module):
         return buf
 
     def initialize_buffer(self, key):        
-        dh = self.dh
+        dh = self.tvb_p['dh']
         nh = int(dh.max_lag)
         buf = jnp.zeros((nh + int(1/self.dt) + 1, dh.n_from, self.nst_vars))
 
@@ -219,9 +199,8 @@ class TVB(nn.Module):
         buf = buf.at[int(1/self.dt):,:,:self.nst_vars].add( initial_cond )
         return buf
 
-
     def chunk(self, module, buf, key):
-        nh = int(self.dh.max_lag)
+        nh = int(self.tvb_p['dh'].max_lag)
         buf = jnp.roll(buf, -int(1/self.dt), axis=0)
         buf = self.noise_fill(buf, nh, key)
         dWt = buf[nh+1:] # initialize carry noise filled
@@ -237,21 +216,10 @@ class TVB(nn.Module):
         s, f, v, q = bold_buf
         return bold_buf, p.v0 * (p.k1 * (1. - q) + p.k2 * (1. - q / v) + p.k3 * (1. - v))
     
-    # def sim_metrics(self, rv):
-
-
     @nn.compact
     def __call__(self, inputs, g, sim_len=400, seed=42):
-        
         # i_ext = self.prepare_stimulus(x, i_ext, self.stvar)
 
-        # to_fit = self.param('to_fit',
-        #                 lambda key, x: self.tvb_p['to_fit'], # Initialization function
-        #                 self.tvb_p['to_fit'].shape)
-
-        
-        # region_pars = jnp.c_[-5. * jnp.ones((self.dh.n_from, 1)), jnp.ones((self.dh.n_from, 1))]
-        # region_pars = region_pars.at[3,:].set(inputs)
         region_pars = inputs
         key = jax.random.PRNGKey(seed)
         buf = self.initialize_buffer(key)
@@ -260,31 +228,32 @@ class TVB(nn.Module):
             pars = self.param('Nodes', lambda key: unfreeze(self.dfun_pars))
             nmm = lambda x, xs, *args: self.dfun(pars, x, xs, scaling_factor=10, *args)
             tvb_dfun = self.fwd(nmm, region_pars, g)
-        else:
+        if self.dfun_pars:
             nmm = lambda x, xs, *args: self.dfun(self.dfun_pars, x, xs, scaling_factor=10, *args)
             tvb_dfun = self.fwd(nmm, region_pars, g)
-        # nmm = lambda x, xs, *args: self.dfun(x, xs, *args)
-        # tvb_dfun = self.fwd(nmm, region_pars, g)
+        else:            
+            nmm = lambda x, xs, *args: self.dfun(x, xs, *args)
+            tvb_dfun = self.fwd(nmm, region_pars, g)
 
 
-        module = self.integrator(tvb_dfun, self.step, self.adhoc, self.dt, nh=int(self.dh.max_lag))
+        module = self.integrator(tvb_dfun, self.step, self.adhoc, self.dt, nh=int(self.tvb_p['dh'].max_lag))
         run_chunk = nn.scan(self.chunk.__call__)
         run_sim = nn.scan(run_chunk)
-        # sim_batch = nn.scan(run_sim)
 
         buf, rv = run_sim(module, buf, jax.random.split(key, (sim_len, 1000)))
         dummy_adhoc_bold = lambda x: x
         bold_dfun_p = lambda sfvq, x: bold_dfun(sfvq, x, bold_default_theta)
-        module = self.integrator(bold_dfun_p, Heun_step, dummy_adhoc_bold, self.dt/10000, nh=int(self.dh.max_lag), p=1)
+        module = self.integrator(bold_dfun_p, Heun_step, dummy_adhoc_bold, self.dt/10000, nh=int(self.tvb_p['dh'].max_lag), p=1)
         run_bold = nn.scan(self.bold_monitor.__call__)
 
-        bold_buf = jnp.ones((4, self.dh.n_from, 1))
+        bold_buf = jnp.ones((4, self.tvb_p['dh'].n_from, 1))
         bold_buf = bold_buf.at[0].set(1.)
 
 
-        bold_buf, bold = run_bold(module, bold_buf, rv[...,0].reshape((-1, int(20000/self.dt), self.dh.n_from, 1)))
-        return bold
-        # return rv.squeeze().reshape(-1, self.dh.n_from, self.nst_vars), bold, bold_buf
+        bold_buf, bold = run_bold(module, bold_buf, rv[...,0].reshape((-1, int(20000/self.dt), self.tvb_p['dh'].n_from, 1)))
+
+        return rv
+
 
 
 class TVB_ODE(nn.Module):
@@ -328,6 +297,31 @@ class Simple_MLP(nn.Module):
         return x*scaling_factor
 
 
+class MontBrio(nn.Module):
+    dfun_pars: Optional[defaultdict] = mpr_default_theta
+    coupled: bool = False
+
+    def setup(self):
+        self.eta = self.dfun_pars.eta
+        self.Delta = self.dfun_pars.Delta
+        self.tau = self.dfun_pars.tau
+        self.I = self.dfun_pars.I
+        self.J = self.dfun_pars.J
+        self.cr = self.dfun_pars.cr
+        self.cv = self.dfun_pars.cv
+        
+    
+    @nn.compact
+    def __call__(self, x, xs, *args):
+        c = args[0] if self.coupled else jnp.zeros(x.shape)
+        xs = xs
+        r, V = x[:,:1], x[:,1:]
+        I_c = self.cr * c[:,:1]
+        r_dot =  (1 / self.tau) * (self.Delta / (jnp.pi * self.tau) + 2 * r * V)
+        v_dot = (1 / self.tau) * (V ** 2 + self.eta + self.J * self.tau * r + self.I + I_c - (jnp.pi ** 2) * (r ** 2) * (self.tau ** 2))
+        return jnp.c_[r_dot, v_dot]
+
+
 class NeuralOdeWrapper(nn.Module):
     out_dim: int
     n_hiddens: Sequence[int]
@@ -336,9 +330,10 @@ class NeuralOdeWrapper(nn.Module):
     dt: Optional[float] = 1.
     step: Optional[Callable] = Heun_step
     integrator: Optional[Callable] = Integrator
-    network: Optional[Callable] = Simple_MLP
+    dfun: Optional[Callable] = Simple_MLP
     integrate: Optional[bool] = True
     coupled: Optional[bool] = False
+    i_ext: Optional[bool] = False
     stvar: Optional[int] = 0
     adhoc: Optional[Callable] = lambda x : x
     
@@ -346,24 +341,21 @@ class NeuralOdeWrapper(nn.Module):
     @nn.compact
     def __call__(self, inputs):
         (x, i_ext) = inputs if self.coupled else (inputs, None)
-        dfun = self.network(self.out_dim, self.n_hiddens, self.act_fn, coupled=self.coupled)
-
+        # dfun = self.dfun(self.out_dim, self.n_hiddens, self.act_fn, coupled=self.coupled)
 
         if not self.integrate:
-            deriv = dfun(inputs[0], inputs[1])
+            deriv = self.dfun(inputs[0], inputs[1])
             return deriv
 
         in_ax = (0,0,0) if self.coupled else (0,0)
-        integrate = self.integrator(dfun, self.step, self.adhoc, self.dt, in_ax=in_ax, p=True)
-        
+        integrate = self.integrator(self.dfun.__call__, self.step, self.adhoc, self.dt, in_ax=in_ax, p=True)
         
         # xs = jnp.zeros_like(x[:,:,:int(self.extra_p)]) # initialize carry
         p = x[:,:,self.extra_p:] # initialize carry param filled
         # i_ext = self.prepare_stimulus(x, i_ext, self.stvar)
         t_count = jnp.tile(jnp.arange(x.shape[0])[...,None,None], (x.shape[1], x.shape[2])) # (length, train_samples, state_vars)
         
-        x = x[0,:,:int(self.extra_p)]
-        
+        x = x[0,:,:self.out_dim]
         return integrate(x, p, t_count, i_ext)[1]
 
 
@@ -437,74 +429,4 @@ class Autoencoder(nn.Module):
             y = self.integrate(encoded, L)
 
         return y
-
-
-
-# class MLP_Ode(nn.Module):
-#     out_dim: int
-#     n_hiddens: Sequence[int]
-#     act_fn: Callable
-#     step: Callable
-#     dt: float = 1.0
-#     additive: bool = False
-#     kernel_init: Callable = jax.nn.initializers.normal(1e-6)
-#     bias_init: Callable = jax.nn.initializers.normal(1e-6)
-#     integrate: Optional[bool] = True
-#     i_ext: Optional[bool] = True
-#     stvar: Optional[int] = 0
-#     p_mix: Optional[bool] = False
-
-#     def setup(self):
-#         self.p_layers = [nn.Dense(feat, kernel_init=self.kernel_init) for feat in self.n_hiddens[0]] if self.p_mix else None
-#         dims = self.n_hiddens[1:] if self.p_mix else self.n_hiddens
-#         self.layers = [nn.Dense(feat, kernel_init=self.kernel_init, bias_init=self.bias_init) for feat in dims]
-#         self.output = nn.Dense(self.out_dim, kernel_init=self.kernel_init, bias_init=self.bias_init)
-
-#     def fwd(self, x, i_ext):
-#         x, p = x
-#         jax.debug.print("🤯 {x} 🤯", x=x.shape)
-#         jax.debug.print("🤯 {x} 🤯", x=i_ext.shape)
-#         if self.p_mix:
-#             for layer in self.p_layers[:-1]:
-#                 p = layer(p)
-#                 p = self.act_fn(p)
-#             p = self.p_layers[-1](p)
-#         if self.additive:
-#             x = jnp.c_[x, p] if self.i_ext else x
-#         else:
-#             x = jnp.c_[x, p, i_ext] if self.i_ext else x
-
-#         for layer in self.layers:
-#             x = layer(x)
-#             x = self.act_fn(x)
-#         x = self.output(x)
-#         if self.additive:
-#             x = x.at[:,1:2].set(x[:,1:2] + i_ext)
-#         return x
-
-#     def prepare_stimulus(self, x, external_i, stvar):
-#         stimulus = jnp.zeros(x.shape)
-#         # stimulus = stimulus.at[:,stvar,:].set(external_i) if isinstance(external_i, jnp.ndarray) else stimulus
-#         return stimulus
-
-#     @nn.compact
-#     def __call__(self, inputs):
-#         if not self.integrate:
-#             (x, p), i_ext = inputs
-#             deriv = self.fwd((x, p), i_ext)
-#             return deriv
-
-#         (x, p), i_ext = inputs if self.i_ext else (inputs, None)
-
-#         integrate = Integrator(self.fwd, self.step, self.dt)
-#         # initialize carry
-#         xs = jnp.zeros_like(x)
-#         # stimulus = self.prepare_stimulus(x, i_ext, self.stvar)
-#         x = x[...,0]
-#         jax.debug.print("🤯 x shape {x} 🤯", x=x.shape)
-#         jax.debug.print("🤯 xs shape {x} 🤯", x=xs.shape)
-#         jax.debug.print("🤯 iext shape {x} 🤯", x=i_ext.shape)
-#         traj = integrate(x, xs, p, i_ext)
-
-#         return traj[1]
 
