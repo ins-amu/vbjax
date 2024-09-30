@@ -297,18 +297,42 @@ class Simple_MLP(nn.Module):
         return x*scaling_factor
 
 
+class Simple_MLP_additive_c(nn.Module):
+    out_dim: int
+    n_hiddens: Sequence[int]
+    act_fn: Callable
+    kernel_init: Callable = jax.nn.initializers.normal(1e-6)
+    coupled: bool = False
+
+    def setup(self):
+        self.layers = [nn.Dense(feat, kernel_init=self.kernel_init, bias_init=self.kernel_init) for feat in self.n_hiddens]
+        self.output = nn.Dense(self.out_dim, kernel_init=self.kernel_init, bias_init=self.kernel_init)
+    
+    @nn.compact
+    def __call__(self, x, xs, *args, scaling_factor=1):
+        x = jnp.c_[x, xs]
+        
+        for layer in self.layers:
+            x = layer(x)
+            x = self.act_fn(x)
+        x = self.output(x)
+        x += args[0] if self.coupled else x
+        return x
+
+
+
 class MontBrio(nn.Module):
     dfun_pars: Optional[defaultdict] = mpr_default_theta
     coupled: bool = False
 
     def setup(self):
-        self.eta = self.dfun_pars.eta
-        self.Delta = self.dfun_pars.Delta
-        self.tau = self.dfun_pars.tau
-        self.I = self.dfun_pars.I
-        self.J = self.dfun_pars.J
-        self.cr = self.dfun_pars.cr
-        self.cv = self.dfun_pars.cv
+        self.eta = self.dfun_pars['eta']
+        self.Delta = self.dfun_pars['Delta']
+        self.tau = self.dfun_pars['tau']
+        self.I = self.dfun_pars['I']
+        self.J = self.dfun_pars['J']
+        self.cr = self.dfun_pars['cr']
+        self.cv = self.dfun_pars['cv']
         
     
     @nn.compact
