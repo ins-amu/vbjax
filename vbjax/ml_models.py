@@ -226,10 +226,10 @@ class TVB(nn.Module):
         
         if self.ode:
             pars = self.param('Nodes', lambda key: unfreeze(self.dfun_pars))
-            nmm = lambda x, xs, *args: self.dfun(pars, x, xs, scaling_factor=10, *args)
+            nmm = lambda x, xs, *args: self.dfun(pars, x, xs, *args)
             tvb_dfun = self.fwd(nmm, region_pars, g)
         if self.dfun_pars:
-            nmm = lambda x, xs, *args: self.dfun(self.dfun_pars, x, xs, scaling_factor=10, *args)
+            nmm = lambda x, xs, *args: self.dfun(self.dfun_pars, x, xs, *args)
             tvb_dfun = self.fwd(nmm, region_pars, g)
         else:            
             nmm = lambda x, xs, *args: self.dfun(x, xs, *args)
@@ -241,18 +241,18 @@ class TVB(nn.Module):
         run_sim = nn.scan(run_chunk)
 
         buf, rv = run_sim(module, buf, jax.random.split(key, (sim_len, 1000)))
-        dummy_adhoc_bold = lambda x: x
-        bold_dfun_p = lambda sfvq, x: bold_dfun(sfvq, x, bold_default_theta)
-        module = self.integrator(bold_dfun_p, Heun_step, dummy_adhoc_bold, self.dt/10000, nh=int(self.tvb_p['dh'].max_lag), p=1)
-        run_bold = nn.scan(self.bold_monitor.__call__)
+        # dummy_adhoc_bold = lambda x: x
+        # bold_dfun_p = lambda sfvq, x: bold_dfun(sfvq, x, bold_default_theta)
+        # module = self.integrator(bold_dfun_p, Heun_step, dummy_adhoc_bold, self.dt/10000, nh=int(self.tvb_p['dh'].max_lag), p=1)
+        # run_bold = nn.scan(self.bold_monitor.__call__)
 
-        bold_buf = jnp.ones((4, self.tvb_p['dh'].n_from, 1))
-        bold_buf = bold_buf.at[0].set(1.)
+        # bold_buf = jnp.ones((4, self.tvb_p['dh'].n_from, 1))
+        # bold_buf = bold_buf.at[0].set(1.)
 
 
-        bold_buf, bold = run_bold(module, bold_buf, rv[...,0].reshape((-1, int(20000/self.dt), self.tvb_p['dh'].n_from, 1)))
+        # bold_buf, bold = run_bold(module, bold_buf, rv[...,0].reshape((-1, int(20000/self.dt), self.tvb_p['dh'].n_from, 1)))
 
-        return rv
+        return buf, rv.reshape(-1, self.tvb_p['dh'].n_from, self.nst_vars)#, bold
 
 
 
@@ -324,15 +324,17 @@ class Simple_MLP_additive_c(nn.Module):
 class MontBrio(nn.Module):
     dfun_pars: Optional[defaultdict] = mpr_default_theta
     coupled: bool = False
+    scaling_factor: float = 1.
 
     def setup(self):
-        self.eta = self.dfun_pars['eta']
-        self.Delta = self.dfun_pars['Delta']
-        self.tau = self.dfun_pars['tau']
-        self.I = self.dfun_pars['I']
-        self.J = self.dfun_pars['J']
-        self.cr = self.dfun_pars['cr']
-        self.cv = self.dfun_pars['cv']
+        # self.eta = self.dfun_pars['eta']
+        self.eta = self.dfun_pars.eta
+        self.Delta = self.dfun_pars.Delta
+        self.tau = self.dfun_pars.tau
+        self.I = self.dfun_pars.I
+        self.J = self.dfun_pars.J
+        self.cr = self.dfun_pars.cr
+        self.cv = self.dfun_pars.cv
         
     
     @nn.compact
@@ -343,7 +345,7 @@ class MontBrio(nn.Module):
         I_c = self.cr * c[:,:1]
         r_dot =  (1 / self.tau) * (self.Delta / (jnp.pi * self.tau) + 2 * r * V)
         v_dot = (1 / self.tau) * (V ** 2 + self.eta + self.J * self.tau * r + self.I + I_c - (jnp.pi ** 2) * (r ** 2) * (self.tau ** 2))
-        return jnp.c_[r_dot, v_dot]
+        return jnp.c_[r_dot, v_dot]*self.scaling_factor
 
 
 class NeuralOdeWrapper(nn.Module):
