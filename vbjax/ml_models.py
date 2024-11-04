@@ -111,23 +111,51 @@ class Buffer_step(nn.Module):
 
     @nn.compact
     def __call__(self, buf, dWt, t, *args):
-        t = t[0][0].astype(int) # retrieve time step
+        # jax.debug.print('t buffer step {x}', x=t)
+        t_step = t.at[0,0].get().astype(int) # retrieve time step
+        stim = t.at[1,:].get()
         nh = self.nh
-
         tmap = jax.tree_util.tree_map
-        x = tmap(lambda buf: buf[nh + t], buf)
-
-
-        d1 = self.dfun(buf, x, nh + t)
+        x = tmap(lambda buf: buf[nh + t_step], buf)
+        # jax.debug.print('buffer {x}', x=buf.shape)
+        # jax.debug.print('x {x}', x=x.shape)
+        d1 = self.dfun(buf, x, nh + t_step,  t)
         xi = tmap(lambda x,d,n: x + self.dt * d + n, x, d1, dWt)
         xi = tmap(self.adhoc, xi)
 
-        d2 = self.dfun(buf, xi, nh + t + 1)
+        d2 = self.dfun(buf, xi, nh + t_step + 1,  t)
 
         nx = tmap(lambda x,d1,d2,n: x + self.dt * 0.5*(d1 + d2) + n, x, d1, d2, dWt)
         nx = tmap(self.adhoc, nx)
-        buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
+        buf = tmap(lambda buf, nx: buf.at[nh + t_step + 1].set(nx), buf, nx)
         return buf, nx
+
+
+class Buffer_step_euler(nn.Module):
+    dfun: Callable
+    adhoc: Callable
+    dt: float
+    nh: Optional[int]
+    p: Optional[Any]
+    external_i: Optional[int] = False
+    
+    @nn.compact
+    def __call__(self, buf, dWt, t, *args):
+        t_step = t.at[0,0].get().astype(int) # retrieve time step
+        nh = self.nh
+        tmap = jax.tree_util.tree_map
+        x = tmap(lambda buf: buf[nh + t_step], buf)
+        d1 = self.dfun(buf, x, nh + t_step,  t)
+        xi = tmap(lambda x,d,n: x + self.dt * d + n, x, d1, dWt)
+        nx = tmap(self.adhoc, xi)
+
+        # d2 = self.dfun(buf, xi, nh + t_step + 1,  t)
+
+        # nx = tmap(lambda x,d1,d2,n: x + self.dt * 0.5*(d1 + d2) + n, x, d1, d2, dWt)
+        nx = tmap(self.adhoc, nx)
+        buf = tmap(lambda buf, nx: buf.at[nh + t_step + 1].set(nx), buf, nx)
+        return buf, nx
+
 
 
 class Integrator(nn.Module):
@@ -159,23 +187,26 @@ class TVB(nn.Module):
     dfun: Callable
     nst_vars: int
     n_pars: int
-    dfun_pars: Optional[defaultdict] = None
+    dfun_pars: Optional[defaultdict] = jnp.array([])
     dt: float = 0.1
     integrator: Optional[Callable] = Integrator
     step: Callable = Buffer_step
     adhoc: Callable = lambda x : x
     gfun: Callable = lambda x : x
-    ode: bool = False
+    stimulus: Optional[Sequence] = jnp.array([])
+    node_stim = 0
+    training: bool = False
 
     def delay_apply(self, dh: DelayHelper, t, buf):
         return (dh.Wt * buf[t - dh.lags, dh.ix_lag_from, :]).sum(axis=1)
     
     def fwd(self, nmm, region_pars, g):
-        def tvb_dfun(buf, x, t):
+        def tvb_dfun(buf, x, t, stim):
             coupled_x = self.delay_apply(self.tvb_p['dh'], t, buf[...,:self.nst_vars])
             coupling_term = coupled_x[:,:1] # firing rate coupling only for QIF
-            # jax.debug.print("coupling {x}", x=coupling_term[0])
-            return nmm(x, region_pars, g*coupling_term)
+            # jax.debug.print('stim {x}', x=stim[:,1:])
+            # jax.debug.print('x {x} r_pars {y} coupling {z}', x=x[0], y=region_pars[0], z=coupling_term[0])
+            return nmm(x, region_pars, g*coupling_term+stim[:,1:])
         return tvb_dfun
 
     def noise_fill(self, buf, nh, key):
@@ -185,62 +216,75 @@ class TVB(nn.Module):
         buf = buf.at[nh+1:].set(noise)
         return buf
 
-    def initialize_buffer(self, key):        
+    def initialize_buffer(self, key, fixed_initial_cond):        
         dh = self.tvb_p['dh']
         nh = int(dh.max_lag)
         buf = jnp.zeros((nh + int(1/self.dt) + 1, dh.n_from, self.nst_vars))
-
         initial_cond = jnp.c_[
             jax.random.uniform(key=key, shape=(dh.n_from, 1), minval=0.1, maxval=2.0),
             jax.random.uniform(key=key, shape=(dh.n_from, 1), minval=-2., maxval=1.5)
             ]
-
+        initial_cond = fixed_initial_cond if fixed_initial_cond.any() else initial_cond
         # horizon is set at the start of the buffer because rolled at the start of chunk
         buf = buf.at[int(1/self.dt):,:,:self.nst_vars].add( initial_cond )
         return buf
 
-    def chunk(self, module, buf, key):
+    def chunk(self, module, buf, stimulus, key):
         nh = int(self.tvb_p['dh'].max_lag)
         buf = jnp.roll(buf, -int(1/self.dt), axis=0)
         buf = self.noise_fill(buf, nh, key)
         dWt = buf[nh+1:] # initialize carry noise filled
-
+        # jax.debug.print('stim {x}', x=stimulus)
         # pass time count to the scanned integrator
-        t_count = jnp.tile(jnp.arange(int(1/self.dt))[...,None,None], (84, 2)) # (buf_len, regions, state_vars)
-        buf, rv = module(buf, dWt, t_count)
+        t_count = jnp.tile(jnp.arange(int(1/self.dt))[...,None,None], (self.tvb_p['dh'].n_from, 1)) # (buf_len, regions, state_vars)
+        
+        stim = jnp.zeros(t_count.shape)
+        # stimulus = jnp.repeat(stimulus, int(1/self.dt))[...,None]
+        stim = stim.at[:,:,:].set(jnp.tile(stimulus[...,None], self.tvb_p['dh'].n_from)[...,None]) if self.training else stim.at[:,self.node_stim,:].set(stimulus[...,None])
+        stim_t_count = jnp.c_[t_count, stim]
+        # jax.debug.print('stim_t_count {x}', x=stim_t_count.shape)
+        buf, rv = module(buf, dWt, stim_t_count)
         return buf, rv
 
     def bold_monitor(self, module, bold_buf, rv, p=bold_default_theta):
-        t_count = jnp.tile(jnp.arange(rv.shape[0])[...,None, None,None], (4, 84, 2)) # (buf_len, regions, state_vars)
+        t_count = jnp.tile(jnp.arange(rv.shape[0])[...,None, None,None], (4, self.tvb_p['dh'].n_from, 2)) # (buf_len, regions, state_vars)
         bold_buf, bold = module(bold_buf, rv, t_count)
         s, f, v, q = bold_buf
         return bold_buf, p.v0 * (p.k1 * (1. - q) + p.k2 * (1. - q / v) + p.k3 * (1. - v))
     
-    @nn.compact
-    def __call__(self, inputs, g, sim_len=400, seed=42):
-        # i_ext = self.prepare_stimulus(x, i_ext, self.stvar)
 
+
+    @nn.compact
+    def __call__(self, inputs, g=0, sim_len=0, seed=42, initial_cond=jnp.array([]), mlp=True):
+        if inputs==None:
+            inputs = jnp.ones((1, self.nst_vars))
         region_pars = inputs
         key = jax.random.PRNGKey(seed)
-        buf = self.initialize_buffer(key)
+        # buf = self.initialize_buffer(key, initial_cond)
         
-        if self.ode:
-            pars = self.param('Nodes', lambda key: unfreeze(self.dfun_pars))
-            nmm = lambda x, xs, *args: self.dfun(pars, x, xs, *args)
-            tvb_dfun = self.fwd(nmm, region_pars, g)
-        if self.dfun_pars:
+        if mlp:
             nmm = lambda x, xs, *args: self.dfun(self.dfun_pars, x, xs, *args)
             tvb_dfun = self.fwd(nmm, region_pars, g)
         else:            
             nmm = lambda x, xs, *args: self.dfun(x, xs, *args)
             tvb_dfun = self.fwd(nmm, region_pars, g)
 
+        # nmm = lambda x, xs, *args: self.dfun(self.dfun_pars, x, xs, *args) if mlp else self.dfun.__call__
+        # tvb_dfun = self.fwd(nmm, region_pars, g)
 
         module = self.integrator(tvb_dfun, self.step, self.adhoc, self.dt, nh=int(self.tvb_p['dh'].max_lag))
         run_chunk = nn.scan(self.chunk.__call__)
         run_sim = nn.scan(run_chunk)
 
-        buf, rv = run_sim(module, buf, jax.random.split(key, (sim_len, 1000)))
+        buf = self.initialize_buffer(key, initial_cond)
+        
+        chunksize = int((self.stimulus.shape[0]/sim_len)) if jnp.any(self.stimulus) else 10000
+        stimulus = stimulus.reshape((sim_len, int(chunksize*self.dt), -1)) if jnp.any(self.stimulus) else jnp.zeros((sim_len, int(chunksize*self.dt), 1))
+        # jax.debug.print('buf {x}', x=buf.shape)
+        buf, rv = run_sim(module, buf, stimulus, jax.random.split(key, (sim_len, int(chunksize*self.dt))))
+
+        # jax.debug.print('rv {x}', x=rv[0].shape)
+        # jax.debug.print('rv {x}', x=rv[1].shape)
         # dummy_adhoc_bold = lambda x: x
         # bold_dfun_p = lambda sfvq, x: bold_dfun(sfvq, x, bold_default_theta)
         # module = self.integrator(bold_dfun_p, Heun_step, dummy_adhoc_bold, self.dt/10000, nh=int(self.tvb_p['dh'].max_lag), p=1)
@@ -249,10 +293,9 @@ class TVB(nn.Module):
         # bold_buf = jnp.ones((4, self.tvb_p['dh'].n_from, 1))
         # bold_buf = bold_buf.at[0].set(1.)
 
-
         # bold_buf, bold = run_bold(module, bold_buf, rv[...,0].reshape((-1, int(20000/self.dt), self.tvb_p['dh'].n_from, 1)))
-
-        return buf, rv.reshape(-1, self.tvb_p['dh'].n_from, self.nst_vars)#, bold
+        return rv
+        return rv.reshape(-1, self.tvb_p['dh'].n_from, self.nst_vars+self.n_pars)#, bold
 
 
 
@@ -279,15 +322,19 @@ class Simple_MLP(nn.Module):
     out_dim: int
     n_hiddens: Sequence[int]
     act_fn: Callable
-    kernel_init: Callable = jax.nn.initializers.normal(1e-6)
+    # kernel_init: Callable = jax.nn.initializers.normal(1e-3)
+    kernel_init: Callable = jax.nn.initializers.he_normal()
     coupled: bool = False
+    n_pars: int = 0
 
     def setup(self):
-        self.layers = [nn.Dense(feat, kernel_init=self.kernel_init, bias_init=self.kernel_init) for feat in self.n_hiddens]
-        self.output = nn.Dense(self.out_dim, kernel_init=self.kernel_init, bias_init=self.kernel_init)
+        self.layers = [nn.Dense(feat, kernel_init=self.kernel_init, bias_init=nn.initializers.zeros) for feat in self.n_hiddens]
+        self.output = nn.Dense(self.out_dim, kernel_init=self.kernel_init, bias_init=nn.initializers.zeros)
     
     @nn.compact
-    def __call__(self, x, xs, *args, scaling_factor=1):
+    def __call__(self, x, xs, *args, scaling_factor=.01):
+        # x = x.at[...,0].set(jnp.log(x[...,0]))
+        # jax.debug.print('x[0] {x} xs[0] {y}', x=x[0], y=xs[0])
         x = jnp.c_[x, xs]
         x = jnp.c_[x, args[0]] if self.coupled else x
         for layer in self.layers:
@@ -327,7 +374,6 @@ class MontBrio(nn.Module):
     scaling_factor: float = 1.
 
     def setup(self):
-        # self.eta = self.dfun_pars['eta']
         self.eta = self.dfun_pars.eta
         self.Delta = self.dfun_pars.Delta
         self.tau = self.dfun_pars.tau
@@ -339,8 +385,9 @@ class MontBrio(nn.Module):
     
     @nn.compact
     def __call__(self, x, xs, *args):
+        # xs contains regions parameters not implemented yet
         c = args[0] if self.coupled else jnp.zeros(x.shape)
-        xs = xs
+        # jax.debug.print('x[0] {x} c[0] {z}', x=x[0], z=c[0])
         r, V = x[:,:1], x[:,1:]
         I_c = self.cr * c[:,:1]
         r_dot =  (1 / self.tau) * (self.Delta / (jnp.pi * self.tau) + 2 * r * V)
