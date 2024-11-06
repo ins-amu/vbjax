@@ -278,7 +278,7 @@ class TVB(nn.Module):
 
         buf = self.initialize_buffer(key, initial_cond)
         
-        chunksize = int((self.stimulus.shape[0]/sim_len)) if jnp.any(self.stimulus) else 10000
+        chunksize = int((self.stimulus.shape[0]/sim_len)) if jnp.any(self.stimulus) else 1000
         stimulus = stimulus.reshape((sim_len, int(chunksize*self.dt), -1)) if jnp.any(self.stimulus) else jnp.zeros((sim_len, int(chunksize*self.dt), 1))
         # jax.debug.print('buf {x}', x=buf.shape)
         buf, rv = run_sim(module, buf, stimulus, jax.random.split(key, (sim_len, int(chunksize*self.dt))))
@@ -326,6 +326,33 @@ class Simple_MLP(nn.Module):
     kernel_init: Callable = jax.nn.initializers.he_normal()
     coupled: bool = False
     n_pars: int = 0
+    scaling_factor: float = .01
+
+    def setup(self):
+        self.layers = [nn.Dense(feat, kernel_init=self.kernel_init, bias_init=nn.initializers.zeros) for feat in self.n_hiddens]
+        self.output = nn.Dense(self.out_dim, kernel_init=self.kernel_init, bias_init=nn.initializers.zeros)
+    
+    @nn.compact
+    def __call__(self, x, xs, *args):
+        # c = args[0]
+        # jax.debug.print('x[0] {x} xs[0] {y} args[0] {z}', x=x.shape, y=xs.shape, z=c.shape)
+        # jax.debug.print('x[0] {x} xs[0] {y}', x=x.shape, y=xs.shape)
+        # jax.debug.print('kernel {x}', x=self.layers[0])
+        x = jnp.c_[x, xs]
+        x = jnp.c_[x, args[0]] if self.coupled else x
+        for layer in self.layers:
+            x = layer(x)
+            x = self.act_fn(x)
+        x = self.output(x)
+        return x*self.scaling_factor
+
+
+class Simple_MLP_additive_c(nn.Module):
+    out_dim: int
+    n_hiddens: Sequence[int]
+    act_fn: Callable
+    kernel_init: Callable = jax.nn.initializers.he_normal(  )
+    coupled: bool = True
 
     def setup(self):
         self.layers = [nn.Dense(feat, kernel_init=self.kernel_init, bias_init=nn.initializers.zeros) for feat in self.n_hiddens]
@@ -333,37 +360,18 @@ class Simple_MLP(nn.Module):
     
     @nn.compact
     def __call__(self, x, xs, *args, scaling_factor=.01):
-        # x = x.at[...,0].set(jnp.log(x[...,0]))
-        # jax.debug.print('x[0] {x} xs[0] {y}', x=x[0], y=xs[0])
+        c = args[0]
+        jax.debug.print('x[0] {x} xs[0] {y} args[0] {z}', x=x[0], y=xs[0], z=c[0])
         x = jnp.c_[x, xs]
-        x = jnp.c_[x, args[0]] if self.coupled else x
         for layer in self.layers:
-            x = layer(x)
+            x = layer(x)    
             x = self.act_fn(x)
         x = self.output(x)
-        return x*scaling_factor
-
-
-class Simple_MLP_additive_c(nn.Module):
-    out_dim: int
-    n_hiddens: Sequence[int]
-    act_fn: Callable
-    kernel_init: Callable = jax.nn.initializers.normal(1e-6)
-    coupled: bool = False
-
-    def setup(self):
-        self.layers = [nn.Dense(feat, kernel_init=self.kernel_init, bias_init=self.kernel_init) for feat in self.n_hiddens]
-        self.output = nn.Dense(self.out_dim, kernel_init=self.kernel_init, bias_init=self.kernel_init)
-    
-    @nn.compact
-    def __call__(self, x, xs, *args, scaling_factor=1):
-        x = jnp.c_[x, xs]
         
-        for layer in self.layers:
-            x = layer(x)
-            x = self.act_fn(x)
-        x = self.output(x)
-        x += args[0] if self.coupled else x
+        x = x*scaling_factor
+        # jax.debug.print('x before {x}', x=x[0])
+        x += jnp.c_[jnp.zeros(args[0].shape), args[0]] if self.coupled else x
+        # jax.debug.print('x after {x}', x=x[0])
         return x
 
 
@@ -403,7 +411,7 @@ class NeuralOdeWrapper(nn.Module):
     dt: Optional[float] = 1.
     step: Optional[Callable] = Heun_step
     integrator: Optional[Callable] = Integrator
-    dfun: Optional[Callable] = Simple_MLP
+    dfun: Optional[Callable] = None
     integrate: Optional[bool] = True
     coupled: Optional[bool] = False
     i_ext: Optional[bool] = False
@@ -418,13 +426,15 @@ class NeuralOdeWrapper(nn.Module):
 
         if not self.integrate:
             deriv = self.dfun(inputs[0], inputs[1])
+            # jax.debug.print('deriv {x}', x=deriv[0])
             return deriv
 
         in_ax = (0,0,0) if self.coupled else (0,0)
         integrate = self.integrator(self.dfun.__call__, self.step, self.adhoc, self.dt, in_ax=in_ax, p=True)
         
         # xs = jnp.zeros_like(x[:,:,:int(self.extra_p)]) # initialize carry
-        p = x[:,:,self.extra_p:] # initialize carry param filled
+        p = x[:,:,-self.extra_p:] # initialize carry param filled
+        # jax.debug.print('p {x}', x=p.shape)
         # i_ext = self.prepare_stimulus(x, i_ext, self.stvar)
         t_count = jnp.tile(jnp.arange(x.shape[0])[...,None,None], (x.shape[1], x.shape[2])) # (length, train_samples, state_vars)
         
