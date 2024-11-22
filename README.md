@@ -1,5 +1,7 @@
 # `vbjax`
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14204250.svg)](https://doi.org/10.5281/zenodo.14204250)
+
 `vbjax` is a Jax-based package for working with virtual brain style models.
 
 ## Installation
