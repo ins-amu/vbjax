@@ -126,7 +126,13 @@ def test_multiple_periods():
     assert fmri.shape == (ts.size, 32)
     numpy.testing.assert_allclose(eeg2, eeg, 2e-3, 1e-4)
 
+try:
+    import pytest_benchmark
+except ImportError:
+    pytest_benchmark = None
 
+
+@pytest.mark.skipif(pytest_benchmark is None, reason='pytest_benchmark not available')
 @pytest.mark.parametrize('opts', [
     f'{args} {dev}'
     for args in ['jit grad','jit grad ckp','jit','']

@@ -16,8 +16,6 @@ dependencies = [
     "jax",
     "jaxlib",
     "scipy",
-    "numpyro",
-    "jax-dataclasses",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -28,7 +26,11 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+bayes = [
+    "numpyro"
+]
 dev = [
+    "jax-dataclasses",
     "pytest",
     "pytest-xdist",
     "pytest-benchmark",

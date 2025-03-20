@@ -174,8 +174,13 @@ def test_rmlp_vjp():
         np.testing.assert_allclose(g_w[i], gh_w[i], 1e-6, 1e-6)
         np.testing.assert_allclose(g_b[i], gh_b[i], 1e-6, 1e-6)
 
+try:
+    import pytest_benchmark
+except ImportError:
+    pytest_benchmark = None
 
-# TODO need to vmap and test batch size
+
+@pytest.mark.skipif(pytest_benchmark is None, reason='pytest_benchmark not available')
 @pytest.mark.parametrize('use_ad', [True, False])
 def test_rmlp_vjp_perf(benchmark, use_ad):
     w, b, D, cache, rmlp, rmlp_vjp = _setup_test_rmlp_vjp()

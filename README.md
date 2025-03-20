@@ -13,15 +13,15 @@ git clone https://github.com/ins-amu/vbjax
 cd vbjax
 pip install -e ".[dev]"
 ```
-You're encouraged to have the source handy to consult and change, but you can also just
-```bash
-pip install git+https://github.com/ins-amu/vbjax
-```
-
 The primary additional dependency of vbjax is
 [JAX](github.com/google/jax), which itself depends only on
 NumPy, SciPy & opt-einsum, so it should be safe to add to your
 existing projects.
+
+Bayesian estimation using NumPyro is an optional dependency,
+```bash
+pip install "vbjax[bayes]"
+```
 
 ### gee pee you
 

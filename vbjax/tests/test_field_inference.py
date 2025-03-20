@@ -1,9 +1,12 @@
 import numpy as np
-import numpyro
+import pytest
+try:
+    import numpyro
+except ImportError:
+    pytest.skip(allow_module_level=True)
 import jax
 import jax.numpy as jnp
 from numpyro.infer import MCMC, NUTS, SVI, Trace_ELBO
-import pytest
 
 import vbjax
 

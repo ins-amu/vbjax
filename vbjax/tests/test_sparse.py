@@ -98,6 +98,13 @@ _perf_values = [vals + (flag, impl, jit)
                 for jit in (True, False)
                 for vals in _perf_values]
 
+try:
+    import pytest_benchmark
+except ImportError:
+    pytest_benchmark = None
+
+
+@pytest.mark.skipif(pytest_benchmark is None, reason='pytest_benchmark not available')
 @pytest.mark.parametrize(_perf_args, _perf_values)
 def test_perf_jbcoo(benchmark, n, density_pct, grad, impl, jit):
     A, x = create_sample_data(n=n, density_pct=density_pct)
