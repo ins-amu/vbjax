@@ -10,7 +10,6 @@ import jax_dataclasses as jdc
 key = random.PRNGKey(0)
 
 # setup model structure using jax dataclass
-@jdc.pytree_dataclass
 class Model:
     """
     DeltaNet-like model for solving pathfinder task
@@ -19,8 +18,7 @@ class Model:
 
 
 # --- 1. Define Data Structures ---
-
-@dataclass
+@jdc.pytree_dataclass
 class ModelParams:
     # Input Embeddings
     pos_embeds: jnp.ndarray      # (16, 16, embed_dim)
@@ -33,7 +31,7 @@ class ModelParams:
     output_w: jnp.ndarray        # (embed_dim, 1)
     output_b: jnp.ndarray
 
-@dataclass
+@jdc.pytree_dataclass
 class DeltaLayerParams:
     wq: jnp.ndarray              # (num_heads, embed_dim, head_dim)
     wk: jnp.ndarray              # (num_heads, embed_dim, head_dim)
@@ -42,19 +40,24 @@ class DeltaLayerParams:
     norm: jnp.ndarray
     B: jnp.ndarray               # (num_heads,) - NEW: Learnable per-head parameter
 
-@dataclass
+@jdc.pytree_dataclass
 class TrainingConfig:
-    learning_rate: float
-    batch_size: int
-    num_iterations: int
-    # Model dimensions
-    embed_dim: int
-    num_heads: int
-    num_layers: int
-    patch_size: int
-    image_size: int
-    # Precision amplification factor
-    alpha: float
+    # Configuration values are fixed during training and not differentiated.
+    # We mark them as `Static` so JAX treats them as part of the Pytree's
+    # structure (treedef) rather than as dynamic leaf nodes. This is crucial
+    # for JIT compilation efficiency.
+    learning_rate: jdc.Static[float
+    batch_size: jdc.Static[int]
+    num_iterations: jdc.Static[int]
+
+    # Model dimensions are static for a given training run.
+    embed_dim: jdc.Static[int]
+    num_heads: jdc.Static[int]
+    num_layers: jdc.Static[int]
+    patch_size: jdc.Static[int]
+    image_size: jdc.Static[int]
+    # Precision amplification factor is a static hyperparameter.
+    alpha: jdc.Static[float]
 
 # --- 2. Model Initialization ---
 
