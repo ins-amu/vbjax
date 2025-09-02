@@ -1,7 +1,7 @@
 from functools import partial
 import numpy as np
 import os
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.98'
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '.9'
 
 import tqdm
 import jax
@@ -99,10 +99,10 @@ def init_model(key, config, scale=1e-6):
 
 # --- 3. Core Model Logic ---
 
-def z_score(x, axis=-1, eps=1e-5):
+def z_score(x, axis=-1, eps=1e-4):
     mean = jnp.mean(x, axis=axis, keepdims=True)
     std = jnp.std(x, axis=axis, keepdims=True)
-    return (x - mean) / (std + eps)
+    return (x - mean) / (std + eps*jnp.r_[:x.shape[axis]])
 
 
 def delta_net_layer_forward(params: DeltaLayerParams, x: jnp.ndarray, S: jnp.ndarray):
@@ -110,14 +110,15 @@ def delta_net_layer_forward(params: DeltaLayerParams, x: jnp.ndarray, S: jnp.nda
     def scan_fn(carry, token_x):
         S_prev = carry
         
-        # Z-score input token
-        token_x_norm = z_score(token_x)
-        
         # Project to Q, K, V for each head
-        q_h = jnp.einsum('d,hdm->hm', token_x_norm, params.wq)
-        k_h = jnp.einsum('d,hdm->hm', token_x_norm, params.wk)
-        v_h = jnp.einsum('d,hdm->hm', token_x_norm, params.wv)
+        q_h = jnp.einsum('d,hdm->hm', token_x, params.wq)
+        k_h = jnp.einsum('d,hdm->hm', token_x, params.wk)
+        v_h = jnp.einsum('d,hdm->hm', token_x, params.wv)
         
+        q_h = z_score(q_h)
+        k_h = z_score(k_h)
+        v_h = z_score(v_h)
+
         # Sigmoid nonlinearity
         q_h, k_h = jax.nn.sigmoid(q_h), jax.nn.sigmoid(k_h)
         
@@ -173,6 +174,34 @@ def delta_net_layer_forward(params: DeltaLayerParams, x: jnp.ndarray, S: jnp.nda
 
     return output_sequence, final_S
 
+def linear_layer_forward(params: DeltaLayerParams, x: jnp.ndarray):# , S: jnp.ndarray):
+    T = x.shape[0]
+
+    # Project to Q, K, V for each head
+    q = jnp.einsum('td,hdm->thm', x, params.wq)
+    k = jnp.einsum('td,hdm->thm', x, params.wk)
+    v = jnp.einsum('td,hdm->thm', x, params.wv)
+    
+    # normalize per head
+    q = z_score(q)
+    k = z_score(k)
+    v = z_score(v)
+
+    # nonlinearity
+    q, k = jax.nn.gelu(q), jax.nn.gelu(k)
+
+    # causal attn matrix
+    a = jnp.einsum('Thm,thm->Tth', q, k)
+    mask = jnp.tril(jnp.ones((T, T)))
+    vt = jnp.einsum('Tth,Tt,thm->Thm', a, mask, v)  # (T, num_head, head_size)
+
+    # output
+    o = vt.reshape(T, -1) @ params.wo
+    return o
+
+
+
+
 def forward_pass(params: ModelParams, batch_patches: jnp.ndarray, config: TrainingConfig):
     # Project raw patches to embed_dim
     # batch_patches shape: (batch_size, seq_len, patch_size*patch_size)
@@ -187,18 +216,18 @@ def forward_pass(params: ModelParams, batch_patches: jnp.ndarray, config: Traini
 
     # Initialize recurrent states (one per layer)
     head_dim = config.embed_dim // config.num_heads
-    initial_S = jnp.zeros((config.num_layers, config.num_heads, head_dim, head_dim))
+    # initial_S = jnp.zeros((config.num_layers, config.num_heads, head_dim, head_dim))
     
     # Propagate through layers
     current_x = x
     for i in range(config.num_layers):
         # print(i, seq_len)
         layer_params = params.delta_layers[i]
-        S_layer = initial_S[i]
+        # S_layer = initial_S[i]
         
         # Vmap across the batch dimension
-        batch_layer_fwd = vmap(delta_net_layer_forward, in_axes=(None, 0, None))
-        current_x, _ = batch_layer_fwd(layer_params, current_x, S_layer)
+        batch_layer_fwd = vmap(linear_layer_forward, in_axes=(None, 0))#, None))
+        current_x = batch_layer_fwd(layer_params, current_x)#, S_layer)
 
     # Readout from the last token
     final_representation = current_x[:, -1] # (batch, embed_dim)
@@ -267,8 +296,8 @@ if __name__ == '__main__':
 
     # Configuration
     config = TrainingConfig(
-        learning_rate=5e-4,
-        batch_size=256,
+        learning_rate=1e-4,
+        batch_size=128,
         num_iterations=10001,
         embed_dim=512,
         num_heads=16,
@@ -291,3 +320,6 @@ if __name__ == '__main__':
     trained_params = train(config, model_params, images_data, labels_data)
 
 # sits at 0.693 which is -log(50%) for binary cross-entropy loss, indicating a random guess or chance-level performance.
+
+# - should go back to the femto shakespeare example, build from there
+# - use the parallel approach to speed up training
