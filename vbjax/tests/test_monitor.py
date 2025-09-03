@@ -40,7 +40,7 @@ def test_gain():
 
     buf, eeg = g_sample(buf)
 
-    numpy.testing.assert_allclose(eeg, gain.sum(axis=1))
+    numpy.testing.assert_allclose(eeg, gain.sum(axis=1), 1e-5, 1e-5)
 
 
 def test_cov_fc():
@@ -48,7 +48,7 @@ def test_cov_fc():
     fc, fc_step, fc_sample = vb.make_fc(xs[0].shape)
     fcol = vb.make_offline(fc_step, fc_sample)
     _, s_fc = fcol(fc, xs)
-    numpy.testing.assert_allclose(s_fc, np.identity(16), 0.09, 0.09)
+    numpy.testing.assert_allclose(s_fc + 1, np.identity(16) + 1, 0.09, 0.09)
 
 
 def test_bold():

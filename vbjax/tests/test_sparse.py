@@ -1,5 +1,6 @@
 
 import time
+from warnings import warn
 import numpy
 import jax
 import jax.test_util
@@ -103,11 +104,13 @@ try:
 except ImportError:
     pytest_benchmark = None
 
-
+@pytest.mark.slow
 @pytest.mark.skipif(pytest_benchmark is None, reason='pytest_benchmark not available')
 @pytest.mark.parametrize(_perf_args, _perf_values)
 def test_perf_jbcoo(benchmark, n, density_pct, grad, impl, jit):
     A, x = create_sample_data(n=n, density_pct=density_pct)
+
+    warn("please use gather/scatter instead")
 
     if impl == 'scipy': # TODO enum
         spmv1 = vb.make_spmv(A)

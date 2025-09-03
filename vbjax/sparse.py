@@ -53,7 +53,7 @@ def _pad_up(x):
 
 def make_sg_spmv(A: scipy.sparse.csr_matrix,
                  use_pmap=False,
-                 sharding: jax.sharding.PositionalSharding=None,
+                 sharding: jax.sharding.Sharding=None,
                  ):
     "Make a SpMV kernel w/ generic scatter-gather operations."
     import jax.numpy as np
