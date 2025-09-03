@@ -37,7 +37,7 @@ jobs:
       - name: Build single-file executable
         run: |
           # Create a dist directory for pyinstaller
-          pyinstaller --onefile --name vbjax -m vbjax.__main__
+          pyinstaller --onefile --name vbjax vbjax/__main__.py
         shell: bash
 
       - name: Upload artifact
