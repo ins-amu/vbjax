@@ -2,7 +2,7 @@ name: Build for Emscripten-Forge
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, 'copilot/*' ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
@@ -30,9 +30,19 @@ jobs:
     - name: Generate conda recipe
       shell: micromamba-shell {0}
       run: |
+        # Extract version from _version.py or use tag
+        if [ "${{ github.ref_type }}" = "tag" ]; then
+          VERSION="${{ github.ref_name }}"
+          # Remove 'v' prefix if present
+          VERSION=${VERSION#v}
+        else
+          # Extract version from _version.py
+          VERSION=$(python -c "import sys; sys.path.insert(0, 'vbjax'); from _version import __version__; print(__version__.lstrip('v'))")
+        fi
+        
         cat > recipe/recipe.yaml << EOF
         context:
-          version: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.17' }}
+          version: \${VERSION}
           
         package:
           name: vbjax
