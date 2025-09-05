@@ -53,6 +53,17 @@ docker run --rm -it ghcr.io/ins-amu/vbjax:main python3 -c 'import vbjax; print(v
 The images are built on Nvidia runtime images, so `--gpus all` is enough
 for Jax to discover the GPU(s).
 
+#### WebAssembly 🌐
+
+vbjax includes experimental support for WebAssembly builds via [emscripten-forge](https://emscripten-forge.org/). 
+This enables deployment in web-based environments like [JupyterLite](https://jupyterlite.readthedocs.io/) 
+with xeus-python kernels.
+
+⚠️ **Note**: WebAssembly support is currently limited due to JAX/JAXlib compatibility constraints in emscripten environments. 
+The package can be built and installed but functionality will be restricted until JAX WebAssembly support improves.
+
+See [`WASM_BUILD.md`](WASM_BUILD.md) for details on building and limitations.
+
 ## Examples
 
 Here are some examples of simulations which show what you can
