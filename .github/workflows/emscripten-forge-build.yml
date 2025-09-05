@@ -79,7 +79,7 @@ jobs:
             # - vbjax
           commands:
             # Test basic package structure
-            - python -c "import vbjax._version; print('vbjax version file available')"
+            - python -c "import sys; from vbjax import _version; print('vbjax version file available:', _version.__version__)"
             
         about:
           home: https://github.com/ins-amu/vbjax
