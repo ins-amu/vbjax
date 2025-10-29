@@ -12,7 +12,7 @@ def to_np(x: jax.numpy.ndarray) -> numpy.ndarray:
 
 def to_jax(x: numpy.ndarray):
     "Move NumPy array to JAX via DLPack."
-    x_dlp = x.__dlpack__()
+    x_dlp = x #.__dlpack__()
     x_jax: jax.numpy.ndarray = jax.dlpack.from_dlpack(x_dlp)
     # if jax.default_backend() == 'gpu':
     #     x_jax = jax.device_put(x_jax)

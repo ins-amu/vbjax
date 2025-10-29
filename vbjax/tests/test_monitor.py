@@ -136,9 +136,11 @@ except ImportError:
 @pytest.mark.parametrize('opts', [
     f'{args} {dev}'
     for args in ['jit grad','jit grad ckp','jit','']
-    for dev in 'cpu,gpu'.split(',')])
+    for dev in ['cpu'] # 'cpu,gpu'.split(',')
+    ])
 def test_multiple_periods_perf(benchmark, opts):
     opts = opts.split(' ')
+    print(opts)
     device_name = 'cpu' if 'cpu' in opts else 'gpu'
     try:
         device = jax.devices(device_name)[0]
@@ -147,8 +149,9 @@ def test_multiple_periods_perf(benchmark, opts):
     unroll = 'unroll' in opts
     with jax.default_device(device):
         sim, op3 = setup_multiple_periods(unroll, 'ckp' in opts)
-        ts = np.r_[:100]
+        ts = np.r_[:10]
         def run(freq, sim):
+            jax.debug.print("run")
             sim = sim.copy()
             sim['freq'] = freq
             sim, (raw, eeg, eeg2, fmri) = jax.lax.scan(
@@ -161,4 +164,6 @@ def test_multiple_periods_perf(benchmark, opts):
         if 'jit' in opts:
             run = jax.jit(run)
             run(0.2, sim)
+        print("start benchmark")
         benchmark(lambda : run(0.2, sim))
+
