@@ -4,6 +4,7 @@ import jax.numpy as np
 import optax
 import numpy as onp
 import os
+import matplotlib.pyplot as plt
 from vbjax.ct_mhsa import init_ct_mhsa, Hyperparameters, scan_ct_mhsa, NetworkState, CTMHSAParams
 
 # 1. Data Pipeline
@@ -76,7 +77,7 @@ def shakespeare_forward(params: ShakespeareParams, state: NetworkState, x_indice
     x_input = x_input.at[:, :, 0, :].set(x_emb)
     
     # MHSA Scan
-    (final_state, _), mhsa_out = scan_ct_mhsa(params.mhsa, state, x_input, hp, lags=lags)
+    (final_state, _), (mhsa_out, surprise_trace) = scan_ct_mhsa(params.mhsa, state, x_input, hp, lags=lags)
     # mhsa_out: (T, B, N, D)
     
     # Readout from Region 7 (Output of 8-region hierarchy)
@@ -89,10 +90,10 @@ def shakespeare_forward(params: ShakespeareParams, state: NetworkState, x_indice
     logits = logits.reshape(T, B, vocab_size)
     logits = np.transpose(logits, (1, 0, 2)) # (B, T, Vocab)
     
-    return logits, final_state
+    return logits, final_state, surprise_trace
 
 def loss_fn_shakespeare(params, state, x, y, hp, lags):
-    logits, _ = shakespeare_forward(params, state, x, hp, lags)
+    logits, _, _ = shakespeare_forward(params, state, x, hp, lags)
     # Cross Entropy
     one_hot = jax.nn.one_hot(y, logits.shape[-1])
     log_probs = jax.nn.log_softmax(logits)
@@ -216,8 +217,13 @@ def train_shakespeare():
     # Top-K Config
     top_k = 15
     
+    all_surprises = []
+    
     for _ in range(200):
-        logits, gen_state = shakespeare_forward(gen_params, gen_state, curr_x, hp, lags)
+        logits, gen_state, surprise = shakespeare_forward(gen_params, gen_state, curr_x, hp, lags)
+        # surprise: (1, K, 1, N, H)
+        all_surprises.append(surprise[0, :, 0, :, :])
+        
         # logits: (1, 1, Vocab)
         next_token_logits = logits[0, 0]
         
@@ -236,6 +242,25 @@ def train_shakespeare():
         curr_x = np.array([[next_char_idx]])
         
     print("Generated:", "".join(chars))
+    
+    # Plotting Surprise
+    try:
+        # Stack: (200, K, N, H)
+        surprises_arr = np.stack(all_surprises) 
+        # Flatten time: (T_gen * K, N, H)
+        surprises_flat = surprises_arr.reshape(-1, hp.n_regions, hp.n_heads)
+        # Compute mean surprise across heads and regions
+        neural_act = np.mean(surprises_flat, axis=(1, 2)) 
+        
+        plt.figure(figsize=(10, 6))
+        plt.plot(neural_act)
+        plt.title("Neural Surprise (Mean over Regions/Heads)")
+        plt.xlabel("Micro-Steps")
+        plt.ylabel("Surprise (Norm of Delta M)")
+        plt.savefig("surprise_plot.png")
+        print("Surprise plot saved to surprise_plot.png")
+    except Exception as e:
+        print(f"Plotting failed: {e}")
 
 if __name__ == "__main__":
     train_shakespeare()

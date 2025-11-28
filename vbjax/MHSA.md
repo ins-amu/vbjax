@@ -142,9 +142,19 @@ sum_j C_{ij} y_{t, j}$ + External Input.
     - [ ] Feed $NeuralAct_t$ into the `vbjax` Balloon-Windkessel model to generate synthetic fMRI.
     - [ ] Feed $NeuralAct_t$ into the Lead Field projection for synthetic ERP/EEG.
 
----
+#### Phase 8.5: Critical Dynamics & Avalanche Analysis
+**Goal:** Investigate if the "neural" surprise signals exhibit signatures of self-organized criticality (SOC), a hallmark of biological brain dynamics.
+
+- [ ] **Avalanche Detection:**
+    - [ ] Define an "event" threshold for the surprise signal $S(t)$.
+    - [ ] Detect avalanches (contiguous time segments where $S(t) > \text{threshold}$).
+- [ ] **Statistical Analysis:**
+    - [ ] Compute distributions of Avalanche Size ($S$) and Duration ($D$).
+    - [ ] Fit power-laws $P(S) \sim S^{-\alpha}$ and $P(D) \sim D^{-\beta}$.
+    - [ ] Check for the scaling relation $\langle S \rangle \sim D^{\gamma}$.
 
 #### Phase 9: Simulation & Empirical Fitting
+
 **Goal:** Validate the model by comparing synthetic behavioral and physiological data against empirical baselines.
 
 - [ ] **Pre-training (Behavioral)**
