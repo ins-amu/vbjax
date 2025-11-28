@@ -9,7 +9,7 @@ def make_loss_fn(hp: Hyperparameters):
         # targets: (T, B, N, D)
         
         # Run model
-        (final_state, final_y), outputs = scan_ct_mhsa(params, state, inputs, hp)
+        (final_state, final_y), (outputs, surprise) = scan_ct_mhsa(params, state, inputs, hp)
         
         # Predictive Coding Loss: 0.5 * || targets - outputs ||^2
         # targets are x_{t+1}, outputs are y_t.
@@ -28,7 +28,7 @@ def run_training_check():
     # Init
     key = jax.random.PRNGKey(100)
     k_p, k_d = jax.random.split(key)
-    params, state = init_ct_mhsa(hp, k_p, batch_size=batch_size)
+    params, state, _ = init_ct_mhsa(hp, k_p, batch_size=batch_size)
     
     # Fake Data: Random sequence
     # We want to predict next step.
