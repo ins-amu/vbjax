@@ -129,71 +129,138 @@ def make_rollout(hp: VisualSearchHyperparameters):
             
     return rollout_fn
 
-def make_loss_fn(rollout, n_classes):
+def get_oracle_saccade(pos, masks, tasks, patch_size, images_shape):
+    """
+    Calculate ideal saccade. Vmap over batch to ensure correct shapes.
+    pos: (B, 2)
+    masks: (B, H, W)
+    """
+    B, H, W = masks.shape
+    
+    # Grid (H, W, 2)
+    y_grid, x_grid = np.meshgrid(np.arange(H), np.arange(W), indexing='ij')
+    grid = np.stack([x_grid, y_grid], axis=-1).astype(np.float32)
+    
+    def single_oracle(p, m):
+        # p: (2,)
+        # m: (H, W)
+        # grid: (H, W, 2)
+        
+        # Convert p to pixels
+        # p is [-1, 1]
+        coord = (p + 1) / 2 * np.array([W, H])
+        
+        # vec: (H, W, 2)
+        vec = grid - coord
+        
+        # Weighted sum
+        # m: (H, W) -> (H, W, 1)
+        m_exp = m[..., None]
+        
+        w_vec = np.sum(vec * m_exp, axis=(0, 1)) # (2,)
+        m_sum = np.sum(m) + 1e-6
+        
+        delta = w_vec / m_sum
+        
+        # Normalize
+        return delta / np.array([W, H]) * 2
+        
+    return jax.vmap(single_oracle)(pos, masks)
+
+def make_loss_fn(rollout, n_classes, hp):
     
     def loss_fn(params, state, images, tasks, labels, mode, scanpaths=None, key=None, masks=None):
-        # Run rollout
         logits_seq, saccades_seq, pos_seq, log_probs_seq = rollout(
             params, state, images, tasks, mode, scanpaths, key
         )
         
-        # 1. Classification Loss (Last Step)
+        # 1. Classification
         final_logits = logits_seq[:, -1, :]
         one_hot = jax.nn.one_hot(labels, n_classes)
         class_loss = optax.softmax_cross_entropy(logits=final_logits, labels=one_hot).mean()
-        
-        # Accuracy
         preds = np.argmax(final_logits, axis=-1)
         acc = np.mean(preds == labels)
         
-        # 2. Policy Loss (Active Only)
         policy_loss = 0.0
+        saccade_loss = 0.0
+        entropy_loss = 0.0
         coverage_mean = 0.0
         
-        if mode == 'active':
-            # Reward: 1 if correct, 0 else
-            cls_reward = (preds == labels).astype(np.float32) # (B,)
+        if mode == 'passive':
+            # Supervised Saccade Training (Imitation Learning)
+            # We want the network to predict the vector towards objects at each step.
+            # pos_seq: (B, T, 2) - These are the FORCED positions.
+            # saccades_seq: (B, T, 2) - The network's PREDICTED output at that forced position.
             
-            # Coverage Reward
+            # Calculate Oracle Target for each step
             B, T, _ = pos_seq.shape
-            masks_rep = np.repeat(masks, T, axis=0) # (B*T, H, W)
+            
+            # Flatten for batch processing
             pos_flat = pos_seq.reshape(B*T, 2)
+            masks_rep = np.repeat(masks, T, axis=0) # (B*T, H, W)
+            # tasks_rep = np.repeat(tasks, T, axis=0)
             
-            mask_patches = extract_patches(masks_rep, pos_flat, 16) # (B*T, 16, 16)
+            target_deltas_flat = get_oracle_saccade(pos_flat, masks_rep, None, hp.patch_size, images.shape)
+            target_deltas = target_deltas_flat.reshape(B, T, 2)
             
-            # Coverage per step: mean of mask patch
-            cov_per_step = np.mean(mask_patches, axis=(1, 2)) # (B*T,)
+            # MSE Loss
+            saccade_loss = np.mean((saccades_seq - target_deltas)**2)
+            
+            # Total Passive Loss
+            total_loss = class_loss + 1.0 * saccade_loss
+            
+        else: # active
+            # ... (Existing Active Logic) ...
+            cls_reward = (preds == labels).astype(np.float32)
+            
+            B, T, _ = pos_seq.shape
+            masks_rep = np.repeat(masks, T, axis=0)
+            pos_flat = pos_seq.reshape(B*T, 2)
+            mask_patches = extract_patches(masks_rep, pos_flat, hp.patch_size)
+            cov_per_step = np.mean(mask_patches, axis=(1, 2))
             cov_seq = cov_per_step.reshape(B, T)
-            
-            # Total Coverage per episode
-            cov_reward = np.mean(cov_seq, axis=1) # (B,)
-            
+            cov_reward = np.mean(cov_seq, axis=1)
             coverage_mean = np.mean(cov_reward)
             
-            # Total Reward: Weigh coverage to be auxiliary
             total_reward = cls_reward + 5.0 * cov_reward
-            
-            # Baseline (Mean reward of batch)
             baseline = np.mean(total_reward)
             advantage = total_reward - baseline
             
-            # REINFORCE
-            traj_log_prob = np.sum(log_probs_seq, axis=1) # (B,)
+            traj_log_prob = np.sum(log_probs_seq, axis=1)
             policy_loss = -np.mean(traj_log_prob * advantage)
             
-        total_loss = class_loss + 0.1 * policy_loss
-        
-        return total_loss, (class_loss, policy_loss, acc, coverage_mean)
+            # Entropy Regularization
+            # We don't have the full distribution, just the sample log_prob.
+            # For Gaussian policy with fixed std (0.1), entropy is constant constant + log(std).
+            # BUT, if we learned sigma, we'd maximize it.
+            # Since sigma is fixed/noise is added externally, "entropy" here effectively means
+            # maximizing the spread of actions if we were outputting logits.
+            # With deterministic Tanh output + Noise, the "Policy" is N(NetworkOut, FixedSigma).
+            # The entropy of this fixed-sigma Gaussian is constant.
+            
+            # HOWEVER, usually in continuous control, we want to penalize "certainty" or saturate tanh.
+            # Or, we just rely on the noise.
+            # If we want "Entropy", we usually mean "Exploration Bonus".
+            # Since we inject fixed noise, we are enforcing exploration.
+            # Maybe we don't need explicit entropy term if sigma is fixed?
+            # Correct. Fixed sigma = fixed entropy.
+            
+            # Let's stick to just the Coverage Reward for now, as "Entropy" is implicitly fixed by the noise injection.
+            # Unless we want to penalize the magnitude of the mean (regularization)? No.
+            
+            total_loss = class_loss + 0.1 * policy_loss
+            
+        return total_loss, (class_loss, policy_loss, saccade_loss, acc, coverage_mean)
 
     return loss_fn
 
 def train_visual_search():
     # Config
     BATCH_SIZE = 32
-    N_STEPS = 10 
-    N_TRAIN_STEPS = 10000 # Increased
+    N_STEPS = 15 
+    N_TRAIN_STEPS = 12000 # Increased
     SWITCH_STEP = 5000 # Increased Passive Phase
-    LR = 3e-4
+    LR = 2e-4
     
     mhsa_hp = Hyperparameters(
         n_regions=8, 
@@ -203,8 +270,8 @@ def train_visual_search():
     )
     hp = VisualSearchHyperparameters(
         mhsa=mhsa_hp,
-        patch_size=16,
-        n_micro_steps=3,
+        patch_size=32, # Increased from 16
+        n_micro_steps=5, # Increased from 3
         n_tasks=2,
         n_classes=3,
         retina_channels=(16, 32) 
@@ -244,13 +311,13 @@ def train_visual_search():
     opt_state = optimizer.init(params)
     
     rollout = make_rollout(hp)
-    loss_fn = make_loss_fn(rollout, hp.n_classes)
+    loss_fn = make_loss_fn(rollout, hp.n_classes, hp)
     
     # We need separate train steps for static arg 'mode'
     @jax.jit
-    def train_step_passive(params, opt_state, state, imgs, paths, tasks, lbls):
+    def train_step_passive(params, opt_state, state, imgs, paths, tasks, lbls, msks):
         (loss, aux), grads = jax.value_and_grad(loss_fn, has_aux=True)(
-            params, state, imgs, tasks, lbls, 'passive', paths, None, None
+            params, state, imgs, tasks, lbls, 'passive', paths, None, msks
         )
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
@@ -281,19 +348,21 @@ def train_visual_search():
         if i < SWITCH_STEP:
             # Passive
             b_paths = train_paths[idx]
-            params, opt_state, loss, (c_loss, p_loss, acc, cov) = train_step_passive(
-                params, opt_state, curr_state, b_imgs, b_paths, b_tasks, b_lbls
+            params, opt_state, loss, (c_loss, p_loss, s_loss, acc, cov) = train_step_passive(
+                params, opt_state, curr_state, b_imgs, b_paths, b_tasks, b_lbls, b_masks
             )
             mode = "Passive"
+            print_stats = f"Loss={loss:.4f} (Cls={c_loss:.4f}, Sacc={s_loss:.4f}) | Acc={acc:.4f}"
         else:
             # Active
-            params, opt_state, loss, (c_loss, p_loss, acc, cov) = train_step_active(
+            params, opt_state, loss, (c_loss, p_loss, s_loss, acc, cov) = train_step_active(
                 params, opt_state, curr_state, b_imgs, b_tasks, b_lbls, b_masks, k_batch
             )
             mode = "Active"
+            print_stats = f"Loss={loss:.4f} (Cls={c_loss:.4f}, Pol={p_loss:.4f}) | Acc={acc:.4f} | Cov={cov:.4f}"
             
         if i % 100 == 0:
-             print(f"Step {i:04d} [{mode}]: Loss={loss:.4f} (Cls={c_loss:.4f}, Pol={p_loss:.4f}) | Acc={acc:.4f} | Cov={cov:.4f}")
+             print(f"Step {i:04d} [{mode}]: {print_stats}")
 
 if __name__ == "__main__":
     train_visual_search()

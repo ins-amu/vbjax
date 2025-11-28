@@ -54,9 +54,20 @@ def init_visual_search(hp: VisualSearchHyperparameters, key) -> Tuple[VisualSear
     # C2: 8 -> 16
     c2_w, c2_b = init_conv(k_c2, hp.retina_channels[0], hp.retina_channels[1])
     
-    # Flatten size: 16x16 -> (stride 2) -> 8x8 -> (stride 2) -> 4x4
-    # 4 * 4 * 16 = 256
-    flat_size = 4 * 4 * hp.retina_channels[1]
+    # Flatten size: 
+    # Patch 16x16 -> (stride 2) -> 8x8 -> (stride 2) -> 4x4. 4*4*C1 = 16*32 = 512
+    # Patch 32x32 -> (stride 2) -> 16x16 -> (stride 2) -> 8x8. 8*8*C1 = 64*32 = 2048
+    # We need to calculate this dynamically or update hardcoded value.
+    # Let's calculate dynamically.
+    
+    def get_conv_out_shape(size, stride=2):
+        return (size + stride - 1) // stride # SAME padding logic approx or manual
+    
+    # JAX 'SAME' padding with stride 2 usually halves dim: 32->16->8
+    s1 = hp.patch_size // 2
+    s2 = s1 // 2
+    flat_size = s2 * s2 * hp.retina_channels[1]
+    
     ro_w, ro_b = init_dense(k_ro, flat_size, hp.mhsa.d_model)
     
     # Embeddings
