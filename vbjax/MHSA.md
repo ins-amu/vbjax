@@ -100,13 +100,13 @@ sum_j C_{ij} y_{t, j}$ + External Input.
 #### Phase 6: Biological Realism & Observables
 **Goal:** Bridge the gap between the current "Map-based" RNN and a biophysical Spatio-Temporal model, enabling "Virtual Brain" simulations.
 
-- [ ] **Implement Delayed Coupling (Space-Time)**
-    - [ ] **Constraint:** Signals require time $\tau_{ij} = D_{ij} / v$ to propagate.
-    - [ ] **Mechanism:** Maintain a History Buffer (`RingBuffer`) of shape $(L_{max}, N, D_{model})$ within the `lax.scan` loop.
-    - [ ] **Kernel:** Adapt `vbjax.coupling` to gather $y_{t-\tau_{ij}, j}$ for vector tokens.
-- [ ] **Structural Enhancements**
-    - [ ] **Skip Connections:** Add residual pathways (e.g., $x_{t+1} = x_t + \dots$) to improve gradient flow and model stability, mimicking biological preservation of state.
-    - [ ] **Layer Norm / Normalization:** Essential for deep/recurrent stability in linear transformers.
+- [x] **Implement Delayed Coupling (Space-Time)**
+    - [x] **Constraint:** Signals require time $\tau_{ij} = D_{ij} / v$ to propagate.
+    - [x] **Mechanism:** Maintain a History Buffer (`RingBuffer`) of shape $(L_{max}, N, D_{model})$ within the `lax.scan` loop.
+    - [x] **Kernel:** Adapt `vbjax.coupling` to gather $y_{t-\tau_{ij}, j}$ for vector tokens.
+- [x] **Structural Enhancements**
+    - [x] **Skip Connections:** Add residual pathways (e.g., $x_{t+1} = x_t + \dots$) to improve gradient flow and model stability, mimicking biological preservation of state.
+    - [x] **Layer Norm / Normalization:** Essential for deep/recurrent stability in linear transformers.
 - [ ] **Task Stimuli (Inputs)**
     - [ ] Define standard injection protocols (Block design, Event-related).
     - [ ] Map scalar stimuli (e.g., visual contrast) to the vector input space $x_t$ (via projection matrix $W_{in}$).
