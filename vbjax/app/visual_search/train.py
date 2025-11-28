@@ -257,15 +257,15 @@ def make_loss_fn(rollout, n_classes, hp):
 def train_visual_search():
     # Config
     BATCH_SIZE = 32
-    N_STEPS = 15 
-    N_TRAIN_STEPS = 12000 # Increased
+    N_STEPS = 20
+    N_TRAIN_STEPS = 20000 # Increased
     SWITCH_STEP = 5000 # Increased Passive Phase
-    LR = 2e-4
+    LR = 1e-4
     
     mhsa_hp = Hyperparameters(
         n_regions=8, 
         n_heads=8,   
-        d_k=16, d_v=16, d_model=32, 
+        d_k=32, d_v=32, d_model=32, 
         steps_per_token=1
     )
     hp = VisualSearchHyperparameters(
