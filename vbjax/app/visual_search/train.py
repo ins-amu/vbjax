@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as np
 import optax
+import argparse
 from typing import NamedTuple
 from vbjax.app.visual_search.data import generate_dataset, make_scanpaths
 from vbjax.app.visual_search.model import (
@@ -167,7 +168,7 @@ def get_oracle_saccade(pos, masks, tasks, patch_size, images_shape):
         
     return jax.vmap(single_oracle)(pos, masks)
 
-def make_loss_fn(rollout, n_classes, hp):
+def make_loss_fn(rollout, n_classes, hp, aux_weight=1.0):
     
     def loss_fn(params, state, images, tasks, labels, mode, scanpaths=None, key=None, masks=None):
         logits_seq, saccades_seq, pos_seq, log_probs_seq = rollout(
@@ -250,28 +251,49 @@ def make_loss_fn(rollout, n_classes, hp):
             
             total_loss = class_loss + 0.1 * policy_loss
             
+            # Auxiliary Supervised Loss (Teacher Forcing)
+            # Guide the agent towards the object even during active exploration
+            pos_flat = pos_seq.reshape(B*T, 2)
+            masks_rep = np.repeat(masks, T, axis=0)
+            target_deltas_flat = get_oracle_saccade(pos_flat, masks_rep, None, hp.patch_size, images.shape)
+            target_deltas = target_deltas_flat.reshape(B, T, 2)
+            aux_saccade_loss = np.mean((saccades_seq - target_deltas)**2)
+            
+            total_loss += aux_weight * aux_saccade_loss
+            saccade_loss = aux_saccade_loss # For logging
+            
         return total_loss, (class_loss, policy_loss, saccade_loss, acc, coverage_mean)
 
     return loss_fn
 
 def train_visual_search():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--steps_per_token", type=int, default=5)
+    parser.add_argument("--n_regions", type=int, default=16)
+    parser.add_argument("--d_model", type=int, default=32)
+    parser.add_argument("--aux_weight", type=float, default=0.5)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--train_steps", type=int, default=15000)
+    parser.add_argument("--switch_step", type=int, default=5000)
+    args = parser.parse_args()
+    
     # Config
-    BATCH_SIZE = 32
+    BATCH_SIZE = args.batch_size
     N_STEPS = 20
-    N_TRAIN_STEPS = 20000 # Increased
-    SWITCH_STEP = 5000 # Increased Passive Phase
-    LR = 1e-4
+    N_TRAIN_STEPS = args.train_steps
+    SWITCH_STEP = args.switch_step
+    LR = args.lr
     
     mhsa_hp = Hyperparameters(
-        n_regions=8, 
+        n_regions=args.n_regions, 
         n_heads=8,   
-        d_k=32, d_v=32, d_model=32, 
-        steps_per_token=1
+        d_k=args.d_model, d_v=args.d_model, d_model=args.d_model, 
+        steps_per_token=args.steps_per_token
     )
     hp = VisualSearchHyperparameters(
         mhsa=mhsa_hp,
         patch_size=32, # Increased from 16
-        n_micro_steps=5, # Increased from 3
         n_tasks=2,
         n_classes=3,
         retina_channels=(16, 32) 
@@ -307,11 +329,14 @@ def train_visual_search():
         history_batch = np.repeat(state_proto.history, BATCH_SIZE, axis=1)
     state = NetworkState(M=M_batch, history=history_batch, step=0)
     
-    optimizer = optax.adamw(LR)
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(1.0),
+        optax.adamw(LR)
+    )
     opt_state = optimizer.init(params)
     
     rollout = make_rollout(hp)
-    loss_fn = make_loss_fn(rollout, hp.n_classes, hp)
+    loss_fn = make_loss_fn(rollout, hp.n_classes, hp, aux_weight=args.aux_weight)
     
     # We need separate train steps for static arg 'mode'
     @jax.jit
@@ -361,7 +386,7 @@ def train_visual_search():
             mode = "Active"
             print_stats = f"Loss={loss:.4f} (Cls={c_loss:.4f}, Pol={p_loss:.4f}) | Acc={acc:.4f} | Cov={cov:.4f}"
             
-        if i % 100 == 0:
+        if i % 500 == 0:
              print(f"Step {i:04d} [{mode}]: {print_stats}")
 
 if __name__ == "__main__":

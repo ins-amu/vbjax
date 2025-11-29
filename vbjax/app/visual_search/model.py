@@ -6,7 +6,6 @@ from vbjax.ct_mhsa import CTMHSAParams, NetworkState, Hyperparameters, mhsa_step
 class VisualSearchHyperparameters(NamedTuple):
     mhsa: Hyperparameters
     patch_size: int = 16
-    n_micro_steps: int = 5
     n_tasks: int = 2
     n_classes: int = 3 # R, G, B (max classes)
     retina_channels: Tuple[int, ...] = (8, 16)
@@ -167,7 +166,7 @@ def agent_step(
     y_init = np.zeros_like(core_input)
     
     # We'll use lax.fori_loop
-    final_state, final_y = jax.lax.fori_loop(0, hp.n_micro_steps, loop_body, (state, y_init))
+    final_state, final_y = jax.lax.fori_loop(0, hp.mhsa.steps_per_token, loop_body, (state, y_init))
     
     # 3. Heads
     # final_y: (B, N, D)
