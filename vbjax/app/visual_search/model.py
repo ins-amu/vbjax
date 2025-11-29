@@ -28,9 +28,11 @@ class VisualSearchParams(NamedTuple):
     head_answer_b: jax.Array
     head_saccade_w: jax.Array
     head_saccade_b: jax.Array
+    head_value_w: jax.Array
+    head_value_b: jax.Array
 
 def init_visual_search(hp: VisualSearchHyperparameters, key) -> Tuple[VisualSearchParams, NetworkState]:
-    k_core, k_c1, k_c2, k_ro, k_pe, k_te, k_ha, k_hs = jax.random.split(key, 8)
+    k_core, k_c1, k_c2, k_ro, k_pe, k_te, k_ha, k_hs, k_hv = jax.random.split(key, 9)
     
     # Init Core
     core_params, core_state, _ = init_ct_mhsa(hp.mhsa, key=k_core, batch_size=1) # Batch size handled dynamically in vmap
@@ -81,6 +83,7 @@ def init_visual_search(hp: VisualSearchHyperparameters, key) -> Tuple[VisualSear
     # Let's Average Pooling for now: (B, D).
     ha_w, ha_b = init_dense(k_ha, hp.mhsa.d_model, hp.n_classes)
     hs_w, hs_b = init_dense(k_hs, hp.mhsa.d_model, 2) # dx, dy
+    hv_w, hv_b = init_dense(k_hv, hp.mhsa.d_model, 1) # Value (Scalar)
     
     params = VisualSearchParams(
         core=core_params,
@@ -90,7 +93,8 @@ def init_visual_search(hp: VisualSearchHyperparameters, key) -> Tuple[VisualSear
         pos_embed_w=pe_w, pos_embed_b=pe_b,
         task_embed=task_embed,
         head_answer_w=ha_w, head_answer_b=ha_b,
-        head_saccade_w=hs_w, head_saccade_b=hs_b
+        head_saccade_w=hs_w, head_saccade_b=hs_b,
+        head_value_w=hv_w, head_value_b=hv_b
     )
     
     return params, core_state
@@ -179,5 +183,8 @@ def agent_step(
     # Paper/Plan usually implies continuous control. Let's use Tanh to bound it comfortably.
     saccade = np.tanh(saccade) 
     
-    return final_state, (logits, saccade)
+    value = y_agg @ params.head_value_w + params.head_value_b
+    value = value.squeeze(-1) # (B,)
+    
+    return final_state, (logits, saccade, value)
 

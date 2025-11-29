@@ -81,17 +81,18 @@ def make_rollout(hp: VisualSearchHyperparameters):
             def passive_body(carry, pos_t):
                 state, _, _ = carry # Ignore internal pos logic
                 patches = extract_patches(images, pos_t, hp.patch_size)
-                new_state, (logits, saccade) = agent_step(params, state, patches, pos_t, tasks, hp)
-                return (new_state, pos_t, None), (logits, saccade, pos_t)
+                new_state, (logits, saccade, value) = agent_step(params, state, patches, pos_t, tasks, hp)
+                return (new_state, pos_t, None), (logits, saccade, pos_t, value)
             
-            final_carry, (logits_seq, saccades_seq, pos_seq) = jax.lax.scan(passive_body, carry_init, scanpaths_T)
+            final_carry, (logits_seq, saccades_seq, pos_seq, values_seq) = jax.lax.scan(passive_body, carry_init, scanpaths_T)
             
             # Reshape (T, B, ...) -> (B, T, ...)
             logits_seq = np.transpose(logits_seq, (1, 0, 2))
             saccades_seq = np.transpose(saccades_seq, (1, 0, 2))
             pos_seq = np.transpose(pos_seq, (1, 0, 2))
+            values_seq = np.transpose(values_seq, (1, 0)) # (B, T)
             
-            return logits_seq, saccades_seq, pos_seq, None
+            return logits_seq, saccades_seq, pos_seq, None, values_seq
             
         else: # ACTIVE
             # Input is dummy range
@@ -101,7 +102,7 @@ def make_rollout(hp: VisualSearchHyperparameters):
                 state, pos, k = carry
                 
                 patches = extract_patches(images, pos, hp.patch_size)
-                new_state, (logits, saccade_delta) = agent_step(params, state, patches, pos, tasks, hp)
+                new_state, (logits, saccade_delta, value) = agent_step(params, state, patches, pos, tasks, hp)
                 
                 # Action: Saccade Delta + Noise
                 # saccade_delta is in [-1, 1] via tanh
@@ -116,17 +117,18 @@ def make_rollout(hp: VisualSearchHyperparameters):
                 # Compute Log Prob of the action (Gaussian)
                 log_prob = -0.5 * np.sum((noise / 0.1)**2, axis=-1) # Sum over x,y
                 
-                return (new_state, new_pos, k), (logits, saccade_delta, new_pos, log_prob)
+                return (new_state, new_pos, k), (logits, saccade_delta, new_pos, log_prob, value)
             
-            final_carry, (logits_seq, saccades_seq, pos_seq, log_probs_seq) = jax.lax.scan(active_body, carry_init, xs)
+            final_carry, (logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq) = jax.lax.scan(active_body, carry_init, xs)
             
             # Reshape from (T, B, ...) to (B, T, ...)
             logits_seq = np.transpose(logits_seq, (1, 0, 2))
             saccades_seq = np.transpose(saccades_seq, (1, 0, 2))
             pos_seq = np.transpose(pos_seq, (1, 0, 2))
             log_probs_seq = np.transpose(log_probs_seq, (1, 0))
+            values_seq = np.transpose(values_seq, (1, 0))
             
-            return logits_seq, saccades_seq, pos_seq, log_probs_seq
+            return logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq
             
     return rollout_fn
 
@@ -168,10 +170,40 @@ def get_oracle_saccade(pos, masks, tasks, patch_size, images_shape):
         
     return jax.vmap(single_oracle)(pos, masks)
 
+def calculate_gae(rewards, values, gamma=0.99, lam=0.95):
+    """
+    Calculate GAE advantages.
+    rewards: (B, T)
+    values: (B, T)
+    Returns: advantages, targets (B, T)
+    """
+    # Calculate targets/adv backwards
+    # next_value is 0 for the last step
+    
+    # We scan backwards over time.
+    # Inputs to scan need to be (T, B)
+    rewards_T = rewards.T
+    values_T = values.T
+    
+    # Append value=0 for T+1
+    next_values_T = np.concatenate([values_T[1:], np.zeros((1, values.shape[0]))], axis=0)
+    
+    deltas = rewards_T + gamma * next_values_T - values_T
+    
+    def scan_body(next_adv, delta):
+        adv = delta + gamma * lam * next_adv
+        return adv, adv
+        
+    _, advantages_T = jax.lax.scan(scan_body, np.zeros_like(rewards_T[0]), deltas, reverse=True)
+    
+    targets_T = advantages_T + values_T
+    
+    return advantages_T.T, targets_T.T
+
 def make_loss_fn(rollout, n_classes, hp, aux_weight=1.0):
     
     def loss_fn(params, state, images, tasks, labels, mode, scanpaths=None, key=None, masks=None):
-        logits_seq, saccades_seq, pos_seq, log_probs_seq = rollout(
+        logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq = rollout(
             params, state, images, tasks, mode, scanpaths, key
         )
         
@@ -184,34 +216,30 @@ def make_loss_fn(rollout, n_classes, hp, aux_weight=1.0):
         
         policy_loss = 0.0
         saccade_loss = 0.0
-        entropy_loss = 0.0
+        value_loss = 0.0
         coverage_mean = 0.0
         
         if mode == 'passive':
-            # Supervised Saccade Training (Imitation Learning)
-            # We want the network to predict the vector towards objects at each step.
-            # pos_seq: (B, T, 2) - These are the FORCED positions.
-            # saccades_seq: (B, T, 2) - The network's PREDICTED output at that forced position.
-            
-            # Calculate Oracle Target for each step
+            # Supervised Saccade Training
             B, T, _ = pos_seq.shape
-            
-            # Flatten for batch processing
             pos_flat = pos_seq.reshape(B*T, 2)
-            masks_rep = np.repeat(masks, T, axis=0) # (B*T, H, W)
-            # tasks_rep = np.repeat(tasks, T, axis=0)
+            masks_rep = np.repeat(masks, T, axis=0)
             
             target_deltas_flat = get_oracle_saccade(pos_flat, masks_rep, None, hp.patch_size, images.shape)
             target_deltas = target_deltas_flat.reshape(B, T, 2)
             
-            # MSE Loss
             saccade_loss = np.mean((saccades_seq - target_deltas)**2)
             
-            # Total Passive Loss
+            # Critic Training in Passive Mode?
+            # We don't have rewards in passive mode really, but we can train Value to predict 0 or dummy?
+            # Or just ignore Value head in passive.
+            # Let's ignore Value head in passive to avoid destabilizing it with garbage.
+            
             total_loss = class_loss + 1.0 * saccade_loss
             
-        else: # active
-            # ... (Existing Active Logic) ...
+            return total_loss, (class_loss, policy_loss, saccade_loss, acc, coverage_mean, value_loss)
+            
+        else: # ACTIVE
             cls_reward = (preds == labels).astype(np.float32)
             
             B, T, _ = pos_seq.shape
@@ -223,46 +251,42 @@ def make_loss_fn(rollout, n_classes, hp, aux_weight=1.0):
             cov_reward = np.mean(cov_seq, axis=1)
             coverage_mean = np.mean(cov_reward)
             
-            total_reward = cls_reward + 5.0 * cov_reward
-            baseline = np.mean(total_reward)
-            advantage = total_reward - baseline
+            # Total Reward per step?
+            # Our rewards are sparse/delayed mostly.
+            # Reward structure: 
+            # Step t: 5.0 * cov_reward[t]
+            # Final Step: cls_reward
             
-            traj_log_prob = np.sum(log_probs_seq, axis=1)
-            policy_loss = -np.mean(traj_log_prob * advantage)
+            rewards = 5.0 * cov_seq
+            # Add cls_reward to last step
+            rewards = rewards.at[:, -1].add(cls_reward)
             
-            # Entropy Regularization
-            # We don't have the full distribution, just the sample log_prob.
-            # For Gaussian policy with fixed std (0.1), entropy is constant constant + log(std).
-            # BUT, if we learned sigma, we'd maximize it.
-            # Since sigma is fixed/noise is added externally, "entropy" here effectively means
-            # maximizing the spread of actions if we were outputting logits.
-            # With deterministic Tanh output + Noise, the "Policy" is N(NetworkOut, FixedSigma).
-            # The entropy of this fixed-sigma Gaussian is constant.
+            # GAE
+            # We need to stop_gradient on values for GAE computation?
+            # Yes, targets should be fixed.
+            advantages, targets = calculate_gae(rewards, jax.lax.stop_gradient(values_seq))
             
-            # HOWEVER, usually in continuous control, we want to penalize "certainty" or saturate tanh.
-            # Or, we just rely on the noise.
-            # If we want "Entropy", we usually mean "Exploration Bonus".
-            # Since we inject fixed noise, we are enforcing exploration.
-            # Maybe we don't need explicit entropy term if sigma is fixed?
-            # Correct. Fixed sigma = fixed entropy.
+            # Normalize advantages
+            advantages = (advantages - np.mean(advantages)) / (np.std(advantages) + 1e-8)
             
-            # Let's stick to just the Coverage Reward for now, as "Entropy" is implicitly fixed by the noise injection.
-            # Unless we want to penalize the magnitude of the mean (regularization)? No.
+            # Actor Loss (Policy Gradient)
+            # log_probs: (B, T)
+            # advantages: (B, T)
+            # For simple A2C: -log_prob * adv
+            policy_loss = -np.mean(log_probs_seq * advantages)
             
-            total_loss = class_loss + 0.1 * policy_loss
+            # Critic Loss (Value)
+            value_loss = np.mean((values_seq - targets)**2)
             
-            # Auxiliary Supervised Loss (Teacher Forcing)
-            # Guide the agent towards the object even during active exploration
-            pos_flat = pos_seq.reshape(B*T, 2)
-            masks_rep = np.repeat(masks, T, axis=0)
+            # Auxiliary Supervised Loss
             target_deltas_flat = get_oracle_saccade(pos_flat, masks_rep, None, hp.patch_size, images.shape)
             target_deltas = target_deltas_flat.reshape(B, T, 2)
             aux_saccade_loss = np.mean((saccades_seq - target_deltas)**2)
             
-            total_loss += aux_weight * aux_saccade_loss
-            saccade_loss = aux_saccade_loss # For logging
+            total_loss = class_loss + 0.1 * policy_loss + 0.5 * value_loss + aux_weight * aux_saccade_loss
+            saccade_loss = aux_saccade_loss
             
-        return total_loss, (class_loss, policy_loss, saccade_loss, acc, coverage_mean)
+        return total_loss, (class_loss, policy_loss, saccade_loss, acc, coverage_mean, value_loss)
 
     return loss_fn
 
@@ -373,18 +397,18 @@ def train_visual_search():
         if i < SWITCH_STEP:
             # Passive
             b_paths = train_paths[idx]
-            params, opt_state, loss, (c_loss, p_loss, s_loss, acc, cov) = train_step_passive(
+            params, opt_state, loss, (c_loss, p_loss, s_loss, acc, cov, v_loss) = train_step_passive(
                 params, opt_state, curr_state, b_imgs, b_paths, b_tasks, b_lbls, b_masks
             )
             mode = "Passive"
             print_stats = f"Loss={loss:.4f} (Cls={c_loss:.4f}, Sacc={s_loss:.4f}) | Acc={acc:.4f}"
         else:
             # Active
-            params, opt_state, loss, (c_loss, p_loss, s_loss, acc, cov) = train_step_active(
+            params, opt_state, loss, (c_loss, p_loss, s_loss, acc, cov, v_loss) = train_step_active(
                 params, opt_state, curr_state, b_imgs, b_tasks, b_lbls, b_masks, k_batch
             )
             mode = "Active"
-            print_stats = f"Loss={loss:.4f} (Cls={c_loss:.4f}, Pol={p_loss:.4f}) | Acc={acc:.4f} | Cov={cov:.4f}"
+            print_stats = f"Loss={loss:.4f} (Cls={c_loss:.4f}, Pol={p_loss:.4f}, Val={v_loss:.4f}) | Acc={acc:.4f} | Cov={cov:.4f}"
             
         if i % 500 == 0:
              print(f"Step {i:04d} [{mode}]: {print_stats}")
