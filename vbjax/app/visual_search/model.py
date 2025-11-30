@@ -31,11 +31,29 @@ class VisualSearchParams(NamedTuple):
     head_value_w: jax.Array
     head_value_b: jax.Array
 
-def init_visual_search(hp: VisualSearchHyperparameters, key) -> Tuple[VisualSearchParams, NetworkState]:
+# Right Hemisphere Indices (0-37)
+IDX_R_FEF = 7
+IDX_R_PCIP = 14 # rPCIP (Intraparietal / Priority Map)
+IDX_R_PFC = 18  # rPFCDL (Dorsolateral PFC)
+IDX_R_V1 = 35   # rV1 (Primary Visual)
+
+def init_visual_search(
+    hp: VisualSearchHyperparameters, 
+    key,
+    connectome_weights: Optional[jax.Array] = None,
+    connectome_lengths: Optional[jax.Array] = None
+) -> Tuple[VisualSearchParams, NetworkState]:
     k_core, k_c1, k_c2, k_ro, k_pe, k_te, k_ha, k_hs, k_hv = jax.random.split(key, 9)
     
     # Init Core
-    core_params, core_state, _ = init_ct_mhsa(hp.mhsa, key=k_core, batch_size=1) # Batch size handled dynamically in vmap
+    # Pass the real connectome if provided
+    core_params, core_state, _ = init_ct_mhsa(
+        hp.mhsa, 
+        key=k_core, 
+        batch_size=1,
+        initial_c=connectome_weights,
+        lengths=connectome_lengths
+    ) # Batch size handled dynamically in vmap
     
     def init_dense(k, n_in, n_out):
         lim = np.sqrt(6 / (n_in + n_out))
@@ -146,45 +164,56 @@ def agent_step(
     pos_feat = pos @ params.pos_embed_w + params.pos_embed_b # (B, D)
     task_feat = params.task_embed[task_idx] # (B, D)
     
-    # Fuse: Sum
+    # Fuse: Sparse Injection
     # Core input x needs to be (B, N, D).
-    # Our features are (B, D). We broadcast to all regions?
-    # Or we only drive specific regions (V1)?
-    # "Input a one-hot... as well as the 16x16 square".
-    # Let's broadcast to all regions for simplicity first, effectively "global context".
-    combined_feat = vis_feat + pos_feat + task_feat
     
-    # Expand to (B, N, D)
+    # Initialize with zeros
+    B = patch.shape[0]
     N = params.core.C.shape[0]
-    core_input = np.tile(combined_feat[:, None, :], (1, N, 1))
+    core_input = np.zeros((B, N, hp.mhsa.d_model))
+    
+    # Inject Visual (V1) + Position (V1/Dorsal stream)
+    # V1 acts as the entry point
+    core_input = core_input.at[:, IDX_R_V1, :].set(vis_feat + pos_feat)
+    
+    # Inject Task Context (PFC)
+    # PFC holds the search goal
+    core_input = core_input.at[:, IDX_R_PFC, :].set(task_feat)
     
     # 2. Micro-steps
-    def loop_body(i, carry):
+    def loop_body(carry, _):
         curr_state, _ = carry
         # We feed the same static sensory input at each microstep?
         # Yes, typical for "settling" dynamics.
-        new_state, y, _ = mhsa_step(params.core, curr_state, core_input, hp.mhsa)
-        return (new_state, y)
+        new_state, y, surprise = mhsa_step(params.core, curr_state, core_input, hp.mhsa)
+        return (new_state, y), surprise
     
     # Initial y (dummy)
     y_init = np.zeros_like(core_input)
     
-    # We'll use lax.fori_loop
-    final_state, final_y = jax.lax.fori_loop(0, hp.mhsa.steps_per_token, loop_body, (state, y_init))
+    # We'll use lax.scan to capture surprise trace
+    (final_state, final_y), surprise_trace = jax.lax.scan(loop_body, (state, y_init), None, length=hp.mhsa.steps_per_token)
+    
+    # surprise_trace: (K, B, N, H) -> (B, K, N, H)
+    surprise_trace = np.transpose(surprise_trace, (1, 0, 2, 3))
     
     # 3. Heads
     # final_y: (B, N, D)
-    # Aggregate over N -> (B, D)
-    y_agg = np.mean(final_y, axis=1)
     
-    logits = y_agg @ params.head_answer_w + params.head_answer_b
-    saccade = y_agg @ params.head_saccade_w + params.head_saccade_b
+    # Saccade from FEF (Actor)
+    fef_activity = final_y[:, IDX_R_FEF, :]
+    saccade = fef_activity @ params.head_saccade_w + params.head_saccade_b
     # Tanh for saccade to keep in [-1, 1]? Or raw?
     # Paper/Plan usually implies continuous control. Let's use Tanh to bound it comfortably.
     saccade = np.tanh(saccade) 
     
-    value = y_agg @ params.head_value_w + params.head_value_b
+    # Classification / Value from PFC (Decision/Critic)
+    pfc_activity = final_y[:, IDX_R_PFC, :]
+    
+    logits = pfc_activity @ params.head_answer_w + params.head_answer_b
+    
+    value = pfc_activity @ params.head_value_w + params.head_value_b
     value = value.squeeze(-1) # (B,)
     
-    return final_state, (logits, saccade, value)
+    return final_state, (logits, saccade, value, surprise_trace)
 

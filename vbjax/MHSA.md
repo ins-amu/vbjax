@@ -114,20 +114,32 @@ sum_j C_{ij} y_{t, j}$ + External Input.
     - [ ] **EEG/MEG:** Define Lead Field projection $V(t) = L \cdot y(t)$ (or $L \cdot \text{aggregated activity}$).
     - [ ] **fMRI (BOLD):** Couple the neural output activity (e.g., $L1$ norm of $y_t$) to the Balloon-Windkessel hemodynamic model (existing in `vbjax`).
 
+#### Phase 6.5: Anatomical Functional Mapping
+**Goal:** Map abstract model components to specific brain regions using a realistic connectome (weights & lengths).
+
+- [x] **Load Real Connectome:**
+    - [x] Import specific Weights ($C$) and Tract Lengths ($L$) matrices (user to provide).
+    - [x] Initialize model with delays based on $L$.
+- [x] **Functional Region Assignment:**
+    - [x] Identify indices for V1 (Visual Input), FEF (Saccade Control), and PFC/Frontal (Task Context).
+    - [x] **V1:** Restrict visual feature injection to V1 indices (instead of global broadcast).
+    - [x] **FEF:** Restrict saccade motor readout to FEF indices.
+    - [x] **PFC:** Inject task context/rule vectors into Frontal regions.
+
 ---
 
 #### Phase 7: Active Visual Search Task (The "Gym")
 **Goal:** Implement a closed-loop environment where the model actively samples the world to solve a cognitive task.
 
-- [ ] **Define Environment (`ActiveVisionEnv`)**
-    - [ ] **State:** Current Image $I$, Current Eye Position $(x, y)$.
-    - [ ] **Observation:** Foveated patch $P_t$ extracted from $I$ at $(x, y)$.
-    - [ ] **Task:** "Feature Search" (e.g., "Find the color with the most objects" or "Count Red items").
-    - [ ] **Conditioning:** One-hot encoded task vector (e.g., Target Color).
-- [ ] **Augment Agent Architecture**
-    - [ ] **Retina Encoder:** A small CNN (e.g., 2-layer Conv) to project $P_t \rightarrow x_{vis} \in \mathbb{R}^{D}$.
-    - [ ] **Oculomotor Head:** Linear projection $y_t \rightarrow (\Delta x, \Delta y)$ to drive the fovea.
-    - [ ] **Decision Head:** Linear projection $y_t \rightarrow \text{Class/Count}$ (accumulated or final step).
+- [x] **Define Environment (`ActiveVisionEnv`)**
+    - [x] **State:** Current Image $I$, Current Eye Position $(x, y)$.
+    - [x] **Observation:** Foveated patch $P_t$ extracted from $I$ at $(x, y)$.
+    - [x] **Task:** "Feature Search" (e.g., "Find the color with the most objects" or "Count Red items").
+    - [x] **Conditioning:** One-hot encoded task vector (e.g., Target Color).
+- [x] **Augment Agent Architecture**
+    - [x] **Retina Encoder:** A small CNN (e.g., 2-layer Conv) to project $P_t \rightarrow x_{vis} \in \mathbb{R}^{D}$.
+    - [x] **Oculomotor Head:** Linear projection $y_t \rightarrow (\Delta x, \Delta y)$ to drive the fovea.
+    - [x] **Decision Head:** Linear projection $y_t \rightarrow \text{Class/Count}$ (accumulated or final step).
 
 ---
 

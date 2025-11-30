@@ -1,0 +1,104 @@
+{
+  "regions": [
+    {
+      "Abbreviation": "V1",
+      "Cortical Area": "Primary Visual Cortex",
+      "Role": "Input (Feature Extraction)",
+      "Function": "First processing stage of the state space ($S_t$). Extracts low-level features (oriented edges, spatial frequencies, local contrast) from the raw pixel environment. Acts as the initial convolutional layer in the vision encoder."
+    },
+    {
+      "Abbreviation": "V2",
+      "Cortical Area": "Secondary Visual Cortex",
+      "Role": "Input (Intermediate Processing)",
+      "Function": "Refines V1 features, processing texture and complex contours. It acts as a router, splitting data into the dorsal (spatial/motion) and ventral (identity/form) streams."
+    },
+    {
+      "Abbreviation": "VACD",
+      "Cortical Area": "Dorsal Anterior Visual Cortex (MT+)",
+      "Role": "Input (Dorsal Stream)",
+      "Function": "Processes motion and spatial location. It feeds into the parietal cortex to help the agent determine 'where' potential targets are located, regardless of their identity."
+    },
+    {
+      "Abbreviation": "VACV",
+      "Cortical Area": "Ventral Anterior Visual Cortex (V4)",
+      "Role": "Input (Ventral Stream)",
+      "Function": "Processes intermediate form and color. It filters the visual field for features that match the target's physical appearance (e.g., 'red', 'round')."
+    },
+    {
+      "Abbreviation": "TCI",
+      "Cortical Area": "Inferior Temporal Cortex (IT)",
+      "Role": "Input (Object Recognition)",
+      "Function": "The final stage of the 'What' pathway. It performs object classification, calculating a similarity score between the attended object and the target object in memory."
+    },
+    {
+      "Abbreviation": "PCIP",
+      "Cortical Area": "Intraparietal Sulcus Cortex (LIP/IPS)",
+      "Role": "State Integration (Priority Map)",
+      "Function": "Integrates bottom-up saliency (from VACD/VACV) and top-down relevance (from PFCDL) into a scalar 'priority map'. This map represents the value $V(s)$ of attending to specific coordinates."
+    },
+    {
+      "Abbreviation": "PFCDL",
+      "Cortical Area": "Dorsolateral Prefrontal Cortex",
+      "Role": "Control (Goal Maintenance)",
+      "Function": "Holds the 'search template' (the target embedding) and the current policy $\\pi$. It provides the top-down bias signal to PCIP to upweight target-relevant locations."
+    },
+    {
+      "Abbreviation": "FEF",
+      "Cortical Area": "Frontal Eye Field",
+      "Role": "Output (Action Selection)",
+      "Function": "The actor head. It applies a winner-take-all (ArgMax or Softmax) operation on the PCIP priority map to select the discrete coordinate $(x, y)$ for the next saccade."
+    }
+  ],
+  "data_flow": [
+    {
+      "from": "Environment",
+      "to": "V1",
+      "signal": "Raw Pixels (Observation)"
+    },
+    {
+      "from": "V1",
+      "to": "V2",
+      "signal": "Low-level Feature Map"
+    },
+    {
+      "from": "V2",
+      "to": "VACD",
+      "signal": "Motion/Space Features (Dorsal Stream)"
+    },
+    {
+      "from": "V2",
+      "to": "VACV",
+      "signal": "Form/Color Features (Ventral Stream)"
+    },
+    {
+      "from": "VACV",
+      "to": "TCI",
+      "signal": "Complex Shape Features"
+    },
+    {
+      "from": "PFCDL",
+      "to": "PCIP",
+      "signal": "Top-Down Bias (Target Embedding)"
+    },
+    {
+      "from": "VACD",
+      "to": "PCIP",
+      "signal": "Bottom-Up Saliency (Location)"
+    },
+    {
+      "from": "TCI",
+      "to": "PCIP",
+      "signal": "Object Relevance Score"
+    },
+    {
+      "from": "PCIP",
+      "to": "FEF",
+      "signal": "Integrated Priority Map (State Value)"
+    },
+    {
+      "from": "FEF",
+      "to": "Environment",
+      "signal": "Saccade Action (x, y coordinates)"
+    }
+  ]
+}

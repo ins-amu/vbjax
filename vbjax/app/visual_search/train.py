@@ -2,6 +2,8 @@ import jax
 import jax.numpy as np
 import optax
 import argparse
+import pickle
+import os
 from typing import NamedTuple
 from vbjax.app.visual_search.data import generate_dataset, make_scanpaths
 from vbjax.app.visual_search.model import (
@@ -81,10 +83,10 @@ def make_rollout(hp: VisualSearchHyperparameters):
             def passive_body(carry, pos_t):
                 state, _, _ = carry # Ignore internal pos logic
                 patches = extract_patches(images, pos_t, hp.patch_size)
-                new_state, (logits, saccade, value) = agent_step(params, state, patches, pos_t, tasks, hp)
-                return (new_state, pos_t, None), (logits, saccade, pos_t, value)
+                new_state, (logits, saccade, value, surprise) = agent_step(params, state, patches, pos_t, tasks, hp)
+                return (new_state, pos_t, None), (logits, saccade, pos_t, value, surprise)
             
-            final_carry, (logits_seq, saccades_seq, pos_seq, values_seq) = jax.lax.scan(passive_body, carry_init, scanpaths_T)
+            final_carry, (logits_seq, saccades_seq, pos_seq, values_seq, surprise_seq) = jax.lax.scan(passive_body, carry_init, scanpaths_T)
             
             # Reshape (T, B, ...) -> (B, T, ...)
             logits_seq = np.transpose(logits_seq, (1, 0, 2))
@@ -92,7 +94,12 @@ def make_rollout(hp: VisualSearchHyperparameters):
             pos_seq = np.transpose(pos_seq, (1, 0, 2))
             values_seq = np.transpose(values_seq, (1, 0)) # (B, T)
             
-            return logits_seq, saccades_seq, pos_seq, None, values_seq
+            # surprise_seq: (T, B, K, N, H) -> (B, T, K, N, H) -> (B, T*K, N, H)
+            surprise_seq = np.transpose(surprise_seq, (1, 0, 2, 3, 4))
+            B, T, K, N, H = surprise_seq.shape
+            surprise_seq = surprise_seq.reshape(B, T*K, N, H)
+            
+            return logits_seq, saccades_seq, pos_seq, None, values_seq, surprise_seq
             
         else: # ACTIVE
             # Input is dummy range
@@ -102,7 +109,7 @@ def make_rollout(hp: VisualSearchHyperparameters):
                 state, pos, k = carry
                 
                 patches = extract_patches(images, pos, hp.patch_size)
-                new_state, (logits, saccade_delta, value) = agent_step(params, state, patches, pos, tasks, hp)
+                new_state, (logits, saccade_delta, value, surprise) = agent_step(params, state, patches, pos, tasks, hp)
                 
                 # Action: Saccade Delta + Noise
                 # saccade_delta is in [-1, 1] via tanh
@@ -117,9 +124,9 @@ def make_rollout(hp: VisualSearchHyperparameters):
                 # Compute Log Prob of the action (Gaussian)
                 log_prob = -0.5 * np.sum((noise / 0.1)**2, axis=-1) # Sum over x,y
                 
-                return (new_state, new_pos, k), (logits, saccade_delta, new_pos, log_prob, value)
+                return (new_state, new_pos, k), (logits, saccade_delta, new_pos, log_prob, value, surprise)
             
-            final_carry, (logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq) = jax.lax.scan(active_body, carry_init, xs)
+            final_carry, (logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq, surprise_seq) = jax.lax.scan(active_body, carry_init, xs)
             
             # Reshape from (T, B, ...) to (B, T, ...)
             logits_seq = np.transpose(logits_seq, (1, 0, 2))
@@ -128,7 +135,12 @@ def make_rollout(hp: VisualSearchHyperparameters):
             log_probs_seq = np.transpose(log_probs_seq, (1, 0))
             values_seq = np.transpose(values_seq, (1, 0))
             
-            return logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq
+            # surprise_seq: (T, B, K, N, H) -> (B, T, K, N, H) -> (B, T*K, N, H)
+            surprise_seq = np.transpose(surprise_seq, (1, 0, 2, 3, 4))
+            B, T, K, N, H = surprise_seq.shape
+            surprise_seq = surprise_seq.reshape(B, T*K, N, H)
+            
+            return logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq, surprise_seq
             
     return rollout_fn
 
@@ -203,7 +215,7 @@ def calculate_gae(rewards, values, gamma=0.99, lam=0.95):
 def make_loss_fn(rollout, n_classes, hp, aux_weight=1.0):
     
     def loss_fn(params, state, images, tasks, labels, mode, scanpaths=None, key=None, masks=None):
-        logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq = rollout(
+        logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq, surprise_seq = rollout(
             params, state, images, tasks, mode, scanpaths, key
         )
         
@@ -294,7 +306,7 @@ def train_visual_search():
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--steps_per_token", type=int, default=5)
-    parser.add_argument("--n_regions", type=int, default=16)
+    parser.add_argument("--n_regions", type=int, default=38) # Updated default for R-Hemisphere
     parser.add_argument("--d_model", type=int, default=32)
     parser.add_argument("--aux_weight", type=float, default=0.5)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -309,8 +321,31 @@ def train_visual_search():
     SWITCH_STEP = args.switch_step
     LR = args.lr
     
+    # Load Connectome
+    base_dir = os.path.dirname(__file__)
+    weights_path = os.path.join(base_dir, 'weights.txt')
+    lengths_path = os.path.join(base_dir, 'tract_lengths.txt')
+    
+    print(f"Loading connectome from {weights_path}...")
+    full_weights = onp.loadtxt(weights_path)
+    full_lengths = onp.loadtxt(lengths_path)
+    
+    # Slice Right Hemisphere (38x38)
+    n_r = 38
+    weights = full_weights[:n_r, :n_r]
+    lengths = full_lengths[:n_r, :n_r]
+    
+    # Normalize Weights
+    # Divide by spectral radius or max to ensure stability?
+    # Simple max normalization often sufficient for linear recurrent
+    weights = weights / (np.max(weights) + 1e-8)
+    
+    # JAX Arrays
+    weights = jax.device_put(weights)
+    lengths = jax.device_put(lengths)
+    
     mhsa_hp = Hyperparameters(
-        n_regions=args.n_regions, 
+        n_regions=n_r, 
         n_heads=8,   
         d_k=args.d_model, d_v=args.d_model, d_model=args.d_model, 
         steps_per_token=args.steps_per_token
@@ -344,12 +379,13 @@ def train_visual_search():
     
     # Init
     key = jax.random.PRNGKey(42)
-    params, state_proto = init_visual_search(hp, key)
+    params, state_proto = init_visual_search(hp, key, connectome_weights=weights, connectome_lengths=lengths)
     
     # Make state batch compatible
     M_batch = np.repeat(state_proto.M, BATCH_SIZE, axis=0)
     history_batch = None
     if state_proto.history is not None:
+        # history: (L, B, N, D) - proto has B=1
         history_batch = np.repeat(state_proto.history, BATCH_SIZE, axis=1)
     state = NetworkState(M=M_batch, history=history_batch, step=0)
     
@@ -412,6 +448,12 @@ def train_visual_search():
             
         if i % 500 == 0:
              print(f"Step {i:04d} [{mode}]: {print_stats}")
+             
+    # Save Params
+    print("Saving parameters...")
+    with open("visual_search_params.pkl", "wb") as f:
+        pickle.dump(params, f)
+    print("Saved to visual_search_params.pkl")
 
 if __name__ == "__main__":
     train_visual_search()
