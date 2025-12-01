@@ -30,6 +30,8 @@ class VisualSearchParams(NamedTuple):
     head_saccade_b: jax.Array
     head_value_w: jax.Array
     head_value_b: jax.Array
+    head_priority_w: jax.Array # New: for PCIP supervision
+    head_priority_b: jax.Array
 
 # Right Hemisphere Indices (0-37)
 IDX_R_FEF = 7
@@ -43,7 +45,7 @@ def init_visual_search(
     connectome_weights: Optional[jax.Array] = None,
     connectome_lengths: Optional[jax.Array] = None
 ) -> Tuple[VisualSearchParams, NetworkState]:
-    k_core, k_c1, k_c2, k_ro, k_pe, k_te, k_ha, k_hs, k_hv = jax.random.split(key, 9)
+    k_core, k_c1, k_c2, k_ro, k_pe, k_te, k_ha, k_hs, k_hv, k_hp = jax.random.split(key, 10)
     
     # Init Core
     # Pass the real connectome if provided
@@ -102,6 +104,7 @@ def init_visual_search(
     ha_w, ha_b = init_dense(k_ha, hp.mhsa.d_model, hp.n_classes)
     hs_w, hs_b = init_dense(k_hs, hp.mhsa.d_model, 2) # dx, dy
     hv_w, hv_b = init_dense(k_hv, hp.mhsa.d_model, 1) # Value (Scalar)
+    hp_w, hp_b = init_dense(k_hp, hp.mhsa.d_model, 1) # Priority (Scalar)
     
     params = VisualSearchParams(
         core=core_params,
@@ -112,7 +115,8 @@ def init_visual_search(
         task_embed=task_embed,
         head_answer_w=ha_w, head_answer_b=ha_b,
         head_saccade_w=hs_w, head_saccade_b=hs_b,
-        head_value_w=hv_w, head_value_b=hv_b
+        head_value_w=hv_w, head_value_b=hv_b,
+        head_priority_w=hp_w, head_priority_b=hp_b
     )
     
     return params, core_state
@@ -215,5 +219,10 @@ def agent_step(
     value = pfc_activity @ params.head_value_w + params.head_value_b
     value = value.squeeze(-1) # (B,)
     
-    return final_state, (logits, saccade, value, surprise_trace)
+    # Priority from PCIP (Priority Map Supervision)
+    pcip_activity = final_y[:, IDX_R_PCIP, :]
+    priority = pcip_activity @ params.head_priority_w + params.head_priority_b
+    priority = priority.squeeze(-1) # (B,)
+    
+    return final_state, (logits, saccade, value, surprise_trace, priority)
 

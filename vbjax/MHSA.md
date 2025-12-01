@@ -141,9 +141,36 @@ sum_j C_{ij} y_{t, j}$ + External Input.
     - [x] **Oculomotor Head:** Linear projection $y_t \rightarrow (\Delta x, \Delta y)$ to drive the fovea.
     - [x] **Decision Head:** Linear projection $y_t \rightarrow \text{Class/Count}$ (accumulated or final step).
 
+#### Phase 7.5: Optimization & Anatomical Supervision
+**Goal:** Stabilize Active RL using "White Box" supervision of functional regions and reward shaping.
+
+- [x] **Anatomical Supervision:**
+    - [x] **PCIP (Priority Map):** Regress `rPCIP` activity to target proximity ($1 - distance$).
+    - [x] **PFCDL (Goal Maintenance):** Apply classification loss at *every* time step (not just final) to enforce stable working memory.
+- [x] **Reward Shaping:**
+    - [x] Implement "Potential-based" reward: $R_{shape} = \text{Dist}_{t-1} - \text{Dist}_t$ (reward approaching the target).
+    - [x] Add Entropy regularization to prevent policy collapse. (Partially implemented via aux losses).
+- [x] **Hyperparameter Tuning:**
+    - [x] Run sweeps for Learning Rate and Auxiliary Weights to maximize "Active" phase stability. (Best: LR=1e-4, Aux=1.0 annealed, Term=5.0, Shape=2.0).
+
 ---
 
-#### Phase 8: Neuro-Behavioral Link (Surprise as Signal)
+#### Phase 8: Pathology Analysis & Mitigation
+**Goal:** Resolve the "Immediate Decision / Prior Bias" pathology identified in Phase 7.5 analysis, where the agent commits to a decision at Step 0 (based on priors) and fails to update its internal belief despite active sampling.
+
+- [ ] **Pathology Analysis:**
+    - [x] **Diagnosis:** Log analysis shows `stable_step` is consistently 0.0, and confidence remains static (~0.47) throughout the trial regardless of fixations.
+    - [ ] **Hypothesis:** Dense classification loss at $t=0$ forces the model to output the "average" label immediately to minimize loss, learning a strong prior instead of evidence accumulation logic.
+- [ ] **Mitigation Implementation:**
+    - [ ] **Masked Classification Loss:** Apply classification loss *only* at steps $t > T_{warmup}$ (e.g., 5) or only at the final step, to force the model to wait for evidence.
+    - [ ] **Evidence Accumulation Reward:** Introduce an intrinsic reward for "Information Gain" (KL Divergence between belief at $t$ and $t-1$) *if* it moves closer to the ground truth.
+    - [ ] **Architecture Check:** Verify if the recurrence gating (Delta Rule) is too stiff or initialized poorly, preventing rapid updates.
+- [ ] **Validation:**
+    - [ ] Re-run `analyze_trials.py`. Success criteria: `stable_step > 0` (decisions change after fixations) and `Accuracy > 60%` on new seeds.
+
+---
+
+#### Phase 9: Neuro-Behavioral Link (Surprise as Signal)
 **Goal:** Link the computational "internal state update" to biological "neural activity" observables.
 
 - [ ] **Define Neural Signal Proxy**
@@ -154,7 +181,7 @@ sum_j C_{ij} y_{t, j}$ + External Input.
     - [ ] Feed $NeuralAct_t$ into the `vbjax` Balloon-Windkessel model to generate synthetic fMRI.
     - [ ] Feed $NeuralAct_t$ into the Lead Field projection for synthetic ERP/EEG.
 
-#### Phase 8.5: Critical Dynamics & Avalanche Analysis
+#### Phase 9.5: Critical Dynamics & Avalanche Analysis
 **Goal:** Investigate if the "neural" surprise signals exhibit signatures of self-organized criticality (SOC), a hallmark of biological brain dynamics.
 
 - [ ] **Avalanche Detection:**
@@ -165,7 +192,7 @@ sum_j C_{ij} y_{t, j}$ + External Input.
     - [ ] Fit power-laws $P(S) \sim S^{-\alpha}$ and $P(D) \sim D^{-\beta}$.
     - [ ] Check for the scaling relation $\langle S \rangle \sim D^{\gamma}$.
 
-#### Phase 9: Simulation & Empirical Fitting
+#### Phase 10: Simulation & Empirical Fitting
 
 **Goal:** Validate the model by comparing synthetic behavioral and physiological data against empirical baselines.
 
