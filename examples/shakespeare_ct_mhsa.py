@@ -4,8 +4,20 @@ import jax.numpy as np
 import optax
 import numpy as onp
 import os
+import pickle
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from vbjax.ct_mhsa import init_ct_mhsa, Hyperparameters, scan_ct_mhsa, NetworkState, CTMHSAParams
+
+def save_checkpoint(params, filename="checkpoint.pkl"):
+    with open(filename, "wb") as f:
+        pickle.dump(params, f)
+    print(f"Checkpoint saved to {filename}")
+
+def load_checkpoint(filename="checkpoint.pkl"):
+    with open(filename, "rb") as f:
+        return pickle.load(f)
 
 # 1. Data Pipeline
 def load_data(path):
@@ -167,7 +179,17 @@ def train_shakespeare():
     key = jax.random.PRNGKey(42)
     k_init, k_train = jax.random.split(key)
     
-    params, lags = init_shakespeare(k_init, hp, vocab_size, lengths, c_mask)
+    checkpoint_path = "checkpoint.pkl"
+    if os.path.exists(checkpoint_path):
+        print(f"Found checkpoint at {checkpoint_path}. Loading...")
+        params = load_checkpoint(checkpoint_path)
+        # We still need 'lags' which comes from init
+        _, lags = init_shakespeare(k_init, hp, vocab_size, lengths, c_mask)
+        do_train = False
+    else:
+        print("No checkpoint found. Initializing fresh parameters...")
+        params, lags = init_shakespeare(k_init, hp, vocab_size, lengths, c_mask)
+        do_train = True
     
     optimizer = optax.adamw(learning_rate=schedule)
     opt_state = optimizer.init(params)
@@ -192,19 +214,24 @@ def train_shakespeare():
     
     state_train = get_fresh_state(batch_size)
     
-    for i in range(total_steps + 1):
-        seq_len = 8 if i < 200 else 64
+    if do_train:
+        for i in range(total_steps + 1):
+            seq_len = 8 if i < 200 else 64
+            
+            key, k_batch = jax.random.split(key)
+            x_batch, y_batch = get_batch(data, batch_size, seq_len, k_batch)
+            
+            params, opt_state, loss = train_step(params, opt_state, x_batch, y_batch, state_train)
+            
+            if i % 100 == 0:
+                print(f"Iter {i}, SeqLen {seq_len}, Loss: {loss:.4f}")
         
-        key, k_batch = jax.random.split(key)
-        x_batch, y_batch = get_batch(data, batch_size, seq_len, k_batch)
-        
-        params, opt_state, loss = train_step(params, opt_state, x_batch, y_batch, state_train)
-        
-        if i % 100 == 0:
-            print(f"Iter {i}, SeqLen {seq_len}, Loss: {loss:.4f}")
+        save_checkpoint(params, checkpoint_path)
+    else:
+        print("Skipping training loop.")
 
     # Generation
-    print("Generating text with Top-K Sampling...")
+    print("Generating text with Top-K Sampling (Chunked JIT)...")
     start_char = onp.array([[data[0]]]) # (1, 1)
     chars = [idx_to_char[data[0]]]
     
@@ -214,53 +241,156 @@ def train_shakespeare():
     
     gen_params = params
     
-    # Top-K Config
-    top_k = 15
-    
+    # Define JIT-compiled chunk generator
+    @jax.jit
+    def generate_chunk(state, start_token, key):
+        def loop_fn(carry, _):
+            curr_state, curr_tok, curr_key = carry
+            
+            # Forward pass (lags is captured from closure)
+            logits, next_state, surprise = shakespeare_forward(gen_params, curr_state, curr_tok, hp, lags)
+            
+            # Sampling
+            next_token_logits = logits[0, 0]
+            curr_key, k_gen = jax.random.split(curr_key)
+            
+            # Top-K Masking
+            top_k = 15
+            top_k_vals, _ = jax.lax.top_k(next_token_logits, top_k)
+            min_val = top_k_vals[-1]
+            mask = next_token_logits >= min_val
+            logits_masked = np.where(mask, next_token_logits, -np.inf)
+            
+            next_char_idx = jax.random.categorical(k_gen, logits_masked)
+            next_tok = next_char_idx.reshape(1, 1)
+            
+            return (next_state, next_tok, curr_key), (next_char_idx, surprise)
+
+        chunk_size = 32
+        final_carry, (tokens, surprises) = jax.lax.scan(loop_fn, (state, start_token, key), None, length=chunk_size)
+        return final_carry, tokens, surprises
+
     all_surprises = []
+    num_chunks = 2000 // 32 + 1
     
-    for _ in range(200):
-        logits, gen_state, surprise = shakespeare_forward(gen_params, gen_state, curr_x, hp, lags)
-        # surprise: (1, K, 1, N, H)
-        all_surprises.append(surprise[0, :, 0, :, :])
-        
-        # logits: (1, 1, Vocab)
-        next_token_logits = logits[0, 0]
-        
-        key, k_gen = jax.random.split(key)
-        
-        # Top-K Masking
-        top_k_vals, _ = jax.lax.top_k(next_token_logits, top_k)
-        min_val = top_k_vals[-1]
-        mask = next_token_logits >= min_val
-        logits_masked = np.where(mask, next_token_logits, -np.inf)
-        
-        # Sample
-        next_char_idx = jax.random.categorical(k_gen, logits_masked)
-        
-        chars.append(idx_to_char[int(next_char_idx)])
-        curr_x = np.array([[next_char_idx]])
-        
-    print("Generated:", "".join(chars))
+    print(f"Generating ~{num_chunks * 32} tokens in {num_chunks} chunks...")
     
-    # Plotting Surprise
+    key_gen = jax.random.PRNGKey(999) # separate key for generation
+    
+    for i in range(num_chunks):
+        (gen_state, curr_x, key_gen), tokens, chunk_surprises = generate_chunk(gen_state, curr_x, key_gen)
+        
+        # Collect tokens
+        for t in tokens:
+            chars.append(idx_to_char[int(t)])
+            
+        # Collect surprises
+        # chunk_surprises: (Chunk, 1, K, 1, N, H)
+        # We want (Chunk, K, N, H)
+        chunk_s = chunk_surprises[:, 0, :, 0, :, :]
+        all_surprises.append(chunk_s)
+        
+        if i % 10 == 0:
+            print(f"Chunk {i}/{num_chunks} done.")
+        
+    print("Generated:", "".join(chars[:200]) + "...")
+    
+    # Criticality Analysis
     try:
-        # Stack: (200, K, N, H)
-        surprises_arr = np.stack(all_surprises) 
-        # Flatten time: (T_gen * K, N, H)
+        # Stack: (NumChunks, ChunkSize, K, N, H)
+        surprises_arr = np.concatenate(all_surprises, axis=0) # (TotalTokens, K, N, H)
+        # Flatten time
         surprises_flat = surprises_arr.reshape(-1, hp.n_regions, hp.n_heads)
-        # Compute mean surprise across heads and regions
-        neural_act = np.mean(surprises_flat, axis=(1, 2)) 
+        # Compute mean surprise (Global Activity G)
+        G = np.mean(surprises_flat, axis=(1, 2))
         
-        plt.figure(figsize=(10, 6))
-        plt.plot(neural_act)
-        plt.title("Neural Surprise (Mean over Regions/Heads)")
-        plt.xlabel("Micro-Steps")
-        plt.ylabel("Surprise (Norm of Delta M)")
-        plt.savefig("surprise_plot.png")
-        print("Surprise plot saved to surprise_plot.png")
+        # Convert to numpy for analysis/plotting
+        G = onp.array(G)
+        
+        # Threshold (95th percentile)
+        threshold = onp.percentile(G, 95)
+        print(f"Surprise Threshold (95th percentile): {threshold:.4f}")
+        
+        # Binarize
+        active = G > threshold
+        
+        # Find avalanches (contiguous segments)
+        active_pad = onp.concatenate(([False], active, [False]))
+        diff = onp.diff(active_pad.astype(int))
+        starts = onp.where(diff == 1)[0]
+        ends = onp.where(diff == -1)[0]
+        
+        durations = ends - starts
+        sizes = []
+        for s, e in zip(starts, ends):
+            # Size = Area above threshold
+            auc = onp.sum(G[s:e] - threshold)
+            sizes.append(auc)
+        sizes = onp.array(sizes)
+        
+        print(f"Found {len(sizes)} avalanches.")
+        
+        # Plot Distributions
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        
+        # Time Series
+        axes[0].plot(G[:1000]) # Show first 1000 micro-steps
+        axes[0].axhline(threshold, color='r', linestyle='--')
+        axes[0].set_title("Global Surprise G(t) (First 1000 steps)")
+        axes[0].set_xlabel("Micro-Steps")
+        axes[0].set_ylabel("Surprise")
+        
+        # Size Distribution (Log-Log)
+        if len(sizes) > 0:
+            # Use log bins
+            bins = onp.logspace(onp.log10(max(1e-6, min(sizes))), onp.log10(max(sizes)), 20)
+            hist, edges = onp.histogram(sizes, bins=bins, density=True)
+            centers = (edges[:-1] + edges[1:]) / 2
+            # Filter zeros
+            mask = hist > 0
+            axes[1].loglog(centers[mask], hist[mask], 'o-', label='Data')
+            
+            # Fit Power Law: log(P) = -alpha * log(S) + c
+            if onp.sum(mask) > 2:
+                log_x = onp.log10(centers[mask])
+                log_y = onp.log10(hist[mask])
+                slope, intercept = onp.polyfit(log_x, log_y, 1)
+                alpha = -slope
+                axes[1].plot(centers[mask], 10**intercept * centers[mask]**slope, 'r--', label=f'Fit $\\alpha={alpha:.2f}$')
+            
+            axes[1].set_title("Avalanche Size P(S)")
+            axes[1].set_xlabel("Size (Area > Threshold)")
+            axes[1].set_ylabel("Probability Density")
+            axes[1].legend()
+            
+            # Duration Distribution (Log-Log)
+            bins_d = onp.logspace(onp.log10(min(durations)), onp.log10(max(durations)), 20)
+            hist_d, edges_d = onp.histogram(durations, bins=bins_d, density=True)
+            centers_d = (edges_d[:-1] + edges_d[1:]) / 2
+            mask_d = hist_d > 0
+            axes[2].loglog(centers_d[mask_d], hist_d[mask_d], 'o-', label='Data')
+            
+            # Fit Power Law: log(P) = -beta * log(D) + c
+            if onp.sum(mask_d) > 2:
+                log_xd = onp.log10(centers_d[mask_d])
+                log_yd = onp.log10(hist_d[mask_d])
+                slope_d, intercept_d = onp.polyfit(log_xd, log_yd, 1)
+                beta = -slope_d
+                axes[2].plot(centers_d[mask_d], 10**intercept_d * centers_d[mask_d]**slope_d, 'r--', label=f'Fit $\\beta={beta:.2f}$')
+
+            axes[2].set_title("Avalanche Duration P(D)")
+            axes[2].set_xlabel("Duration (Micro-Steps)")
+            axes[2].set_ylabel("Probability Density")
+            axes[2].legend()
+            
+        plt.tight_layout()
+        plt.savefig("avalanche_analysis.png")
+        print("Avalanche analysis plot saved to avalanche_analysis.png")
+        
     except Exception as e:
-        print(f"Plotting failed: {e}")
+        print(f"Analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     train_shakespeare()

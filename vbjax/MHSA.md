@@ -134,10 +134,10 @@ sum_j C_{ij} y_{t, j}$ + External Input.
 #### Phase 8: Neuro-Behavioral Link (Surprise as Signal)
 **Goal:** Link the computational "internal state update" to biological "neural activity" observables.
 
-- [ ] **Define Neural Signal Proxy**
-    - [ ] [cite_start]Hypothesis: Neural metabolic cost is proportional to the "Bayesian Surprise" or Information Gain[cite: 611].
-    - [ ] **Metric:** $NeuralAct_t = || M_t - M_{t-1} ||_F$ (Frobenius norm of the Memory update).
-    - [ ] *Interpretation:* High update = high surprise = strong BOLD/EEG response.
+- [x] **Define Neural Signal Proxy**
+    - [x] [cite_start]Hypothesis: Neural metabolic cost is proportional to the "Bayesian Surprise" or Information Gain[cite: 611].
+    - [x] **Metric:** $NeuralAct_t = || M_t - M_{t-1} ||_F$ (Frobenius norm of the Memory update).
+    - [x] *Interpretation:* High update = high surprise = strong BOLD/EEG response.
 - [ ] **Connect to Monitors**
     - [ ] Feed $NeuralAct_t$ into the `vbjax` Balloon-Windkessel model to generate synthetic fMRI.
     - [ ] Feed $NeuralAct_t$ into the Lead Field projection for synthetic ERP/EEG.
@@ -145,13 +145,13 @@ sum_j C_{ij} y_{t, j}$ + External Input.
 #### Phase 8.5: Critical Dynamics & Avalanche Analysis
 **Goal:** Investigate if the "neural" surprise signals exhibit signatures of self-organized criticality (SOC), a hallmark of biological brain dynamics.
 
-- [ ] **Avalanche Detection:**
-    - [ ] Define an "event" threshold for the surprise signal $S(t)$.
-    - [ ] Detect avalanches (contiguous time segments where $S(t) > \text{threshold}$).
-- [ ] **Statistical Analysis:**
-    - [ ] Compute distributions of Avalanche Size ($S$) and Duration ($D$).
-    - [ ] Fit power-laws $P(S) \sim S^{-\alpha}$ and $P(D) \sim D^{-\beta}$.
-    - [ ] Check for the scaling relation $\langle S \rangle \sim D^{\gamma}$.
+- [x] **Avalanche Detection:**
+    - [x] Define an "event" threshold for the surprise signal $S(t)$.
+    - [x] Detect avalanches (contiguous time segments where $S(t) > \text{threshold}$).
+- [x] **Statistical Analysis:**
+    - [x] Compute distributions of Avalanche Size ($S$) and Duration ($D$).
+    - [x] Fit power-laws $P(S) \sim S^{-\alpha}$ and $P(D) \sim D^{-\beta}$.
+    - [x] Check for the scaling relation $\langle S \rangle \sim D^{\gamma}$.
 
 #### Phase 9: Simulation & Empirical Fitting
 
