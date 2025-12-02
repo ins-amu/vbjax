@@ -370,6 +370,7 @@ def train_visual_search():
     parser.add_argument("--terminal_reward", type=float, default=10.0)
     parser.add_argument("--shaping_reward", type=float, default=5.0)
     parser.add_argument("--cls_mask_steps", type=int, default=0)
+    parser.add_argument("--checkpoint", type=str, default=None)
     args = parser.parse_args()
     
     # Config
@@ -435,6 +436,17 @@ def train_visual_search():
     key = jax.random.PRNGKey(42)
     params, state_proto = init_visual_search(hp, key, connectome_weights=weights, connectome_lengths=lengths)
     
+    if args.checkpoint is not None:
+        if os.path.exists(args.checkpoint):
+            print(f"Loading checkpoint from {args.checkpoint}...")
+            with open(args.checkpoint, "rb") as f:
+                loaded_params = pickle.load(f)
+            # We assume structure matches. JAX doesn't check strict structure on replace usually, but let's be safe.
+            # Ideally we traverse tree. For now, direct assignment.
+            params = loaded_params
+        else:
+            print(f"Checkpoint {args.checkpoint} not found. Starting from scratch.")
+
     # Make state batch compatible
     M_batch = np.repeat(state_proto.M, BATCH_SIZE, axis=0)
     history_batch = None
@@ -497,12 +509,9 @@ def train_visual_search():
             )
             mode = "Passive"
             print_stats = f"Loss={loss:.4f} (Cls={c_loss:.4f}, Sacc={s_loss:.4f}, Pri={pri_loss:.4f}) | Acc={acc:.4f}"
-        else:
-            # Active
-            # Anneal Aux Weight
-            steps_since_switch = i - SWITCH_STEP
-            progress = min(max(steps_since_switch / ANNEAL_STEPS, 0.0), 1.0)
-            current_aux_weight = 1.0 * (1.0 - progress)
+        else: # Active
+            # Maintain Aux Weight (no annealing)
+            current_aux_weight = args.aux_weight
             
             params, opt_state, loss, (c_loss, p_loss, s_loss, acc, cov, v_loss, pri_loss) = train_step_active(
                 params, opt_state, curr_state, b_imgs, b_tasks, b_lbls, b_masks, k_batch, current_aux_weight

@@ -17,3 +17,7 @@ build/
 _build/
 dist/
 *.egg-info/
+*.log
+*.pkl
+*.png
+*.txt

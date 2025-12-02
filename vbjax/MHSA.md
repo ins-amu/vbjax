@@ -233,6 +233,31 @@ sum_j C_{ij} y_{t, j}$ + External Input.
 - [ ] **Probe 4: Visual-Prior Conflict**
     - [ ] **Concept:** Present a "Perfect Stimulus" (e.g., massive target object) that contradicts the prior.
     - [ ] **Expectation:** Logits should shift significantly compared to a blank image.
-- [ ] **Probe 5: Surprise Dynamics**
-    - [ ] **Concept:** Feed alternating vs. static patches.
-    - [ ] **Expectation:** Alternating patches should maintain high "Surprise" (update norm), static patches should decay to 0.
+- [x] **Probe 5: Surprise Dynamics**
+    - [x] **Concept:** Feed alternating vs. static patches.
+    - [x] **Expectation:** Alternating patches should maintain high "Surprise" (update norm), static patches should decay to 0.
+
+#### Phase 11.5: Correction & Warm-Start (Implemented)
+**Goal:** Address the "Lobotomized Agent" and "Blind Policy" issues identified in Phase 11.
+
+- [x] **Connectivity Fix:**
+    - [x] **Diagnosis:** Probe 4 showed zero gradient flow from V1 to PFC/FEF.
+    - [x] **Fix:** Manually injected bidirectional connections (weight 0.5) between V1-PFC, V1-FEF, and PFC-FEF in `init_visual_search`.
+    - [x] **Result:** Gradient flow restored (Probe 4 Norm > 4.0).
+- [x] **Coupling Logic Fix:**
+    - [x] **Diagnosis:** `agent_step` (fixation settling) was missing `network_coupling`, preventing signal propagation during the decision phase.
+    - [x] **Fix:** Added `network_coupling` to the micro-step loop.
+- [x] **Saccade Pre-training (Warm-Start):**
+    - [x] **Diagnosis:** Passive training with random scanpaths resulted in a random/biased FEF policy (Probe B CosSim ~ 0).
+    - [x] **Fix:** Implemented `train_saccade.py` to "clone" an Oracle policy (minimizing MSE between FEF output and vector-to-object).
+    - [x] **Result:** FEF policy perfectly aligns with targets (Probe B CosSim > 0.99).
+
+---
+
+#### Phase 12: Active Curriculum Training (Current Focus)
+**Goal:** Train the fully capable agent (Vision + Motor initialized) using RL/Active inference to solve the task in dynamic conditions.
+
+- [ ] **Active Training Run:**
+    - [ ] Load pre-trained "Saccade Cloned" weights.
+    - [ ] Start immediately in **Active Mode** (`switch_step=0`).
+    - [ ] Train for 15k steps to refine decision-making and handle multiple objects.
