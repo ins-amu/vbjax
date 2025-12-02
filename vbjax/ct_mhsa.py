@@ -22,6 +22,7 @@ class NetworkState(NamedTuple):
     M: jax.Array  # (B, N, H, Dv, Dk)
     history: Optional[jax.Array] = None  # (L, B, N, D)
     step: int = 0
+    lags: Optional[jax.Array] = None # (N, N) delays in steps
 
 
 class CTMHSAParams(NamedTuple):
@@ -85,7 +86,7 @@ def init_ct_mhsa(
 
     ln_gamma = np.ones((hp.d_model,))
     ln_beta = np.zeros((hp.d_model,))
-
+    
     params = CTMHSAParams(
         W_Q=W_Q, W_K=W_K, W_V=W_V, W_Y=W_Y, C=C, ln_gamma=ln_gamma, ln_beta=ln_beta
     )
@@ -95,9 +96,9 @@ def init_ct_mhsa(
     M_shape = (batch_size, hp.n_regions, hp.n_heads, hp.d_v, hp.d_k)
     M = np.zeros(M_shape)
 
-    state = NetworkState(M=M, history=history, step=0)
+    state = NetworkState(M=M, history=history, step=0, lags=lags)
 
-    return params, state, lags
+    return params, state
 
 
 # Phase 2: The Cortical Microcircuit (The "Head")
@@ -134,7 +135,7 @@ def compute_projections(
     return q, k, v
 
 
-def update_memory_l23(state: NetworkState, k: jax.Array, v: jax.Array, hp: Hyperparameters) -> Tuple[NetworkState, jax.Array]:
+def update_memory_l23(state: NetworkState, k: jax.Array, v: jax.Array, lam_val: jax.Array) -> Tuple[NetworkState, jax.Array]:
     """
     Update memory M using Delta Rule.
     M_t = M_{t-1} + lambda * (v_t * k_t^T - M_{t-1})
@@ -143,13 +144,17 @@ def update_memory_l23(state: NetworkState, k: jax.Array, v: jax.Array, hp: Hyper
     # k: (B, N, H, Dk)
     # v: (B, N, H, Dv)
     # M: (B, N, H, Dv, Dk)
+    # lam_val: scalar (from hp.lam)
     
     # Outer product v * k^T -> (B, N, H, Dv, Dk)
     # Einsum: bnhv, bnhk -> bnhvk
     target = np.einsum('bnhv,bnhk->bnhvk', v, k)
     
     # Delta M = lambda * (target - M_prev)
-    delta_M = hp.lam * (target - state.M)
+    # Broadcast scalar lam_val to M's shape
+    lam_b = lam_val.reshape((1, 1, 1, 1, 1))
+    
+    delta_M = lam_b * (target - state.M)
     M_new = state.M + delta_M
     
     # Surprise: Frobenius norm over last two dims (Dv, Dk)
@@ -189,8 +194,11 @@ def mhsa_step(params: CTMHSAParams, state: NetworkState, x: jax.Array, hp: Hyper
     """
     q, k, v = compute_projections(params, x)
     
+    # Standard Linear Attention with scalar forgetting
+    lam_val = np.array(hp.lam)
+    
     # Update Memory (L2/3)
-    state_new, surprise = update_memory_l23(state, k, v, hp)
+    state_new, surprise = update_memory_l23(state, k, v, lam_val)
     
     # Retrieve (L5)
     o = retrieve_query_l5(state_new, q)

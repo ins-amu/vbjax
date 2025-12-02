@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as np
 from typing import NamedTuple, Tuple, Optional
-from vbjax.ct_mhsa import CTMHSAParams, NetworkState, Hyperparameters, mhsa_step, init_ct_mhsa
+from vbjax.ct_mhsa import CTMHSAParams, NetworkState, Hyperparameters, mhsa_step, init_ct_mhsa, network_coupling
 
 class VisualSearchHyperparameters(NamedTuple):
     mhsa: Hyperparameters
@@ -9,6 +9,7 @@ class VisualSearchHyperparameters(NamedTuple):
     n_tasks: int = 2
     n_classes: int = 3 # R, G, B (max classes)
     retina_channels: Tuple[int, ...] = (8, 16)
+    max_steps: int = 100 # Max horizon for time embeddings
 
 class VisualSearchParams(NamedTuple):
     core: CTMHSAParams
@@ -23,6 +24,7 @@ class VisualSearchParams(NamedTuple):
     pos_embed_w: jax.Array
     pos_embed_b: jax.Array
     task_embed: jax.Array # (n_tasks, d_model)
+    time_embed: jax.Array # (max_steps, d_model)
     # Heads
     head_answer_w: jax.Array
     head_answer_b: jax.Array
@@ -45,11 +47,26 @@ def init_visual_search(
     connectome_weights: Optional[jax.Array] = None,
     connectome_lengths: Optional[jax.Array] = None
 ) -> Tuple[VisualSearchParams, NetworkState]:
-    k_core, k_c1, k_c2, k_ro, k_pe, k_te, k_ha, k_hs, k_hv, k_hp = jax.random.split(key, 10)
+    k_core, k_c1, k_c2, k_ro, k_pe, k_te, k_ha, k_hs, k_hv, k_hp, k_time = jax.random.split(key, 11)
     
     # Init Core
     # Pass the real connectome if provided
-    core_params, core_state, _ = init_ct_mhsa(
+    
+    # FORCE CONNECTIVITY FIX for Visual Search
+    # Ensure signal propagation from Visual Input (V1) to Decision (PFC) and Action (FEF)
+    if connectome_weights is not None:
+        # V1 (35) -> PFC (18) (Ventral/Dorsal Stream shortcut)
+        connectome_weights = connectome_weights.at[IDX_R_PFC, IDX_R_V1].set(0.5) 
+        # PFC (18) -> V1 (35) (Top-down attention)
+        connectome_weights = connectome_weights.at[IDX_R_V1, IDX_R_PFC].set(0.5) 
+        
+        # V1 (35) -> FEF (7) (Saliency map shortcut)
+        connectome_weights = connectome_weights.at[IDX_R_FEF, IDX_R_V1].set(0.5)
+        
+        # PFC (18) -> FEF (7) (Executive control of eye)
+        connectome_weights = connectome_weights.at[IDX_R_FEF, IDX_R_PFC].set(0.5)
+
+    core_params, core_state = init_ct_mhsa(
         hp.mhsa, 
         key=k_core, 
         batch_size=1,
@@ -94,6 +111,7 @@ def init_visual_search(
     # Embeddings
     pe_w, pe_b = init_dense(k_pe, 2, hp.mhsa.d_model)
     task_embed = jax.random.normal(k_te, (hp.n_tasks, hp.mhsa.d_model)) * 0.1
+    time_embed = jax.random.normal(k_time, (hp.max_steps, hp.mhsa.d_model)) * 0.1
     
     # Heads
     # Output of core is (B, N, d_model)
@@ -113,6 +131,7 @@ def init_visual_search(
         retina_out_w=ro_w, retina_out_b=ro_b,
         pos_embed_w=pe_w, pos_embed_b=pe_b,
         task_embed=task_embed,
+        time_embed=time_embed,
         head_answer_w=ha_w, head_answer_b=ha_b,
         head_saccade_w=hs_w, head_saccade_b=hs_b,
         head_value_w=hv_w, head_value_b=hv_b,
@@ -156,6 +175,7 @@ def agent_step(
     patch: jax.Array,
     pos: jax.Array,
     task_idx: jax.Array,
+    step_idx: int,
     hp: VisualSearchHyperparameters
 ) -> Tuple[NetworkState, Tuple[jax.Array, jax.Array]]:
     """
@@ -167,6 +187,7 @@ def agent_step(
     vis_feat = retina_forward(params, patch) # (B, D)
     pos_feat = pos @ params.pos_embed_w + params.pos_embed_b # (B, D)
     task_feat = params.task_embed[task_idx] # (B, D)
+    time_feat = params.time_embed[step_idx] # (B, D) (Assuming step_idx is valid index)
     
     # Fuse: Sparse Injection
     # Core input x needs to be (B, N, D).
@@ -186,14 +207,39 @@ def agent_step(
     
     # 2. Micro-steps
     def loop_body(carry, _):
-        curr_state, _ = carry
-        # We feed the same static sensory input at each microstep?
-        # Yes, typical for "settling" dynamics.
-        new_state, y, surprise = mhsa_step(params.core, curr_state, core_input, hp.mhsa)
-        return (new_state, y), surprise
+        curr_state, y_prev = carry
+        
+        # Network Coupling (Transmission)
+        # x_t = C * y_{t-1} + External Input
+        x_t = network_coupling(
+            y_prev, params.core, core_input, 
+            history=curr_state.history, 
+            step=curr_state.step, 
+            lags=curr_state.lags
+        )
+        
+        # Microcircuit Step
+        # Note: mhsa_step uses x_t to update M and produce y_t
+        # It returns state with updated M, but NOT updated history/step
+        new_state_m, y, surprise = mhsa_step(params.core, curr_state, x_t, hp.mhsa)
+        
+        # Update History & Step
+        history = curr_state.history
+        step = curr_state.step
+        
+        if history is not None:
+            L_max = history.shape[0]
+            # Write y_prev (output of previous step) to history
+            # For step=0, we write y_init (zeros) to history
+            idx = (step - 1) % L_max
+            history = history.at[idx].set(y_prev)
+            
+        final_state = new_state_m._replace(history=history, step=step + 1)
+
+        return (final_state, y), surprise
     
     # Initial y (dummy)
-    y_init = np.zeros_like(core_input)
+    y_init = np.zeros((B, N, hp.mhsa.d_model))
     
     # We'll use lax.scan to capture surprise trace
     (final_state, final_y), surprise_trace = jax.lax.scan(loop_body, (state, y_init), None, length=hp.mhsa.steps_per_token)

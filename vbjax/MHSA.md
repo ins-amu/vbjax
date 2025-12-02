@@ -215,3 +215,24 @@ sum_j C_{ij} y_{t, j}$ + External Input.
     * *Example Memory Update:* `v_t (B, N, H, D_v), k_t (B, N, H, D_k) -> Outer Product (B, N, H, D_v, D_k)`. (Adhered to).
 2.  **JIT Compilation:** Ensure all functions in Phases 2-4 are pure and JIT-compatible. (All core functions are `jax.jit`-able).
 3.  **Numerical Stability:** The PDF notes specific forgetting factors $\lambda$. [cite_start]If $\lambda=1$ (no decay), the memory integrates infinitely[cite: 78]. [cite_start]Ensure $\lambda < 1$ (e.g., 0.9 or 0.99) for stability[cite: 587]. (Default `lam=0.9` used).
+
+---
+
+#### Phase 11: Debugging & Micro-Validation (Current Focus)
+**Goal:** Diagnose the "Static Prior" pathology using gradient-based probes and micro-simulations to verify signal propagation and learning capability.
+
+- [ ] **Probe 1: One-Step Overfitting (The "Sanity Check")**
+    - [ ] **Concept:** Train the model on a *single* batch of fixed images.
+    - [ ] **Expectation:** Accuracy must reach 100%. Failure indicates a broken architecture (disconnected graph, dimension bottleneck, or coding error).
+- [ ] **Probe 2: Input Sensitivity (Gradient Check)**
+    - [ ] **Concept:** Compute $\nabla_{Image} \text{Logits}$.
+    - [ ] **Expectation:** Gradients should be non-zero and focused on task-relevant objects. Zero gradients imply the model is ignoring visual input.
+- [ ] **Probe 3: Task Context Gradient**
+    - [ ] **Concept:** Compute $\nabla_{Task} M_{t=30}$.
+    - [ ] **Expectation:** Check if the Task Vector signal vanishes due to $\lambda$ decay over 30 steps.
+- [ ] **Probe 4: Visual-Prior Conflict**
+    - [ ] **Concept:** Present a "Perfect Stimulus" (e.g., massive target object) that contradicts the prior.
+    - [ ] **Expectation:** Logits should shift significantly compared to a blank image.
+- [ ] **Probe 5: Surprise Dynamics**
+    - [ ] **Concept:** Feed alternating vs. static patches.
+    - [ ] **Expectation:** Alternating patches should maintain high "Surprise" (update norm), static patches should decay to 0.

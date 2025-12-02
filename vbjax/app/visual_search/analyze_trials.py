@@ -27,7 +27,7 @@ def analyze_trials(n_trials=100, params_path="visual_search_params.pkl"):
     lengths = jax.device_put(lengths)
     
     mhsa_hp = Hyperparameters(n_regions=n_r, n_heads=8, d_k=32, d_v=32, d_model=32, steps_per_token=5)
-    hp = VisualSearchHyperparameters(mhsa=mhsa_hp, patch_size=32, n_tasks=2, n_classes=3, retina_channels=(16, 32))
+    hp = VisualSearchHyperparameters(mhsa=mhsa_hp, patch_size=32, n_tasks=2, n_classes=3, retina_channels=(16, 32), max_steps=100)
     
     # Init State
     key = jax.random.PRNGKey(42)
@@ -101,6 +101,9 @@ def analyze_trials(n_trials=100, params_path="visual_search_params.pkl"):
         
         if (i+1) % 10 == 0:
             print(f"Processed {i+1}/{n_trials}...")
+            
+        if i < 5:
+            print(f"Trial {i}: Preds={preds} (Label={label}) | Correct={is_correct}")
 
     # Aggregate
     df_correct = [r for r in results if r['correct']]

@@ -16,9 +16,9 @@ def generate_shapes_image(key_seed, size=128, min_objects=3, max_objects=10):
     
     # 0: Red, 1: Green, 2: Blue
     colors = [
-        (1.0, 0.0, 0.0),
-        (0.0, 1.0, 0.0),
-        (0.0, 0.0, 1.0)
+        (255.0, 0.0, 0.0),
+        (0.0, 255.0, 0.0),
+        (0.0, 0.0, 255.0)
     ]
     
     # 0: Circle, 1: Square

@@ -97,14 +97,16 @@ def make_rollout(hp: VisualSearchHyperparameters, n_steps=10):
         if mode == 'passive':
             # Input is scanpaths transposed: (T, B, 2)
             scanpaths_T = np.transpose(scanpaths, (1, 0, 2))
+            steps = np.arange(N_STEPS)
             
-            def passive_body(carry, pos_t):
+            def passive_body(carry, inputs):
+                pos_t, step_t = inputs
                 state, _, _ = carry # Ignore internal pos logic
                 patches = extract_patches(images, pos_t, hp.patch_size)
-                new_state, (logits, saccade, value, surprise, priority) = agent_step(params, state, patches, pos_t, tasks, hp)
+                new_state, (logits, saccade, value, surprise, priority) = agent_step(params, state, patches, pos_t, tasks, step_t, hp)
                 return (new_state, pos_t, None), (logits, saccade, pos_t, value, surprise, priority)
             
-            final_carry, (logits_seq, saccades_seq, pos_seq, values_seq, surprise_seq, priority_seq) = jax.lax.scan(passive_body, carry_init, scanpaths_T)
+            final_carry, (logits_seq, saccades_seq, pos_seq, values_seq, surprise_seq, priority_seq) = jax.lax.scan(passive_body, carry_init, (scanpaths_T, steps))
             
             # Reshape (T, B, ...) -> (B, T, ...)
             logits_seq = np.transpose(logits_seq, (1, 0, 2))
@@ -124,11 +126,11 @@ def make_rollout(hp: VisualSearchHyperparameters, n_steps=10):
             # Input is dummy range
             xs = np.arange(N_STEPS)
             
-            def active_body(carry, _):
+            def active_body(carry, step_t):
                 state, pos, k = carry
                 
                 patches = extract_patches(images, pos, hp.patch_size)
-                new_state, (logits, saccade_delta, value, surprise, priority) = agent_step(params, state, patches, pos, tasks, hp)
+                new_state, (logits, saccade_delta, value, surprise, priority) = agent_step(params, state, patches, pos, tasks, step_t, hp)
                 
                 # Action: Saccade Delta + Noise
                 # saccade_delta is in [-1, 1] via tanh
@@ -232,7 +234,7 @@ def calculate_gae(rewards, values, gamma=0.99, lam=0.95):
     
     return advantages_T.T, targets_T.T
 
-def make_loss_fn(rollout, n_classes, hp, term_reward=10.0, shape_reward=5.0):
+def make_loss_fn(rollout, n_classes, hp, term_reward=10.0, shape_reward=5.0, cls_mask_steps=0):
     
     def loss_fn(params, state, images, tasks, labels, mode, scanpaths=None, key=None, masks=None, aux_weight=1.0):
         logits_seq, saccades_seq, pos_seq, log_probs_seq, values_seq, surprise_seq, priority_seq = rollout(
@@ -253,13 +255,26 @@ def make_loss_fn(rollout, n_classes, hp, term_reward=10.0, shape_reward=5.0):
         # Broadcast labels to (B, T, n_classes)
         one_hot_seq = np.repeat(one_hot[:, None, :], logits_seq.shape[1], axis=1)
         
-        dense_cls_loss = optax.softmax_cross_entropy(logits=logits_seq, labels=one_hot_seq).mean()
+        # Masked Classification Loss
+        # Create Mask: 0 for t < cls_mask_steps, 1 otherwise
+        B, T, _ = logits_seq.shape
+        time_indices = np.arange(T)
+        loss_mask = (time_indices >= cls_mask_steps).astype(np.float32) # (T,)
+        loss_mask = loss_mask[None, :] # (1, T)
+        
+        per_step_loss = optax.softmax_cross_entropy(logits=logits_seq, labels=one_hot_seq) # (B, T)
+        
+        # Apply mask and normalize by the effective number of steps
+        masked_loss = per_step_loss * loss_mask
+        dense_cls_loss = np.sum(masked_loss) / (np.sum(loss_mask) * B + 1e-8)
+        
         class_loss = dense_cls_loss # Use dense loss as main class loss
         
         # Final Accuracy
         final_logits = logits_seq[:, -1, :]
         preds = np.argmax(final_logits, axis=-1)
         acc = np.mean(preds == labels)
+        
         
         # 2. Priority Supervision (PCIP)
         # Target: 1.0 - dist (closer = higher priority)
@@ -350,10 +365,11 @@ def train_visual_search():
     parser.add_argument("--aux_weight", type=float, default=0.5)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_steps", type=int, default=15000)
-    parser.add_argument("--switch_step", type=int, default=5000)
+    parser.add_argument("--switch_step", type=int, default=15000) # Ensure it stays passive
     parser.add_argument("--n_steps", type=int, default=30) # New arg
     parser.add_argument("--terminal_reward", type=float, default=10.0)
     parser.add_argument("--shaping_reward", type=float, default=5.0)
+    parser.add_argument("--cls_mask_steps", type=int, default=0)
     args = parser.parse_args()
     
     # Config
@@ -401,18 +417,16 @@ def train_visual_search():
     # Data
     print("Generating Data (with Masks)...")
     images_np, tasks_np, labels_np, masks_np = generate_dataset(n_samples=1000) 
-    scanpaths_np = make_scanpaths(n_samples=1000, n_steps=N_STEPS)
+    # Scanpaths will be generated dynamically
     
     images = jax.device_put(images_np) / 255.0
     tasks = jax.device_put(tasks_np.flatten())
     labels = jax.device_put(labels_np)
-    scanpaths = jax.device_put(scanpaths_np)
     masks = jax.device_put(masks_np)
     
     # Train/Test
     n_train = int(0.8 * len(images))
     train_imgs, test_imgs = images[:n_train], images[n_train:]
-    train_paths, test_paths = scanpaths[:n_train], scanpaths[n_train:]
     train_tasks, test_tasks = tasks[:n_train], tasks[n_train:]
     train_lbls, test_lbls = labels[:n_train], labels[n_train:]
     train_masks, test_masks = masks[:n_train], masks[n_train:]
@@ -427,7 +441,9 @@ def train_visual_search():
     if state_proto.history is not None:
         # history: (L, B, N, D) - proto has B=1
         history_batch = np.repeat(state_proto.history, BATCH_SIZE, axis=1)
-    state = NetworkState(M=M_batch, history=history_batch, step=0)
+    # Lags handled in init now
+    lags = state_proto.lags
+    state = NetworkState(M=M_batch, history=history_batch, step=0, lags=lags)
     
     optimizer = optax.chain(
         optax.clip_by_global_norm(1.0),
@@ -436,7 +452,7 @@ def train_visual_search():
     opt_state = optimizer.init(params)
     
     rollout = make_rollout(hp, n_steps=N_STEPS) # Pass N_STEPS
-    loss_fn = make_loss_fn(rollout, hp.n_classes, hp, term_reward=args.terminal_reward, shape_reward=args.shaping_reward)
+    loss_fn = make_loss_fn(rollout, hp.n_classes, hp, term_reward=args.terminal_reward, shape_reward=args.shaping_reward, cls_mask_steps=args.cls_mask_steps)
     
     # We need separate train steps for static arg 'mode'
     @jax.jit
@@ -462,7 +478,7 @@ def train_visual_search():
     ANNEAL_STEPS = 2000
     
     for i in range(N_TRAIN_STEPS):
-        key, k_batch = jax.random.split(key)
+        key, k_batch, k_paths = jax.random.split(key, 3)
         idx = onp.random.randint(0, len(train_imgs), BATCH_SIZE)
         
         b_imgs = train_imgs[idx]
@@ -473,8 +489,9 @@ def train_visual_search():
         curr_state = state # Reset M
         
         if i < SWITCH_STEP:
-            # Passive
-            b_paths = train_paths[idx]
+            # Passive - Generate Random Scanpaths
+            b_paths = jax.random.uniform(k_paths, (BATCH_SIZE, N_STEPS, 2), minval=-0.8, maxval=0.8)
+            
             params, opt_state, loss, (c_loss, p_loss, s_loss, acc, cov, v_loss, pri_loss) = train_step_passive(
                 params, opt_state, curr_state, b_imgs, b_paths, b_tasks, b_lbls, b_masks, 1.0
             )
