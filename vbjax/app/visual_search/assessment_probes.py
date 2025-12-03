@@ -21,12 +21,12 @@ def load_trained_params(path="visual_search_params.pkl"):
     mhsa_hp = Hyperparameters(
         n_regions=n_r, 
         n_heads=8,   
-        d_k=32, d_v=32, d_model=32, 
+        d_k=16, d_v=16, d_model=64, 
         steps_per_token=5 # Match training default
     )
     hp = VisualSearchHyperparameters(
         mhsa=mhsa_hp,
-        patch_size=32,
+        patch_size=64,
         n_tasks=2,
         n_classes=3,
         retina_channels=(16, 32) 

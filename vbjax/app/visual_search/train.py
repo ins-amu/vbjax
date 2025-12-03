@@ -7,7 +7,7 @@ import os
 from typing import NamedTuple
 from vbjax.app.visual_search.data import generate_dataset, make_scanpaths
 from vbjax.app.visual_search.model import (
-    init_visual_search, agent_step, 
+    init_visual_search, agent_step, agent_step_eval, 
     VisualSearchHyperparameters, VisualSearchParams, NetworkState
 )
 from vbjax.ct_mhsa import Hyperparameters, init_ct_mhsa
@@ -72,7 +72,7 @@ def get_target_coords(masks):
     
     return np.stack([cx_norm, cy_norm], axis=-1)
 
-def make_rollout(hp: VisualSearchHyperparameters, n_steps=10):
+def make_rollout(hp: VisualSearchHyperparameters, n_steps=10, deterministic=False):
     
     def rollout_fn(params: VisualSearchParams, init_state: NetworkState, images, tasks, 
                    mode='active', scanpaths=None, key=None):
@@ -130,20 +130,26 @@ def make_rollout(hp: VisualSearchHyperparameters, n_steps=10):
                 state, pos, k = carry
                 
                 patches = extract_patches(images, pos, hp.patch_size)
-                new_state, (logits, saccade_delta, value, surprise, priority) = agent_step(params, state, patches, pos, tasks, step_t, hp)
                 
-                # Action: Saccade Delta + Noise
-                # saccade_delta is in [-1, 1] via tanh
-                # Add exploration noise
-                k, k_noise = jax.random.split(k)
-                noise = jax.random.normal(k_noise, shape=pos.shape) * 0.1 # std dev 0.1
+                if deterministic:
+                    new_state, (logits, saccade_delta, value, surprise, priority) = agent_step_eval(params, state, patches, pos, tasks, step_t, hp)
+                    move = saccade_delta # No noise
+                    log_prob = np.zeros(B) # No log_prob for deterministic policy
+                else:
+                    new_state, (logits, saccade_delta, value, surprise, priority) = agent_step(params, state, patches, pos, tasks, step_t, hp)
+                    # Action: Saccade Delta + Noise
+                    # saccade_delta is in [-1, 1] via tanh
+                    # Add exploration noise
+                    k, k_noise = jax.random.split(k)
+                    noise = jax.random.normal(k_noise, shape=pos.shape) * 0.1 # std dev 0.1
+                    
+                    # Actual move
+                    move = saccade_delta + noise
+                    
+                    # Compute Log Prob of the action (Gaussian)
+                    log_prob = -0.5 * np.sum((noise / 0.1)**2, axis=-1) # Sum over x,y
                 
-                # Actual move
-                move = saccade_delta + noise
                 new_pos = np.clip(pos + move, -1.0, 1.0)
-                
-                # Compute Log Prob of the action (Gaussian)
-                log_prob = -0.5 * np.sum((noise / 0.1)**2, axis=-1) # Sum over x,y
                 
                 return (new_state, new_pos, k), (logits, saccade_delta, new_pos, log_prob, value, surprise, priority)
             
@@ -357,11 +363,55 @@ def make_loss_fn(rollout, n_classes, hp, term_reward=10.0, shape_reward=5.0, cls
     return loss_fn
 
 def train_visual_search():
+    """
+    Trains the Cortico-Thalamic MHSA model for the Visual Search task.
+
+    Recommended Training Approach for Optimal Performance and Reproducibility:
+
+    Phase 1: Saccade Policy Warm-up (Supervised Learning)
+    -----------------------------------------------------
+    First, train the agent's Frontal Eye Field (FEF) to accurately target objects.
+    Use `vbjax/app/visual_search/train_saccade.py` with default parameters.
+    This script will save a `visual_search_params.pkl` checkpoint containing the warm-started FEF weights.
+    Example command:
+    `python3 -m vbjax.app.visual_search.train_saccade --steps 2000 --batch_size 32 --lr 1e-3`
+    This phase ensures the agent can reliably move its gaze towards salient objects before engaging in full reinforcement learning.
+
+    Phase 2: Active Visual Search (Reinforcement Learning with Stable Saccade Supervision)
+    --------------------------------------------------------------------------------------
+    After warming up the FEF, switch to active training mode using this `train.py` script.
+    It is crucial to load the checkpoint from Phase 1 and maintain a constant, significant
+    `aux_weight` for saccade supervision throughout this phase. This prevents the FEF policy
+    from degrading under the exploration pressures of reinforcement learning.
+
+    Example command:
+    `python3 -m vbjax.app.visual_search.train --train_steps 30000 --batch_size 32 --n_steps 30 \
+        --switch_step 0 --checkpoint visual_search_params.pkl --aux_weight 1.0`
+
+    Parameters:
+        --batch_size (int): Number of episodes per training step.
+        --steps_per_token (int): Number of micro-steps for the MHSA core per time step.
+        --n_regions (int): Number of regions in the connectome (default 38 for right hemisphere).
+        --d_model (int): Dimensionality of the model's internal representations.
+        --aux_weight (float): Weight for the auxiliary saccade loss during active training.
+                              Keep at a constant value (e.g., 1.0) for stable FEF guidance.
+        --lr (float): Learning rate for the AdamW optimizer.
+        --train_steps (int): Total number of training steps.
+        --switch_step (int): Step at which to switch from passive to active mode. Set to 0 to start directly in active mode.
+        --n_steps (int): Number of time steps (fixations) per episode.
+        --terminal_reward (float): Reward granted for correct classification at the final step.
+        --shaping_reward (float): Reward for approaching the target object.
+        --cls_mask_steps (int): Number of initial steps to mask classification loss (e.g., to allow exploration).
+        --checkpoint (str): Path to a pre-trained model checkpoint (e.g., `visual_search_params.pkl`).
+                            Highly recommended to use the output of `train_saccade.py`.
+
+    The training process saves the final model parameters to `visual_search_params.pkl`.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--steps_per_token", type=int, default=5)
     parser.add_argument("--n_regions", type=int, default=38) # Updated default for R-Hemisphere
-    parser.add_argument("--d_model", type=int, default=32)
+    parser.add_argument("--d_model", type=int, default=64)
     parser.add_argument("--aux_weight", type=float, default=0.5)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train_steps", type=int, default=15000)
@@ -404,33 +454,18 @@ def train_visual_search():
     mhsa_hp = Hyperparameters(
         n_regions=n_r, 
         n_heads=8,   
-        d_k=args.d_model, d_v=args.d_model, d_model=args.d_model, 
+        d_k=16, d_v=16, d_model=args.d_model, 
         steps_per_token=args.steps_per_token
     )
     hp = VisualSearchHyperparameters(
         mhsa=mhsa_hp,
-        patch_size=32, # Increased from 16
+        patch_size=64, # Increased from 32
         n_tasks=2,
         n_classes=3,
         retina_channels=(16, 32) 
     )
     
-    # Data
-    print("Generating Data (with Masks)...")
-    images_np, tasks_np, labels_np, masks_np = generate_dataset(n_samples=1000) 
-    # Scanpaths will be generated dynamically
-    
-    images = jax.device_put(images_np) / 255.0
-    tasks = jax.device_put(tasks_np.flatten())
-    labels = jax.device_put(labels_np)
-    masks = jax.device_put(masks_np)
-    
-    # Train/Test
-    n_train = int(0.8 * len(images))
-    train_imgs, test_imgs = images[:n_train], images[n_train:]
-    train_tasks, test_tasks = tasks[:n_train], tasks[n_train:]
-    train_lbls, test_lbls = labels[:n_train], labels[n_train:]
-    train_masks, test_masks = masks[:n_train], masks[n_train:]
+    # Data - Removed static generation
     
     # Init
     key = jax.random.PRNGKey(42)
@@ -491,12 +526,14 @@ def train_visual_search():
     
     for i in range(N_TRAIN_STEPS):
         key, k_batch, k_paths = jax.random.split(key, 3)
-        idx = onp.random.randint(0, len(train_imgs), BATCH_SIZE)
         
-        b_imgs = train_imgs[idx]
-        b_tasks = train_tasks[idx]
-        b_lbls = train_lbls[idx]
-        b_masks = train_masks[idx]
+        # Generate Fresh Data
+        b_imgs_np, b_tasks_np, b_lbls_np, b_masks_np = generate_dataset(n_samples=BATCH_SIZE, seed=onp.random.randint(0, 1000000))
+        
+        b_imgs = jax.device_put(b_imgs_np) / 255.0
+        b_tasks = jax.device_put(b_tasks_np.flatten())
+        b_lbls = jax.device_put(b_lbls_np)
+        b_masks = jax.device_put(b_masks_np)
         
         curr_state = state # Reset M
         

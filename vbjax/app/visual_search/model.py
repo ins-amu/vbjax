@@ -272,3 +272,103 @@ def agent_step(
     
     return final_state, (logits, saccade, value, surprise_trace, priority)
 
+def agent_step_eval(
+    params: VisualSearchParams,
+    state: NetworkState,
+    patch: jax.Array,
+    pos: jax.Array,
+    task_idx: jax.Array,
+    step_idx: int,
+    hp: VisualSearchHyperparameters
+) -> Tuple[NetworkState, Tuple[jax.Array, jax.Array]]:
+    """
+    Processes one visual fixation (saccade step) deterministically (no exploration noise).
+    Runs the core micro-circuit for n_micro_steps.
+    """
+    
+    # 1. Encode Inputs
+    vis_feat = retina_forward(params, patch) # (B, D)
+    pos_feat = pos @ params.pos_embed_w + params.pos_embed_b # (B, D)
+    task_feat = params.task_embed[task_idx] # (B, D)
+    time_feat = params.time_embed[step_idx] # (B, D) (Assuming step_idx is valid index)
+    
+    # Fuse: Sparse Injection
+    # Core input x needs to be (B, N, D).
+    
+    # Initialize with zeros
+    B = patch.shape[0]
+    N = params.core.C.shape[0]
+    core_input = np.zeros((B, N, hp.mhsa.d_model))
+    
+    # Inject Visual (V1) + Position (V1/Dorsal stream)
+    # V1 acts as the entry point
+    core_input = core_input.at[:, IDX_R_V1, :].set(vis_feat + pos_feat)
+    
+    # Inject Task Context (PFC)
+    # PFC holds the search goal
+    core_input = core_input.at[:, IDX_R_PFC, :].set(task_feat)
+    
+    # 2. Micro-steps
+    def loop_body(carry, _):
+        curr_state, y_prev = carry
+        
+        # Network Coupling (Transmission)
+        # x_t = C * y_{t-1} + External Input
+        x_t = network_coupling(
+            y_prev, params.core, core_input, 
+            history=curr_state.history, 
+            step=curr_state.step, 
+            lags=curr_state.lags
+        )
+        
+        # Microcircuit Step
+        # Note: mhsa_step uses x_t to update M and produce y_t
+        # It returns state with updated M, but NOT updated history/step
+        new_state_m, y, surprise = mhsa_step(params.core, curr_state, x_t, hp.mhsa)
+        
+        # Update History & Step
+        history = curr_state.history
+        step = curr_state.step
+        
+        if history is not None:
+            L_max = history.shape[0]
+            # Write y_prev (output of previous step) to history
+            # For step=0, we write y_init (zeros) to history
+            idx = (step - 1) % L_max
+            history = history.at[idx].set(y_prev)
+            
+        final_state = new_state_m._replace(history=history, step=step + 1)
+
+        return (final_state, y), surprise
+    
+    # Initial y (dummy)
+    y_init = np.zeros((B, N, hp.mhsa.d_model))
+    
+    # We'll use lax.scan to capture surprise trace
+    (final_state, final_y), surprise_trace = jax.lax.scan(loop_body, (state, y_init), None, length=hp.mhsa.steps_per_token)
+    
+    # surprise_trace: (K, B, N, H) -> (B, K, N, H)
+    surprise_trace = np.transpose(surprise_trace, (1, 0, 2, 3))
+    
+    # 3. Heads
+    # final_y: (B, N, D)
+    
+    # Saccade from FEF (Actor)
+    fef_activity = final_y[:, IDX_R_FEF, :]
+    saccade = fef_activity @ params.head_saccade_w + params.head_saccade_b
+    saccade = np.tanh(saccade) 
+    
+    # Classification / Value from PFC (Decision/Critic)
+    pfc_activity = final_y[:, IDX_R_PFC, :]
+    
+    logits = pfc_activity @ params.head_answer_w + params.head_answer_b
+    
+    value = pfc_activity @ params.head_value_w + params.head_value_b
+    value = value.squeeze(-1) # (B,)
+    
+    # Priority from PCIP (Priority Map Supervision)
+    pcip_activity = final_y[:, IDX_R_PCIP, :]
+    priority = pcip_activity @ params.head_priority_w + params.head_priority_b
+    priority = priority.squeeze(-1) # (B,)
+    
+    return final_state, (logits, saccade, value, surprise_trace, priority)

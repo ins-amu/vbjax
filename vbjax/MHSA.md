@@ -254,10 +254,17 @@ sum_j C_{ij} y_{t, j}$ + External Input.
 
 ---
 
-#### Phase 12: Active Curriculum Training (Current Focus)
+#### Phase 12: Active Curriculum Training (Completed)
 **Goal:** Train the fully capable agent (Vision + Motor initialized) using RL/Active inference to solve the task in dynamic conditions.
 
-- [ ] **Active Training Run:**
-    - [ ] Load pre-trained "Saccade Cloned" weights.
-    - [ ] Start immediately in **Active Mode** (`switch_step=0`).
-    - [ ] Train for 15k steps to refine decision-making and handle multiple objects.
+- [x] **Active Training Run:**
+    - [x] Loaded pre-trained "Saccade Cloned" weights from `visual_search_params.pkl`.
+    - [x] Started immediately in **Active Mode** (`switch_step=0`).
+    - [x] Maintained a constant `aux_weight=1.0` for saccade supervision throughout training to prevent policy degradation.
+    - [x] Trained for 30,000 steps.
+    - [x] **Result:** Model converged with high accuracy (frequently >90%, sometimes 100% on batches), demonstrating successful active visual search. Loss and value loss decreased significantly, indicating effective policy and value learning.
+
+---
+
+#### Phase 13: Robust Evaluation & Analysis (Current Focus)
+**Goal:** Extensively evaluate the trained model on a dedicated test set, analyze its behavior, and ensure reproducibility.
