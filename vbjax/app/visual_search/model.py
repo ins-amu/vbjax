@@ -92,19 +92,9 @@ def init_visual_search(
     # C2: 8 -> 16
     c2_w, c2_b = init_conv(k_c2, hp.retina_channels[0], hp.retina_channels[1])
     
-    # Flatten size: 
-    # Patch 16x16 -> (stride 2) -> 8x8 -> (stride 2) -> 4x4. 4*4*C1 = 16*32 = 512
-    # Patch 32x32 -> (stride 2) -> 16x16 -> (stride 2) -> 8x8. 8*8*C1 = 64*32 = 2048
-    # We need to calculate this dynamically or update hardcoded value.
-    # Let's calculate dynamically.
-    
-    def get_conv_out_shape(size, stride=2):
-        return (size + stride - 1) // stride # SAME padding logic approx or manual
-    
-    # JAX 'SAME' padding with stride 2 usually halves dim: 32->16->8
-    s1 = hp.patch_size // 2
-    s2 = s1 // 2
-    flat_size = s2 * s2 * hp.retina_channels[1]
+    # Spatial Softmax Flatten Size
+    # Output is (B, C*2) because we get x,y for each channel
+    flat_size = hp.retina_channels[1] * 2
     
     ro_w, ro_b = init_dense(k_ro, flat_size, hp.mhsa.d_model)
     
@@ -140,6 +130,35 @@ def init_visual_search(
     
     return params, core_state
 
+def spatial_softmax(features):
+    """
+    features: (Batch, Height, Width, Channels)
+    Returns: (Batch, Channels * 2) -> flattened list of x,y coords
+    """
+    B, H, W, C = features.shape
+    
+    # Create coordinate grids
+    y_grid, x_grid = np.meshgrid(np.arange(H), np.arange(W), indexing='ij')
+    # Normalize to [-1, 1]
+    y_grid = (y_grid / (H - 1 + 1e-6) * 2 - 1).astype(np.float32)
+    x_grid = (x_grid / (W - 1 + 1e-6) * 2 - 1).astype(np.float32)
+    
+    # Flatten spatial dims: (B, H*W, C)
+    features_flat = features.reshape(B, H * W, C)
+    
+    # Softmax over space to get attention maps (spatial dimension is axis 1)
+    # We want softmax over H*W for each channel independently
+    probs = jax.nn.softmax(features_flat, axis=1) # (B, H*W, C)
+    
+    # Compute expected X and Y for each channel
+    # Sum(Prob * Coord)
+    # x_grid flat: (H*W,) -> (1, H*W, 1) broadcast
+    expected_x = np.sum(probs * x_grid.reshape(1, -1, 1), axis=1) # (B, C)
+    expected_y = np.sum(probs * y_grid.reshape(1, -1, 1), axis=1) # (B, C)
+    
+    # Concatenate (B, C*2)
+    return np.concatenate([expected_x, expected_y], axis=-1)
+
 def retina_forward(params: VisualSearchParams, patch: jax.Array) -> jax.Array:
     # patch: (B, 16, 16, 3)
     # Conv1
@@ -161,9 +180,8 @@ def retina_forward(params: VisualSearchParams, patch: jax.Array) -> jax.Array:
     )
     x = jax.nn.relu(x + params.conv2_b)
     
-    # Flatten
-    B = patch.shape[0]
-    x = x.reshape((B, -1))
+    # Spatial Softmax instead of Flatten
+    x = spatial_softmax(x)
     
     # Projection
     x = x @ params.retina_out_w + params.retina_out_b

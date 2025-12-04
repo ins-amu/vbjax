@@ -185,28 +185,44 @@ def get_oracle_saccade(pos, masks, tasks, patch_size, images_shape):
     grid = np.stack([x_grid, y_grid], axis=-1).astype(np.float32)
     
     def single_oracle(p, m):
-        # p: (2,)
-        # m: (H, W)
-        # grid: (H, W, 2)
+        # p: (2,) - Current eye position in [-1, 1]
+        # m: (H, W) - Binary mask of objects
         
         # Convert p to pixels
-        # p is [-1, 1]
-        coord = (p + 1) / 2 * np.array([W, H])
+        # p is [-1, 1] -> [0, W]
+        coord = (p + 1) / 2 * np.array([W, H]) # (2,)
         
-        # vec: (H, W, 2)
-        vec = grid - coord
+        # Grid: (H, W, 2)
+        # We need distances from coord to every pixel
+        diff = grid - coord # (H, W, 2)
+        dist_sq = np.sum(diff**2, axis=-1) # (H, W)
         
-        # Weighted sum
-        # m: (H, W) -> (H, W, 1)
-        m_exp = m[..., None]
+        # Mask out invalid pixels (where m == 0)
+        # Add a large value to dist_sq where m is 0
+        # m is usually 0.0 or 1.0
+        valid_dist = dist_sq + (1.0 - m) * 1e9
         
-        w_vec = np.sum(vec * m_exp, axis=(0, 1)) # (2,)
-        m_sum = np.sum(m) + 1e-6
+        # Find argmin (nearest active pixel)
+        # We flatten to find index
+        flat_dist = valid_dist.ravel()
+        min_idx = np.argmin(flat_dist)
         
-        delta = w_vec / m_sum
+        # Get vector to that pixel
+        # We can re-use diff
+        flat_diff = diff.reshape(-1, 2)
+        target_vec = flat_diff[min_idx] # (2,)
         
-        # Normalize
-        return delta / np.array([W, H]) * 2
+        # Normalize to [-1, 1] coordinate space delta
+        # Pixel delta -> Normalized delta
+        # 2 * delta / Size
+        norm_delta = target_vec / np.array([W, H]) * 2
+        
+        # If mask is empty (all 0), m_sum is 0.
+        # Check if mask has any targets
+        has_target = np.max(m) > 0.5
+        
+        # If no target, return 0,0
+        return jax.lax.select(has_target, norm_delta, np.zeros(2))
         
     return jax.vmap(single_oracle)(pos, masks)
 
@@ -412,9 +428,9 @@ def train_visual_search():
     parser.add_argument("--steps_per_token", type=int, default=5)
     parser.add_argument("--n_regions", type=int, default=38) # Updated default for R-Hemisphere
     parser.add_argument("--d_model", type=int, default=64)
-    parser.add_argument("--aux_weight", type=float, default=0.5)
+    parser.add_argument("--aux_weight", type=float, default=10.0)
     parser.add_argument("--lr", type=float, default=1e-4)
-    parser.add_argument("--train_steps", type=int, default=15000)
+    parser.add_argument("--train_steps", type=int, default=60000)
     parser.add_argument("--switch_step", type=int, default=15000) # Ensure it stays passive
     parser.add_argument("--n_steps", type=int, default=30) # New arg
     parser.add_argument("--terminal_reward", type=float, default=10.0)

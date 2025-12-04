@@ -25,7 +25,7 @@ def evaluate_visual_search():
     if params is None: return
 
     # Rollout function for evaluation
-    rollout_fn = make_rollout(hp, n_steps=args.n_steps, deterministic=True)
+    rollout_fn = make_rollout(hp, n_steps=args.n_steps, deterministic=False)
 
     # Data Generation (fresh test set)
     print(f"Generating {args.num_episodes} test episodes...")
