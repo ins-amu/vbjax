@@ -9,36 +9,36 @@ This diagram shows how visual information and task goals are injected into the b
 ```mermaid
 graph TD
     subgraph Inputs
-        Retina[Retina (ConvNet)]
-        Pos[Eye Position (x,y)]
-        Task[Task Goal (Color/Shape)]
+        Retina["Retina (ConvNet)"]
+        Pos["Eye Position (x,y)"]
+        Task["Task Goal (Color/Shape)"]
     end
 
     subgraph "Brain Network (38 Regions / Right Hemisphere)"
         direction TB
         
         subgraph "Injection Points"
-            rV1[rV1 (Visual Cortex)]
-            rPFC[rPFCDL (Prefrontal)]
+            rV1["rV1 (Visual Cortex)"]
+            rPFC["rPFCDL (Prefrontal)"]
         end
         
         subgraph "Core Dynamics"
-            Connectome[Connectome (White Matter)]
-            MHSA[Self-Attention (Micro-Circuit)]
+            Connectome["Connectome (White Matter)"]
+            MHSA["Self-Attention (Micro-Circuit)"]
         end
         
         subgraph "Readout Regions"
-            rFEF[rFEF (Frontal Eye Field)]
-            rPCIP[rPCIP (Priority Map)]
-            rPFC_out[rPFCDL (Decision)]
+            rFEF["rFEF (Frontal Eye Field)"]
+            rPCIP["rPCIP (Priority Map)"]
+            rPFC_out["rPFCDL (Decision)"]
         end
     end
 
     subgraph Outputs
-        Saccade[Saccade (dx, dy)]
-        Priority[Priority Map]
-        Class[Object Classification]
-        Value[State Value]
+        Saccade["Saccade (dx, dy)"]
+        Priority["Priority Map"]
+        Class["Object Classification"]
+        Value["State Value"]
     end
 
     %% Connections
@@ -102,9 +102,9 @@ This diagram explains the multi-phase training strategy used to stabilize learni
 flowchart LR
     subgraph "Phase 1: Warm-Up"
         direction TB
-        Target[Target Location (Oracle)]
-        FEF_Pre[FEF Policy]
-        Loss_S[Supervised Saccade Loss]
+        Target["Target Location (Oracle)"]
+        FEF_Pre["FEF Policy"]
+        Loss_S["Supervised Saccade Loss"]
         
         Target --> Loss_S
         FEF_Pre --> Loss_S
@@ -115,28 +115,28 @@ flowchart LR
         direction TB
         
         subgraph "RL (PPO)"
-            Reward[Reward Signal]
-            Value[Value Head]
-            Policy[Saccade Policy]
+            Reward["Reward Signal"]
+            Value["Value Head"]
+            Policy["Saccade Policy"]
             
-            Reward --> Advantage[GAE Calculation]
+            Reward --> Advantage["GAE Calculation"]
             Value --> Advantage
-            Advantage --> Loss_Pol[Policy Loss]
-            Advantage --> Loss_Val[Value Loss]
+            Advantage --> Loss_Pol["Policy Loss"]
+            Advantage --> Loss_Val["Value Loss"]
         end
         
         subgraph "Auxiliary Supervision"
-            Oracle[Oracle Saccade]
-            Dist[Distance to Target]
+            Oracle["Oracle Saccade"]
+            Dist["Distance to Target"]
             
-            Oracle --> Loss_AuxS[Aux Saccade Loss]
-            Dist --> Loss_Pri[Priority Map Loss]
+            Oracle --> Loss_AuxS["Aux Saccade Loss"]
+            Dist --> Loss_Pri["Priority Map Loss"]
         end
         
         subgraph "Classification"
-            Label[Ground Truth]
-            ClassHead[Class Head]
-            Label --> Loss_Cls[Cross Entropy]
+            Label["Ground Truth"]
+            ClassHead["Class Head"]
+            Label --> Loss_Cls["Cross Entropy"]
         end
         
         %% Connections
@@ -156,9 +156,9 @@ This diagram details the probes used to verify the internal mechanics of the tra
 ```mermaid
 graph TB
     subgraph "Probe A: Belief Update"
-        P1_In[Forced Scanpath:\nEmpty -> Object]
-        Model_A[Model]
-        P1_Out[Logit Trace]
+        P1_In["Forced Scanpath:\nEmpty -> Object"]
+        Model_A["Model"]
+        P1_Out["Logit Trace"]
         
         P1_In --> Model_A
         Model_A --> P1_Out
@@ -167,9 +167,9 @@ graph TB
     end
 
     subgraph "Probe B: FEF Vector Field"
-        P2_In[Grid of Eye Positions\n(Static Object at Center)]
-        Model_B[Model]
-        P2_Out[Saccade Vectors (dx, dy)]
+        P2_In["Grid of Eye Positions\n(Static Object at Center)"]
+        Model_B["Model"]
+        P2_Out["Saccade Vectors (dx, dy)"]
         
         P2_In --> Model_B
         Model_B --> P2_Out
