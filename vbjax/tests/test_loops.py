@@ -79,6 +79,108 @@ def test_sdde_zero_delay():
     assert max_error < 1e-4, f"Max error {max_error:.2e} too large for zero-delay case"
 
 
+def test_ode_methods_exponential_decay():
+    """Test ODE methods (euler, heun, rk4) with exponential decay: dx/dt = -x"""
+    
+    def dfun(x, p):
+        return -x
+    
+    dt = 0.01
+    t_max = 5.0
+    ts = np.arange(0, t_max, dt)
+    x0 = 1.0
+    
+    # Test all methods with different accuracy thresholds
+    # Note: thresholds adjusted for float32 precision
+    methods = ['euler', 'heun', 'rk4']
+    analytical = np.exp(-t_max)
+    thresholds = {'euler': 1e-3, 'heun': 1e-5, 'rk4': 1e-7}
+    
+    for method in methods:
+        step, loop = vb.make_ode(dt, dfun, method=method)
+        x = loop(x0, ts, None)
+        error = abs(x[-1] - analytical)
+        
+        assert error < thresholds[method], \
+            f"{method} method error {error:.2e} exceeds threshold {thresholds[method]:.2e}"
+
+
+def test_ode_harmonic_oscillator():
+    """Test harmonic oscillator: d²x/dt² = -x with energy conservation"""
+    
+    def harmonic(state, p):
+        x, v = state
+        return np.array([v, -x])
+    
+    dt = 0.01
+    t_max = 10.0
+    ts = np.arange(0, t_max, dt)
+    x0 = np.array([1.0, 0.0])
+    
+    step, loop = vb.make_ode(dt, harmonic, method='rk4')
+    states = loop(x0, ts, None)
+    
+    # Check energy conservation (relaxed threshold for float32)
+    energy = 0.5 * (states[:, 0]**2 + states[:, 1]**2)
+    energy_drift = abs(energy[-1] - energy[0])
+    
+    # Check against analytical solution
+    x_analytical = np.cos(t_max)
+    v_analytical = -np.sin(t_max)
+    
+    x_error = abs(states[-1, 0] - x_analytical)
+    v_error = abs(states[-1, 1] - v_analytical)
+    
+    # Assertions (thresholds adjusted for float32)
+    assert energy_drift < 1e-6, f"Energy drift {energy_drift:.2e} exceeds threshold 1e-6"
+    assert x_error < 1e-2, f"Position error {x_error:.2e} exceeds threshold 1e-2"
+    assert v_error < 1e-2, f"Velocity error {v_error:.2e} exceeds threshold 1e-2"
+
+
+def test_ode_convergence_order():
+    """Test that RK4 shows higher-order convergence than Euler"""
+    
+    def dfun(x, p):
+        return -x
+    
+    t_max = 1.0
+    dts = [0.1, 0.05, 0.025]
+    x0 = 1.0
+    analytical = np.exp(-t_max)
+    
+    # Test RK4 convergence
+    errors_rk4 = []
+    for dt in dts:
+        ts = np.arange(0, t_max, dt)
+        step, loop = vb.make_ode(dt, dfun, method='rk4')
+        x = loop(x0, ts, None)
+        error = abs(x[-1] - analytical)
+        errors_rk4.append(error)
+    
+    # Test Euler convergence
+    errors_euler = []
+    for dt in dts:
+        ts = np.arange(0, t_max, dt)
+        step, loop = vb.make_ode(dt, dfun, method='euler')
+        x = loop(x0, ts, None)
+        error = abs(x[-1] - analytical)
+        errors_euler.append(error)
+    
+    # Check that RK4 error reduces faster than Euler
+    # RK4 should show better convergence
+    import numpy
+    rk4_ratio = numpy.mean([errors_rk4[i]/errors_rk4[i+1] for i in range(len(errors_rk4)-1)])
+    euler_ratio = numpy.mean([errors_euler[i]/errors_euler[i+1] for i in range(len(errors_euler)-1)])
+    
+    # RK4 should have better (higher) convergence ratio than Euler
+    assert rk4_ratio > euler_ratio, \
+        f"RK4 convergence ratio {rk4_ratio:.2f} should be higher than Euler {euler_ratio:.2f}"
+    
+    # RK4 should have at least 3x better convergence (conservative for float32)
+    assert rk4_ratio > 3.0, \
+        f"RK4 convergence ratio {rk4_ratio:.2f} should be > 3.0"
+
+
 # TODO theta method? https://gist.github.com/maedoc/c47acb9d346e31017e05324ffc4582c1
     
 def test_heun_pytree():
