@@ -41,6 +41,44 @@ def test_sdde():
     sdde(vb.randn(20)+10, None)
 
 
+def test_sdde_zero_delay():
+    """Test SDDE with zero delay (nh=0) should behave like regular SDE"""
+    dt = 0.01
+    nh = 0  # zero delay
+    t_max = 0.5
+    n_steps = int(t_max / dt)
+    
+    # Simple ODE: dx/dt = -x
+    def dfun(xt, x, t, p):
+        return -x  # no delay, just -x
+    
+    # No noise
+    gfun = 0.0
+    
+    # Initial condition
+    x0 = 1.0
+    buf_size = nh + 1 + n_steps
+    buf = np.ones(buf_size) * x0
+    
+    # Create SDDE integrator
+    step, loop = vb.make_sdde(dt, nh, dfun, gfun)
+    
+    # Integrate
+    final_buf, trajectory = loop(buf, None)
+    
+    # Basic sanity checks
+    assert trajectory.shape == (n_steps,), f"Expected shape ({n_steps},), got {trajectory.shape}"
+    assert np.all(np.isfinite(trajectory)), "Solution contains non-finite values"
+    
+    # Compare with analytical solution x(t) = exp(-t)
+    ts = np.arange(0, t_max, dt)
+    analytical = np.exp(-ts)
+    
+    # Should match very closely now that we use optimized SDE integrator for zero delay
+    max_error = np.max(np.abs(trajectory[:-1] - analytical[1:]))
+    assert max_error < 1e-4, f"Max error {max_error:.2e} too large for zero-delay case"
+
+
 # TODO theta method? https://gist.github.com/maedoc/c47acb9d346e31017e05324ffc4582c1
     
 def test_heun_pytree():
