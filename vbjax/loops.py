@@ -238,7 +238,30 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     sqrt_dt = np.sqrt(dt)
     nh = int(nh)
 
-    # TODO nh == 0: return make_sde(dt, dfun, gfun) etc
+    # Handle zero delay case: reduce to regular SDE
+    if nh == 0:
+        # Create SDE version of dfun that ignores buffer and time arguments
+        def sde_dfun(x, p):
+            # For zero delay, buffer is irrelevant, time index is irrelevant
+            return dfun(None, x, 0, p)
+        
+        sde_step, sde_loop = make_sde(dt, sde_dfun, gfun, adhoc=adhoc, return_euler=False, unroll=unroll)
+        
+        def step(buf_t, z_t, p):
+            buf, t = buf_t
+            x = tmap(lambda buf: buf[nh + t], buf)
+            nx = sde_step(x, z_t, p)
+            buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
+            return (buf, t+1), nx
+        
+        def loop(buf, p, t=0):
+            "xt is the buffer, zt is (ts, zs), p is parameters."
+            op = lambda xt, tz: step(xt, tz, p)
+            dWt = tmap(lambda b: b[nh+1:], buf)
+            (buf, _), nxs = jax.lax.scan(op, (buf, t), dWt, unroll=unroll)
+            return buf, nxs
+        
+        return step, loop
 
     # gfun is a numerical value or a function f(x,p) -> sig
     if not hasattr(gfun, '__call__'):
