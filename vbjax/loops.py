@@ -10,6 +10,21 @@ import jax.numpy as np
 zero = 0
 tmap = jax.tree_util.tree_map
 
+def euler_step(x, dfun, dt, *args, add=zero, adhoc=None):
+    """
+    Use a Euler scheme to step state with a right hand sides dfun(.)
+    and additional forcing term add.
+    """
+    adhoc = adhoc or (lambda x, *args: x)
+    k1 = dfun(x, *args)
+    if add is not zero:
+        x_new = tmap(lambda x, d, a: x + dt * d + a, x, k1, add)
+    else:
+        x_new = tmap(lambda x, d: x + dt * d, x, k1)
+    x_new = adhoc(x_new, *args)
+    return x_new
+
+
 def heun_step(x, dfun, dt, *args, add=zero, adhoc=None, return_euler=False):
     """Use a Heun scheme to step state with a right hand sides dfun(.)
     and additional forcing term add.
@@ -29,6 +44,38 @@ def heun_step(x, dfun, dt, *args, add=zero, adhoc=None, return_euler=False):
     nx = adhoc(nx, *args)
     if return_euler:
         return xi, nx
+    return nx
+
+def rk4_step(x, dfun, dt, *args, add=zero, adhoc=None):
+    """
+    Use a Runge-Kutta 4 scheme to step state with a right hand sides dfun(.)
+    and additional forcing term add.
+    """
+    adhoc = adhoc or (lambda x, *args: x)
+    k1 = dfun(x, *args)
+    k2 = dfun(tmap(lambda x, k: x + dt / 2 * k, x, k1), *args)
+    k3 = dfun(tmap(lambda x, k: x + dt / 2 * k, x, k2), *args)
+    k4 = dfun(tmap(lambda x, k: x + dt * k, x, k3), *args)
+    if add is not zero:
+        nx = tmap(
+            lambda x, k1, k2, k3, k4, a: x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4) + a,
+            x,
+            k1,
+            k2,
+            k3,
+            k4,
+            add,
+        )
+    else:
+        nx = tmap(
+            lambda x, k1, k2, k3, k4: x + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4),
+            x,
+            k1,
+            k2,
+            k3,
+            k4,
+        )
+    nx = adhoc(nx, *args)
     return nx
 
 
@@ -128,7 +175,7 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     return step, loop
 
 
-def make_ode(dt, dfun, adhoc=None):
+def make_ode(dt, dfun, adhoc=None, method='heun'):
     """Use a Heun scheme to integrate autonomous ordinary differential
     equations (ODEs).
 
@@ -164,9 +211,15 @@ def make_ode(dt, dfun, adhoc=None):
     Array([0.5   , 0.25  , 0.125 , 0.0625], dtype=float32, weak_type=True)
 
     """
+    
+    step_fn = {
+        "euler": euler_step,
+        "heun": heun_step,
+        "rk4": rk4_step,
+    }
 
     def step(x, t, p):
-        return heun_step(x, dfun, dt, p, adhoc=adhoc)
+        return step_fn[method](x, dfun, dt, p, adhoc=adhoc)
 
     @jax.jit
     def loop(x0, ts, p):
