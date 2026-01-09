@@ -26,11 +26,12 @@ except:
     print("JAX setup issue.")
 
 def benchmark_config(Seid70, idelays, init_state, bold_params, nn, n_svar, horizon, chunk_len, dt, num_skip, 
-                     n_devices, batch_size):
+                     n_devices, per_device_batch_size):
     """
-    Benchmarks a specific (n_devices, batch_size) configuration using JAX Sharding.
+    Benchmarks a specific (n_devices, per_device_batch_size) configuration using JAX Sharding.
     Returns: microsteps_per_second
     """
+    global_batch_size = n_devices * per_device_batch_size
     
     # 1. Define Sharding
     devices = jax.devices()[:n_devices]
@@ -43,18 +44,18 @@ def benchmark_config(Seid70, idelays, init_state, bold_params, nn, n_svar, horiz
     
     step_fn = fused_jax.make_run_chunk(
         Seid70, idelays, horizon=horizon, chunk_len=chunk_len,
-        dt=dt, num_skip=num_skip, num_item=batch_size, num_svar=n_svar,
+        dt=dt, num_skip=num_skip, num_item=global_batch_size, num_svar=n_svar,
         bold_params=bold_params
     )
     
     # Construct Dummy Data (Global Shape)
-    buffer = jp.zeros((nn, horizon, batch_size)) + init_state[0]
-    x = jp.zeros((n_svar, nn, batch_size)) + init_state[0]
+    buffer = jp.zeros((nn, horizon, global_batch_size)) + init_state[0]
+    x = jp.zeros((n_svar, nn, global_batch_size)) + init_state[0]
     t = 0 # Scalar, replicated
-    bold_init, _, _ = vb.make_bold((nn, batch_size), dt * num_skip * 1e-3, bold_params)
+    bold_init, _, _ = vb.make_bold((nn, global_batch_size), dt * num_skip * 1e-3, bold_params)
     
     # Params
-    Jsa_dummy = jp.ones((batch_size,)) * 10.0
+    Jsa_dummy = jp.ones((global_batch_size,)) * 10.0
     
     base_theta = gm.dopa_default_theta._replace(
         I=0, Ja=0, Jsg=0, Jdopa=0, Jg=0, Rd=0, sigma_V=0.1,
@@ -64,9 +65,6 @@ def benchmark_config(Seid70, idelays, init_state, bold_params, nn, n_svar, horiz
     params = base_theta._replace(Jsa=Jsa_dummy)
 
     try:
-        if batch_size % n_devices != 0:
-            return 0.0 # Cannot shard evenly
-            
         # Shard Data
         # buffer: (nn, horizon, batch) -> P(None, None, 'batch')
         buffer = jax.device_put(buffer, NamedSharding(mesh, PartitionSpec(None, None, 'batch')))
@@ -83,7 +81,7 @@ def benchmark_config(Seid70, idelays, init_state, bold_params, nn, n_svar, horiz
         
         # Params: Jsa is (batch,), others scalar.
         params_sharded = jax.tree_util.tree_map(
-             lambda arr: jax.device_put(arr, NamedSharding(mesh, PartitionSpec('batch'))) if (hasattr(arr, 'shape') and arr.shape==(batch_size,)) else jax.device_put(arr, S_repl),
+             lambda arr: jax.device_put(arr, NamedSharding(mesh, PartitionSpec('batch'))) if (hasattr(arr, 'shape') and arr.shape==(global_batch_size,)) else jax.device_put(arr, S_repl),
              params
         )
         
@@ -105,13 +103,13 @@ def benchmark_config(Seid70, idelays, init_state, bold_params, nn, n_svar, horiz
         jax.block_until_ready(final_state[1])
         dur = time.time() - t0
         
-        total_microsteps = n_steps * chunk_len * batch_size 
+        total_microsteps = n_steps * chunk_len * global_batch_size 
         
         microsteps_per_sec = total_microsteps / dur
         return microsteps_per_sec
         
     except Exception as e:
-        # print(f"  Failed {n_devices}x{batch_size}: {e}")
+        # print(f"  Failed {n_devices}x{per_device_batch_size}: {e}")
         return 0.0
 
 def autotune(Seid70, idelays, init_state, bold_params, nn, n_svar, horizon, chunk_len, dt, num_skip):
@@ -126,8 +124,7 @@ def autotune(Seid70, idelays, init_state, bold_params, nn, n_svar, horizon, chun
         d *= 2
     n_dev_candidates.append(len(devices))
     # Unique and sorted
-    n_dev_candidates = sorted(list(set(n_dev_candidates)))[::-1]
-    print(n_dev_candidates)
+    n_dev_candidates = sorted(list(set(n_dev_candidates)))
     
     batch_candidates = [4, 8, 16] 
     
@@ -137,7 +134,7 @@ def autotune(Seid70, idelays, init_state, bold_params, nn, n_svar, horizon, chun
     
     for nd in n_dev_candidates:
         for bs in batch_candidates:
-            if time.time() - t_start_tune > 240:
+            if time.time() - t_start_tune > 300:
                 break
                 
             if bs < nd: continue # inefficient
@@ -150,18 +147,18 @@ def autotune(Seid70, idelays, init_state, bold_params, nn, n_svar, horizon, chun
             if metric > 0:
                 # Log in "k iter/s" or "M iter/s"
                 msg = f"{metric/1e3:.1f}k" if metric < 1e6 else f"{metric/1e6:.2f}M"
-                print(f"  Config {nd} devs, {bs} batch: {msg} microsteps/s")
+                print(f"  Config {nd} devs, {bs} per-device bs: {msg} microsteps/s")
                 results.append({
                     'n_devices': nd,
-                    'batch_size': bs,
+                    'per_device_bs': bs,
                     'throughput': metric
                 })
-        if time.time() - t_start_tune > 120:
+        if time.time() - t_start_tune > 300:
             print("  Autotune time limit reached.")
             break
 
     if not results:
-        print("Autotune failed, defaulting to 1 dev, 16 batch")
+        print("Autotune failed, defaulting to 1 dev, 16 per-device bs")
         return 1, 16
 
     # Selection Logic
@@ -173,12 +170,12 @@ def autotune(Seid70, idelays, init_state, bold_params, nn, n_svar, horizon, chun
     candidates = [r for r in results if r['throughput'] >= 0.95 * best_thp]
     
     # 3. Sort by 'efficiency': prefer fewer devices, then smaller batch
-    candidates.sort(key=lambda x: (x['n_devices'], x['batch_size']))
+    candidates.sort(key=lambda x: (x['n_devices'], x['per_device_bs']))
     
     winner = candidates[0]
-    print(f"Selected Config: {winner['n_devices']} devices, {winner['batch_size']} batch ({winner['throughput']/1e6:.2f}M steps/s)")
+    print(f"Selected Config: {winner['n_devices']} devices, {winner['per_device_bs']} per-device batch ({winner['throughput']/1e6:.2f}M steps/s)")
     
-    return winner['n_devices'], winner['batch_size']
+    return winner['n_devices'], winner['per_device_bs']
 
 def main():
     # --- 1. Load Structural Connectivity ---
@@ -226,12 +223,13 @@ def main():
     )
     
     # --- 5. Full Run ---
-    print(f"Running full sweep ({TOTAL_ITEMS} items)...")
+    best_global_bs = best_nd * best_bs
+    print(f"Running full sweep ({TOTAL_ITEMS} items) with global batch size {best_global_bs}...")
     
     # Re-setup Kernel with selected global batch size
     step_fn = fused_jax.make_run_chunk(
         Seid70, idelays, horizon=horizon, chunk_len=chunk_len,
-        dt=dt, num_skip=num_skip, num_item=best_bs, num_svar=n_svar,
+        dt=dt, num_skip=num_skip, num_item=best_global_bs, num_svar=n_svar,
         bold_params=bold_params
     )
     jit_step = jax.jit(step_fn)
@@ -243,10 +241,10 @@ def main():
     S_repl = NamedSharding(mesh, PartitionSpec())
     
     # Prepare Data Padding
-    n_batches = int(np.ceil(TOTAL_ITEMS / best_bs))
-    total_padded = n_batches * best_bs
+    n_batches = int(np.ceil(TOTAL_ITEMS / best_global_bs))
+    total_padded = n_batches * best_global_bs
     Jsa_padded = np.pad(Jsa_sweep, (0, total_padded - TOTAL_ITEMS), mode='edge')
-    Jsa_batches = Jsa_padded.reshape(n_batches, best_bs)
+    Jsa_batches = Jsa_padded.reshape(n_batches, best_global_bs)
     
     base_theta = gm.dopa_default_theta._replace(
         I=0, Ja=0, Jsg=0, Jdopa=0, Jg=0, Rd=0, sigma_V=0.1,
@@ -264,15 +262,15 @@ def main():
         # Others -> Replicate
         params_tree = base_theta._replace(Jsa=batch_Jsa)
         params_sharded = jax.tree_util.tree_map(
-             lambda arr: jax.device_put(arr, S_batch) if (hasattr(arr, 'shape') and arr.shape==(best_bs,)) else jax.device_put(arr, S_repl),
+             lambda arr: jax.device_put(arr, S_batch) if (hasattr(arr, 'shape') and arr.shape==(best_global_bs,)) else jax.device_put(arr, S_repl),
              params_tree
         )
         
         # Prepare State
-        buffer = jp.zeros((nn, horizon, best_bs)) + init_state[0]
-        x = jp.zeros((n_svar, nn, best_bs)) + init_state[0]
+        buffer = jp.zeros((nn, horizon, best_global_bs)) + init_state[0]
+        x = jp.zeros((n_svar, nn, best_global_bs)) + init_state[0]
         t = 0
-        bold_init, _, _ = vb.make_bold((nn, best_bs), dt * num_skip * 1e-3, bold_params)
+        bold_init, _, _ = vb.make_bold((nn, best_global_bs), dt * num_skip * 1e-3, bold_params)
         
         # Shard Data
         # buffer: (nn, horizon, batch) -> P(None, None, 'batch')
