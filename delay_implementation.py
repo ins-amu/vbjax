@@ -126,15 +126,17 @@ def autotune(Seid70, idelays, init_state, bold_params, nn, n_svar, horizon, chun
     # Unique and sorted
     n_dev_candidates = sorted(list(set(n_dev_candidates)))
     
-    batch_candidates = [4, 8, 16] 
-    
+    batch_candidates = [4, 8, 16]
+    if len(devices) > 0 and devices[0].platform == 'gpu':
+        batch_candidates = [2**i for i in range(8, 14)]
+
     results = []
     
     t_start_tune = time.time()
     
     for nd in n_dev_candidates:
         for bs in batch_candidates:
-            if time.time() - t_start_tune > 300:
+            if time.time() - t_start_tune > 60:
                 break
                 
             if bs < nd: continue # inefficient
@@ -153,7 +155,7 @@ def autotune(Seid70, idelays, init_state, bold_params, nn, n_svar, horizon, chun
                     'per_device_bs': bs,
                     'throughput': metric
                 })
-        if time.time() - t_start_tune > 300:
+        if time.time() - t_start_tune > 60:
             print("  Autotune time limit reached.")
             break
 
@@ -224,6 +226,13 @@ def main():
     
     # --- 5. Full Run ---
     best_global_bs = best_nd * best_bs
+    if TOTAL_ITEMS < best_global_bs:
+        print(f"  Shrinking batch size: sweep size {TOTAL_ITEMS} < optimal batch size {best_global_bs}")
+        # Shrink to match TOTAL_ITEMS, but keep it a multiple of best_nd
+        best_global_bs = int(np.ceil(TOTAL_ITEMS / best_nd) * best_nd)
+        best_bs = best_global_bs // best_nd
+        print(f"  New selected config: {best_nd} devices, {best_bs} per-device batch (total {best_global_bs})")
+
     print(f"Running full sweep ({TOTAL_ITEMS} items) with global batch size {best_global_bs}...")
     
     # Re-setup Kernel with selected global batch size
