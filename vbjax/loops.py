@@ -94,7 +94,7 @@ def _compute_noise(gfun, x, p, sqrt_dt, z_t):
             noise = tmap(lambda g,z: g * sqrt_dt * z, g, z_t)
     return noise
 
-def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
+def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10, noise_rate=None):
     """Use a stochastic Heun scheme to integrate autonomous stochastic
     differential equations (SDEs).
 
@@ -117,6 +117,11 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
         Return solution with local Euler estimates.
     unroll: int, default 10
         Force unrolls the time stepping loop.
+    noise_rate: float, default None
+        If provided, use colored noise with this rate (lambda).
+        The state vector x must be augmented to include the noise state e: (x, e).
+        The step function will be step((x, e), z_t, p) and return (nx, ne).
+        The gfun acts as the amplitude of the noise (sigma).
 
     Returns
     =======
@@ -150,6 +155,65 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     if not hasattr(gfun, '__call__'):
         sig = gfun
         gfun = lambda *_: sig
+
+    if noise_rate is not None:
+        E = np.exp(-noise_rate * dt)
+        one_minus_E2 = 1.0 - E**2
+
+        def step(xe, z_t, p):
+            x, e = xe
+            # Colored noise acts as additive term e * dt on x
+            noise_x = tmap(lambda e: e * dt, e)
+            nx = heun_step(
+                x, dfun, dt, p, add=noise_x, adhoc=adhoc,
+                return_euler=return_euler)
+
+            # Update colored noise e (Ornstein-Uhlenbeck)
+            sigma = gfun(x, p)
+            # h = sigma * sqrt(lambda * (1 - E^2)) * z_t
+            # Handle pytrees for sigma and z_t
+            # Assuming sigma structure matches z_t structure or is scalar
+
+            # Helper to compute h
+            def compute_h(sig, z):
+                return sig * np.sqrt(noise_rate * one_minus_E2) * z
+
+            if isinstance(sigma, float) or (hasattr(sigma, 'ndim') and sigma.ndim == 0):
+                 h = tmap(lambda z: compute_h(sigma, z), z_t)
+            else:
+                 h = tmap(compute_h, sigma, z_t)
+
+            ne = tmap(lambda e, h: e * E + h, e, h)
+
+            if return_euler:
+                # nx is (xi, nx_final)
+                # We need to restructure return.
+                # step usually returns new_state.
+                # But here state is (x, e).
+                # If return_euler, we probably want ((xi, e_prev), (nx_final, ne))?
+                # But heun_step returns (xi, nx).
+                xi, nx_final = nx
+                return ((xi, e), (nx_final, ne)) # e is technically e_prev (at start of step)
+
+            return (nx, ne)
+
+        @jax.jit
+        def loop(xe0, zs, p):
+            def op(xe, z):
+                xe_new = step(xe, z, p)
+                if return_euler:
+                    # xe_new is (euler_state, new_state)
+                    ex, xe = xe_new
+                else:
+                    ex = None
+                    xe = xe_new
+                return xe, (ex, xe)
+            _, xes = jax.lax.scan(op, xe0, zs, unroll=unroll)
+            if not return_euler:
+                _, xes = xes
+            return xes
+
+        return step, loop
 
     def step(x, z_t, p):
         noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
@@ -236,7 +300,7 @@ def make_dde(dt, nh, dfun, unroll=10, adhoc=None):
     return make_sdde(dt, nh, dfun, 0, unroll, adhoc=adhoc)
 
 
-def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
+def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None, noise_rate=None):
     """Use a stochastic Heun scheme to integrate autonomous
     stochastic delay differential equations (SDEs).
 
@@ -257,6 +321,8 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     adhoc : function or None
         Function of the form `f(x,p)` that allows making adhoc corrections after
         each step.
+    noise_rate : float or None
+        If provided, use colored noise. State is ((buf, t), e).
 
     Returns
     =======
@@ -298,8 +364,26 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
             # For zero delay, buffer is irrelevant, time index is irrelevant
             return dfun(None, x, 0, p)
         
-        sde_step, sde_loop = make_sde(dt, sde_dfun, gfun, adhoc=adhoc, return_euler=False, unroll=unroll)
+        sde_step, sde_loop = make_sde(dt, sde_dfun, gfun, adhoc=adhoc, return_euler=False, unroll=unroll, noise_rate=noise_rate)
         
+        if noise_rate is not None:
+             def step(buf_t_e, z_t, p):
+                buf_t, e = buf_t_e
+                buf, t = buf_t
+                x = tmap(lambda buf: buf[nh + t], buf)
+                # sde_step takes (x, e)
+                (nx, ne) = sde_step((x, e), z_t, p)
+                buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
+                return ((buf, t+1), ne), nx
+
+             def loop(buf_e, p, t=0):
+                buf, e = buf_e
+                op = lambda xt, tz: step(xt, tz, p)
+                dWt = tmap(lambda b: b[nh+1:], buf)
+                ((buf, _), ne), nxs = jax.lax.scan(op, ((buf, t), e), dWt, unroll=unroll)
+                return (buf, ne), nxs
+             return step, loop
+
         def step(buf_t, z_t, p):
             buf, t = buf_t
             x = tmap(lambda buf: buf[nh + t], buf)
@@ -323,6 +407,55 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
 
     if adhoc is None:
         adhoc = lambda x,p : x
+
+    if noise_rate is not None:
+        E = np.exp(-noise_rate * dt)
+        one_minus_E2 = 1.0 - E**2
+
+        def step(buf_t_e, z_t, p):
+            buf_t, e = buf_t_e
+            buf, t = buf_t
+            x = tmap(lambda buf: buf[nh + t], buf)
+
+            # Colored noise
+            noise_x = tmap(lambda e: e * dt, e)
+
+            d1 = dfun(buf, x, nh + t, p)
+            xi = tmap(lambda x,d,n: x + dt*d + n, x, d1, noise_x)
+            xi = adhoc(xi, p)
+
+            if heun:
+                if zero_delays:
+                    buf = tmap(lambda buf, xi: buf.at[nh + t + 1].set(xi), buf, xi)
+                d2 = dfun(buf, xi, nh + t + 1, p)
+                nx = tmap(lambda x,d1,d2,n: x + dt*0.5*(d1 + d2) + n, x, d1, d2, noise_x)
+                nx = adhoc(nx, p)
+            else:
+                nx = xi
+
+            buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
+
+            # Update e
+            sigma = gfun(x, p)
+            def compute_h(sig, z):
+                return sig * np.sqrt(noise_rate * one_minus_E2) * z
+            if isinstance(sigma, float) or (hasattr(sigma, 'ndim') and sigma.ndim == 0):
+                 h = tmap(lambda z: compute_h(sigma, z), z_t)
+            else:
+                 h = tmap(compute_h, sigma, z_t)
+
+            ne = tmap(lambda e, h: e * E + h, e, h)
+
+            return ((buf, t+1), ne), nx
+
+        def loop(buf_e, p, t=0):
+            buf, e = buf_e
+            op = lambda xt, tz: step(xt, tz, p)
+            dWt = tmap(lambda b: b[nh+1:], buf)
+            ((buf, _), ne), nxs = jax.lax.scan(op, ((buf, t), e), dWt, unroll=unroll)
+            return (buf, ne), nxs
+
+        return step, loop
 
     def step(buf_t, z_t, p):
         buf, t = buf_t
