@@ -4,7 +4,12 @@ try:
   from jax._src.numpy.util import _wraps
 except ImportError:
   from functools import wraps as _wraps
-from jax._src.numpy.util import check_arraylike
+try:
+  from jax._src.numpy.util import check_arraylike
+except ImportError:
+  # Fallback if check_arraylike is missing or moved
+  def check_arraylike(name, x):
+    pass
 
 @_wraps(osp_signal.hilbert)
 def hilbert(x, N=None, axis=-1):
