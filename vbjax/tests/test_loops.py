@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as np
 import vbjax as vb
+import jax.random as jr
 
 
 def test_sde():
@@ -79,108 +80,6 @@ def test_sdde_zero_delay():
     assert max_error < 1e-4, f"Max error {max_error:.2e} too large for zero-delay case"
 
 
-def test_ode_methods_exponential_decay():
-    """Test ODE methods (euler, heun, rk4) with exponential decay: dx/dt = -x"""
-    
-    def dfun(x, p):
-        return -x
-    
-    dt = 0.01
-    t_max = 5.0
-    ts = np.arange(0, t_max, dt)
-    x0 = 1.0
-    
-    # Test all methods with different accuracy thresholds
-    # Note: thresholds adjusted for float32 precision
-    methods = ['euler', 'heun', 'rk4']
-    analytical = np.exp(-t_max)
-    thresholds = {'euler': 1e-3, 'heun': 1e-5, 'rk4': 1e-7}
-    
-    for method in methods:
-        step, loop = vb.make_ode(dt, dfun, method=method)
-        x = loop(x0, ts, None)
-        error = abs(x[-1] - analytical)
-        
-        assert error < thresholds[method], \
-            f"{method} method error {error:.2e} exceeds threshold {thresholds[method]:.2e}"
-
-
-def test_ode_harmonic_oscillator():
-    """Test harmonic oscillator: d²x/dt² = -x with energy conservation"""
-    
-    def harmonic(state, p):
-        x, v = state
-        return np.array([v, -x])
-    
-    dt = 0.01
-    t_max = 10.0
-    ts = np.arange(0, t_max, dt)
-    x0 = np.array([1.0, 0.0])
-    
-    step, loop = vb.make_ode(dt, harmonic, method='rk4')
-    states = loop(x0, ts, None)
-    
-    # Check energy conservation (relaxed threshold for float32)
-    energy = 0.5 * (states[:, 0]**2 + states[:, 1]**2)
-    energy_drift = abs(energy[-1] - energy[0])
-    
-    # Check against analytical solution
-    x_analytical = np.cos(t_max)
-    v_analytical = -np.sin(t_max)
-    
-    x_error = abs(states[-1, 0] - x_analytical)
-    v_error = abs(states[-1, 1] - v_analytical)
-    
-    # Assertions (thresholds adjusted for float32)
-    assert energy_drift < 1e-6, f"Energy drift {energy_drift:.2e} exceeds threshold 1e-6"
-    assert x_error < 1e-2, f"Position error {x_error:.2e} exceeds threshold 1e-2"
-    assert v_error < 1e-2, f"Velocity error {v_error:.2e} exceeds threshold 1e-2"
-
-
-def test_ode_convergence_order():
-    """Test that RK4 shows higher-order convergence than Euler"""
-    
-    def dfun(x, p):
-        return -x
-    
-    t_max = 1.0
-    dts = [0.1, 0.05, 0.025]
-    x0 = 1.0
-    analytical = np.exp(-t_max)
-    
-    # Test RK4 convergence
-    errors_rk4 = []
-    for dt in dts:
-        ts = np.arange(0, t_max, dt)
-        step, loop = vb.make_ode(dt, dfun, method='rk4')
-        x = loop(x0, ts, None)
-        error = abs(x[-1] - analytical)
-        errors_rk4.append(error)
-    
-    # Test Euler convergence
-    errors_euler = []
-    for dt in dts:
-        ts = np.arange(0, t_max, dt)
-        step, loop = vb.make_ode(dt, dfun, method='euler')
-        x = loop(x0, ts, None)
-        error = abs(x[-1] - analytical)
-        errors_euler.append(error)
-    
-    # Check that RK4 error reduces faster than Euler
-    # RK4 should show better convergence
-    import numpy
-    rk4_ratio = numpy.mean([errors_rk4[i]/errors_rk4[i+1] for i in range(len(errors_rk4)-1)])
-    euler_ratio = numpy.mean([errors_euler[i]/errors_euler[i+1] for i in range(len(errors_euler)-1)])
-    
-    # RK4 should have better (higher) convergence ratio than Euler
-    assert rk4_ratio > euler_ratio, \
-        f"RK4 convergence ratio {rk4_ratio:.2f} should be higher than Euler {euler_ratio:.2f}"
-    
-    # RK4 should have at least 3x better convergence (conservative for float32)
-    assert rk4_ratio > 3.0, \
-        f"RK4 convergence ratio {rk4_ratio:.2f} should be > 3.0"
-
-
 # TODO theta method? https://gist.github.com/maedoc/c47acb9d346e31017e05324ffc4582c1
     
 def test_heun_pytree():
@@ -246,3 +145,85 @@ def test_continuation():
         xs.reshape(-1, 2)[:, 1],
         1e-6, 2e-5
     )
+
+def test_sde_colored_noise():
+    dt = 0.01
+    lam = 1.0 # noise rate
+    sigma = 1.0
+
+    # Define linear system dx = -x dt + e dt
+    # where e is colored noise with correlation time 1/lam
+    # Stationary variance of e is sigma^2 * lam.
+
+    # Use make_sde with noise_rate
+    step, loop = vb.make_sde(dt, lambda x, p: -x, sigma, noise_rate=lam)
+
+    key = jr.PRNGKey(42)
+    n_steps = 100000
+    zs = jr.normal(key, (n_steps,))
+
+    x0 = np.array(0.0)
+    # Initialize e from stationary dist: N(0, sigma^2 * lam)
+    # sigma=1, lam=1 -> std=1
+    e0 = jr.normal(jr.PRNGKey(0))
+
+    # State is (x, e)
+    xe0 = (x0, e0)
+
+    # Run loop
+    xes = loop(xe0, zs, None)
+
+    # unpack
+    # xes should be ((xs...), (es...)) if return_euler=False
+    xs, es = xes
+
+    print(f"Mean x: {np.mean(xs)}")
+    print(f"Std x: {np.std(xs)}")
+    print(f"Mean e: {np.mean(es)}")
+    print(f"Std e: {np.std(es)}")
+
+    # Check correlation of e
+    E = np.exp(-lam * dt)
+    corr = np.corrcoef(es[:-1], es[1:])[0,1]
+    print(f"Correlation e lag 1: {corr:.4f}, Expected: {E:.4f}")
+
+    # With 100,000 steps, effective sample size is approx 500. 1/sqrt(500) ~ 0.045.
+    # We use 0.15 as tolerance (3 sigma)
+    assert np.abs(np.mean(es)) < 0.15
+    assert np.abs(np.std(es) - 1.0) < 0.1
+    assert np.abs(corr - E) < 0.01
+
+def test_sdde_colored_noise():
+    dt = 0.01
+    lam = 1.0
+    sigma = 1.0
+    nh = 10
+
+    # Define SDDE dx = -x(t) dt + e dt
+
+    step, loop = vb.make_sdde(dt, nh, lambda buf, x, t, p: -x, sigma, noise_rate=lam)
+
+    key = jr.PRNGKey(42)
+    n_steps = 100000
+
+    total_len = nh + 1 + n_steps
+    buf = np.zeros((total_len,))
+
+    zs = jr.normal(key, (total_len,))
+    buf = buf.at[nh+1:].set(zs[nh+1:])
+
+    e0 = jr.normal(jr.PRNGKey(0))
+
+    # Initial state (buf, e)
+    buf_e = (buf, e0)
+
+    (buf_res, ne), nxs = loop(buf_e, None)
+
+    xs = nxs
+    print(f"Mean x (sdde): {np.mean(xs)}")
+    print(f"Std x (sdde): {np.std(xs)}")
+
+    # x should behave similarly to SDE case.
+    # Std x for SDE is approx 0.67
+
+    assert np.abs(np.std(xs) - 0.67) < 0.1

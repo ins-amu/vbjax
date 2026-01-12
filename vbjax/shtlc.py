@@ -8,17 +8,6 @@ try:
 except ImportError:
     vb._say('ò_ô shtns is not available')
 
-# Compatibility wrapper for sph_harm
-try:
-    # SciPy >= 1.15.0
-    sph_harm_y = sp.sph_harm_y
-    def sph_harm(m, n, theta, phi):
-        # Old: sph_harm(m, n, theta=azimuthal, phi=polar)
-        # New: sph_harm_y(n, m, theta=polar, phi=azimuthal)
-        return sph_harm_y(n, m, phi, theta)
-except AttributeError:
-    # SciPy < 1.15.0
-    sph_harm = sp.sph_harm
 
 # Grid functions
 
@@ -147,8 +136,8 @@ def make_shtdiff_np(lmax, nlat, nlon, D, return_L=False, np=np):
     L = []
     for m in range(lmax):
         l = lm[0,lm[0]>=m]
-        fwd = gw[None, :] * sph_harm(m, l[:, None], 0, phi[None, :]).conjugate()
-        bwd = sph_harm(m, l[None, :], 0, phi[:, None])
+        fwd = gw[None, :] * sp.sph_harm(m, l[:, None], 0, phi[None, :]).conjugate()
+        bwd = sp.sph_harm(m, l[None, :], 0, phi[:, None])
         dll = D * l * (l + 1)
         L.append(bwd.dot(dll[:, None] * fwd))
     L = np.array(L)
