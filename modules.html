@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>neural_mass &#8212; vbjax 0.1.dev1+ge3c84a251 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=3ee1c6c6" />
+    <link rel="stylesheet" type="text/css" href="_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <script src="_static/documentation_options.js?v=ad5ced72"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Numerical Integration Guide" href="integrators.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="integrators.html" title="Numerical Integration Guide"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">vbjax 0.1.dev1+ge3c84a251 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">neural_mass</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="module-vbjax.neural_mass">
+<span id="neural-mass"></span><h1>neural_mass<a class="headerlink" href="#module-vbjax.neural_mass" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">JRTheta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nu_max</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">J</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">I</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.JRTheta" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.A">
+<span class="sig-name descname"><span class="pre">A</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.A" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.B">
+<span class="sig-name descname"><span class="pre">B</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.B" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.I">
+<span class="sig-name descname"><span class="pre">I</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.I" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 13</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.J">
+<span class="sig-name descname"><span class="pre">J</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.J" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 7</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.a">
+<span class="sig-name descname"><span class="pre">a</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.a" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.a_1">
+<span class="sig-name descname"><span class="pre">a_1</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.a_1" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 8</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.a_2">
+<span class="sig-name descname"><span class="pre">a_2</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.a_2" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 9</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.a_3">
+<span class="sig-name descname"><span class="pre">a_3</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.a_3" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 10</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.a_4">
+<span class="sig-name descname"><span class="pre">a_4</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.a_4" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 11</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.b">
+<span class="sig-name descname"><span class="pre">b</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.b" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.mu">
+<span class="sig-name descname"><span class="pre">mu</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.mu" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 12</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.nu_max">
+<span class="sig-name descname"><span class="pre">nu_max</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.nu_max" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 5</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.r">
+<span class="sig-name descname"><span class="pre">r</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.r" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 6</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRTheta.v0">
+<span class="sig-name descname"><span class="pre">v0</span></span><a class="headerlink" href="#vbjax.neural_mass.JRTheta.v0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRState">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">JRState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.JRState" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRState.y0">
+<span class="sig-name descname"><span class="pre">y0</span></span><a class="headerlink" href="#vbjax.neural_mass.JRState.y0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRState.y1">
+<span class="sig-name descname"><span class="pre">y1</span></span><a class="headerlink" href="#vbjax.neural_mass.JRState.y1" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRState.y2">
+<span class="sig-name descname"><span class="pre">y2</span></span><a class="headerlink" href="#vbjax.neural_mass.JRState.y2" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRState.y3">
+<span class="sig-name descname"><span class="pre">y3</span></span><a class="headerlink" href="#vbjax.neural_mass.JRState.y3" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRState.y4">
+<span class="sig-name descname"><span class="pre">y4</span></span><a class="headerlink" href="#vbjax.neural_mass.JRState.y4" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.JRState.y5">
+<span class="sig-name descname"><span class="pre">y5</span></span><a class="headerlink" href="#vbjax.neural_mass.JRState.y5" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 5</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.jr_dfun">
+<span class="sig-name descname"><span class="pre">jr_dfun</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ys</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">c</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.jr_dfun" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BVEPTheta">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">BVEPTheta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tau0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">I1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.BVEPTheta" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BVEPTheta.I1">
+<span class="sig-name descname"><span class="pre">I1</span></span><a class="headerlink" href="#vbjax.neural_mass.BVEPTheta.I1" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BVEPTheta.tau0">
+<span class="sig-name descname"><span class="pre">tau0</span></span><a class="headerlink" href="#vbjax.neural_mass.BVEPTheta.tau0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BVEPTheta.x0">
+<span class="sig-name descname"><span class="pre">x0</span></span><a class="headerlink" href="#vbjax.neural_mass.BVEPTheta.x0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.bvep_dfun">
+<span class="sig-name descname"><span class="pre">bvep_dfun</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ys</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">c</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#vbjax.neural_mass.BVEPTheta" title="vbjax.neural_mass.BVEPTheta"><span class="pre">BVEPTheta</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.bvep_dfun" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRTheta">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MPRTheta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tau</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">I</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Delta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">J</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cv</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.MPRTheta" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRTheta.Delta">
+<span class="sig-name descname"><span class="pre">Delta</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRTheta.Delta" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRTheta.I">
+<span class="sig-name descname"><span class="pre">I</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRTheta.I" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRTheta.J">
+<span class="sig-name descname"><span class="pre">J</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRTheta.J" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRTheta.cr">
+<span class="sig-name descname"><span class="pre">cr</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRTheta.cr" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 5</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRTheta.cv">
+<span class="sig-name descname"><span class="pre">cv</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRTheta.cv" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 6</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRTheta.eta">
+<span class="sig-name descname"><span class="pre">eta</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRTheta.eta" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRTheta.tau">
+<span class="sig-name descname"><span class="pre">tau</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRTheta.tau" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRState">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MPRState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">V</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.MPRState" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRState.V">
+<span class="sig-name descname"><span class="pre">V</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRState.V" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.MPRState.r">
+<span class="sig-name descname"><span class="pre">r</span></span><a class="headerlink" href="#vbjax.neural_mass.MPRState.r" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.mpr_dfun">
+<span class="sig-name descname"><span class="pre">mpr_dfun</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ys</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">c</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.mpr_dfun" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.mpr_r_positive">
+<span class="sig-name descname"><span class="pre">mpr_r_positive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.mpr_r_positive" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">BOLDTheta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tau_s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau_f</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">te</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">e0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nu_0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r_0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_tau_s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_tau_f</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_tau_o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_alpha</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recip_e0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.alpha">
+<span class="sig-name descname"><span class="pre">alpha</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.alpha" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.e0">
+<span class="sig-name descname"><span class="pre">e0</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.e0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 6</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.epsilon">
+<span class="sig-name descname"><span class="pre">epsilon</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.epsilon" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 7</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.k1">
+<span class="sig-name descname"><span class="pre">k1</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.k1" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 15</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.k2">
+<span class="sig-name descname"><span class="pre">k2</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.k2" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 16</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.k3">
+<span class="sig-name descname"><span class="pre">k3</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.k3" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 17</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.nu_0">
+<span class="sig-name descname"><span class="pre">nu_0</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.nu_0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 8</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.r_0">
+<span class="sig-name descname"><span class="pre">r_0</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.r_0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 9</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.recip_alpha">
+<span class="sig-name descname"><span class="pre">recip_alpha</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.recip_alpha" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 13</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.recip_e0">
+<span class="sig-name descname"><span class="pre">recip_e0</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.recip_e0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 14</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.recip_tau_f">
+<span class="sig-name descname"><span class="pre">recip_tau_f</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.recip_tau_f" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 11</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.recip_tau_o">
+<span class="sig-name descname"><span class="pre">recip_tau_o</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.recip_tau_o" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 12</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.recip_tau_s">
+<span class="sig-name descname"><span class="pre">recip_tau_s</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.recip_tau_s" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 10</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.tau_f">
+<span class="sig-name descname"><span class="pre">tau_f</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.tau_f" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.tau_o">
+<span class="sig-name descname"><span class="pre">tau_o</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.tau_o" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.tau_s">
+<span class="sig-name descname"><span class="pre">tau_s</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.tau_s" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.te">
+<span class="sig-name descname"><span class="pre">te</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.te" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.BOLDTheta.v0">
+<span class="sig-name descname"><span class="pre">v0</span></span><a class="headerlink" href="#vbjax.neural_mass.BOLDTheta.v0" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 5</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.compute_bold_theta">
+<span class="sig-name descname"><span class="pre">compute_bold_theta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tau_s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.65</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau_f</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.41</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau_o</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.98</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">te</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.04</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">v0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">e0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nu_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">40.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">25.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.compute_bold_theta" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.bold_dfun">
+<span class="sig-name descname"><span class="pre">bold_dfun</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sfvq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta" title="vbjax.neural_mass.BOLDTheta"><span class="pre">BOLDTheta</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.bold_dfun" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DCMTheta">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DCMTheta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">C</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.DCMTheta" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DCMTheta.A">
+<span class="sig-name descname"><span class="pre">A</span></span><a class="headerlink" href="#vbjax.neural_mass.DCMTheta.A" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DCMTheta.B">
+<span class="sig-name descname"><span class="pre">B</span></span><a class="headerlink" href="#vbjax.neural_mass.DCMTheta.B" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DCMTheta.C">
+<span class="sig-name descname"><span class="pre">C</span></span><a class="headerlink" href="#vbjax.neural_mass.DCMTheta.C" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.dcm_dfun">
+<span class="sig-name descname"><span class="pre">dcm_dfun</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#vbjax.neural_mass.DCMTheta" title="vbjax.neural_mass.DCMTheta"><span class="pre">DCMTheta</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.dcm_dfun" title="Link to this definition">¶</a></dt>
+<dd><p>Implements the classical bilinear DCM
+dot{x} = (A + sum_j u_j B_j ) x + C u</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DopaTheta">
+<span class="sig-name descname"><span class="pre">DopaTheta</span></span><a class="headerlink" href="#vbjax.neural_mass.DopaTheta" title="Link to this definition">¶</a></dt>
+<dd><p>alias of <code class="xref py py-class docutils literal notranslate"><span class="pre">dopaTheta</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DopaState">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DopaState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">V</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">u</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Sa</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Sg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Dp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.DopaState" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DopaState.Dp">
+<span class="sig-name descname"><span class="pre">Dp</span></span><a class="headerlink" href="#vbjax.neural_mass.DopaState.Dp" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 5</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DopaState.Sa">
+<span class="sig-name descname"><span class="pre">Sa</span></span><a class="headerlink" href="#vbjax.neural_mass.DopaState.Sa" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DopaState.Sg">
+<span class="sig-name descname"><span class="pre">Sg</span></span><a class="headerlink" href="#vbjax.neural_mass.DopaState.Sg" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DopaState.V">
+<span class="sig-name descname"><span class="pre">V</span></span><a class="headerlink" href="#vbjax.neural_mass.DopaState.V" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DopaState.r">
+<span class="sig-name descname"><span class="pre">r</span></span><a class="headerlink" href="#vbjax.neural_mass.DopaState.r" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="vbjax.neural_mass.DopaState.u">
+<span class="sig-name descname"><span class="pre">u</span></span><a class="headerlink" href="#vbjax.neural_mass.DopaState.u" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.dopa_dfun">
+<span class="sig-name descname"><span class="pre">dopa_dfun</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dopaTheta</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.dopa_dfun" title="Link to this definition">¶</a></dt>
+<dd><p>Adaptive QIF model with dopamine modulation.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.dopa_net_dfun">
+<span class="sig-name descname"><span class="pre">dopa_net_dfun</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.dopa_net_dfun" title="Link to this definition">¶</a></dt>
+<dd><p>Canonical form for network of dopa nodes.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.dopa_r_positive">
+<span class="sig-name descname"><span class="pre">dopa_r_positive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.dopa_r_positive" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.dopa_gfun_mulr">
+<span class="sig-name descname"><span class="pre">dopa_gfun_mulr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.dopa_gfun_mulr" title="Link to this definition">¶</a></dt>
+<dd><p>Provide a multiplicative r, additive V gfun.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.neural_mass.dopa_gfun_add">
+<span class="sig-name descname"><span class="pre">dopa_gfun_add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.neural_mass.dopa_gfun_add" title="Link to this definition">¶</a></dt>
+<dd><p>Provides an additive noise gfun.</p>
+</dd></dl>
+
+</section>
+<section id="module-vbjax.monitor">
+<span id="monitor"></span><h1>monitor<a class="headerlink" href="#module-vbjax.monitor" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.monitor.make_offline">
+<span class="sig-name descname"><span class="pre">make_offline</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">step_fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_fn</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.monitor.make_offline" title="Link to this definition">¶</a></dt>
+<dd><p>Compute monitor samples in an offline or batch fashion.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.monitor.make_timeavg">
+<span class="sig-name descname"><span class="pre">make_timeavg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.monitor.make_timeavg" title="Link to this definition">¶</a></dt>
+<dd><p>Make a time average monitor.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.monitor.compute_sarvas_gain">
+<span class="sig-name descname"><span class="pre">compute_sarvas_gain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">att</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Dc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Array</span></span></span><a class="headerlink" href="#vbjax.monitor.compute_sarvas_gain" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.monitor.make_gain">
+<span class="sig-name descname"><span class="pre">make_gain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.monitor.make_gain" title="Link to this definition">¶</a></dt>
+<dd><p>Make a gain-matrix monitor suitable for sEEG, EEG &amp; MEG.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.monitor.make_bold">
+<span class="sig-name descname"><span class="pre">make_bold</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta" title="vbjax.neural_mass.BOLDTheta"><span class="pre">BOLDTheta</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.monitor.make_bold" title="Link to this definition">¶</a></dt>
+<dd><p>Make a BOLD fMRI monitor.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.monitor.make_cov">
+<span class="sig-name descname"><span class="pre">make_cov</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.monitor.make_cov" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.monitor.make_fc">
+<span class="sig-name descname"><span class="pre">make_fc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.monitor.make_fc" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.monitor.make_fft">
+<span class="sig-name descname"><span class="pre">make_fft</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.monitor.make_fft" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="module-vbjax.loops">
+<span id="loops"></span><h1>loops<a class="headerlink" href="#module-vbjax.loops" title="Link to this heading">¶</a></h1>
+<p>Functions for building time stepping loops.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.loops.euler_step">
+<span class="sig-name descname"><span class="pre">euler_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.loops.euler_step" title="Link to this definition">¶</a></dt>
+<dd><p>Use a Euler scheme to step state with a right hand sides dfun(.)
+and additional forcing term add.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.loops.heun_step">
+<span class="sig-name descname"><span class="pre">heun_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_euler</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.loops.heun_step" title="Link to this definition">¶</a></dt>
+<dd><p>Use a Heun scheme to step state with a right hand sides dfun(.)
+and additional forcing term add.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.loops.rk4_step">
+<span class="sig-name descname"><span class="pre">rk4_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.loops.rk4_step" title="Link to this definition">¶</a></dt>
+<dd><p>Use a Runge-Kutta 4 scheme to step state with a right hand sides dfun(.)
+and additional forcing term add.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.loops.make_sde">
+<span class="sig-name descname"><span class="pre">make_sde</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_euler</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unroll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.loops.make_sde" title="Link to this definition">¶</a></dt>
+<dd><p>Use a stochastic Heun scheme to integrate autonomous stochastic
+differential equations (SDEs).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dt</strong><span class="classifier">float</span></dt><dd><p>Time step</p>
+</dd>
+<dt><strong>dfun</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">dfun(x,</span> <span class="pre">p)</span></code> that computes drift coefficients of
+the stochastic differential equation.</p>
+</dd>
+<dt><strong>gfun</strong><span class="classifier">function or float</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">gfun(x,</span> <span class="pre">p)</span></code> that computes diffusion coefficients
+of the stochastic differential equation. If a numerical value is
+provided, this is used as a constant diffusion coefficient for additive
+linear SDE.</p>
+</dd>
+<dt><strong>adhoc</strong><span class="classifier">function or None</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">f(x,</span> <span class="pre">p)</span></code> that allows making adhoc corrections
+to states after a step.</p>
+</dd>
+<dt><strong>return_euler: bool, default False</strong></dt><dd><p>Return solution with local Euler estimates.</p>
+</dd>
+<dt><strong>unroll: int, default 10</strong></dt><dd><p>Force unrolls the time stepping loop.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>step</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">step(x,</span> <span class="pre">z_t,</span> <span class="pre">p)</span></code> that takes one step in time
+according to the Heun scheme.</p>
+</dd>
+<dt><strong>loop</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">loop(x0,</span> <span class="pre">zs,</span> <span class="pre">p)</span></code> that iteratively calls <code class="xref any docutils literal notranslate"><span class="pre">step</span></code>
+for all <code class="xref any docutils literal notranslate"><span class="pre">z</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>In both cases, a Jax compatible parameter set <code class="xref any docutils literal notranslate"><span class="pre">p</span></code> is provided, either an array
+or some pytree compatible structure.</p>
+<p>Note that the integrator does not sample normally distributed noise, so this
+must be provided by the user.</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">vb</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">_</span><span class="p">,</span> <span class="n">sde</span> <span class="o">=</span> <span class="n">vb</span><span class="o">.</span><span class="n">make_sde</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="o">-</span><span class="n">x</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sde</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">vb</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+<span class="go">Array([ 0.5093468 ,  0.30794007,  0.07600437, -0.03876263], dtype=float32)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.loops.make_ode">
+<span class="sig-name descname"><span class="pre">make_ode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'heun'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.loops.make_ode" title="Link to this definition">¶</a></dt>
+<dd><p>Use a Heun scheme to integrate autonomous ordinary differential
+equations (ODEs).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dt</strong><span class="classifier">float</span></dt><dd><p>Time step</p>
+</dd>
+<dt><strong>dfun</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">dfun(x,</span> <span class="pre">p)</span></code> that computes derivatives of the
+ordinary differential equations.</p>
+</dd>
+<dt><strong>adhoc</strong><span class="classifier">function or None</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">f(x,</span> <span class="pre">p)</span></code> that allows making adhoc corrections
+to states after a step.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>step</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">step(x,</span> <span class="pre">t,</span> <span class="pre">p)</span></code> that takes one step in time
+according to the Heun scheme.</p>
+</dd>
+<dt><strong>loop</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">loop(x0,</span> <span class="pre">ts,</span> <span class="pre">p)</span></code> that iteratively calls <code class="xref any docutils literal notranslate"><span class="pre">step</span></code>
+for all time steps <code class="xref any docutils literal notranslate"><span class="pre">ts</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>In both cases, a Jax compatible parameter set <code class="xref any docutils literal notranslate"><span class="pre">p</span></code> is provided, either an array
+or some pytree compatible structure.</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">vb</span><span class="o">,</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">_</span><span class="p">,</span> <span class="n">ode</span> <span class="o">=</span> <span class="n">vb</span><span class="o">.</span><span class="n">make_ode</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="o">-</span><span class="n">x</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ode</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">r_</span><span class="p">[:</span><span class="mi">4</span><span class="p">],</span> <span class="kc">None</span><span class="p">)</span>
+<span class="go">Array([0.5   , 0.25  , 0.125 , 0.0625], dtype=float32, weak_type=True)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.loops.make_dde">
+<span class="sig-name descname"><span class="pre">make_dde</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unroll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.loops.make_dde" title="Link to this definition">¶</a></dt>
+<dd><p>Invokes make_sdde w/ gfun 0.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.loops.make_sdde">
+<span class="sig-name descname"><span class="pre">make_sdde</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unroll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_delays</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.loops.make_sdde" title="Link to this definition">¶</a></dt>
+<dd><p>Use a stochastic Heun scheme to integrate autonomous
+stochastic delay differential equations (SDEs).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>dt</strong><span class="classifier">float</span></dt><dd><p>Time step</p>
+</dd>
+<dt><strong>nh</strong><span class="classifier">int</span></dt><dd><p>Maximum delay in time steps.</p>
+</dd>
+<dt><strong>dfun</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">dfun(xt,</span> <span class="pre">x,</span> <span class="pre">t,</span> <span class="pre">p)</span></code> that computes drift coefficients of
+the stochastic differential equation.</p>
+</dd>
+<dt><strong>gfun</strong><span class="classifier">function or float</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">gfun(x,</span> <span class="pre">p)</span></code> that computes diffusion coefficients
+of the stochastic differential equation. If a numerical value is
+provided, this is used as a constant diffusion coefficient for additive
+linear SDE.</p>
+</dd>
+<dt><strong>adhoc</strong><span class="classifier">function or None</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">f(x,p)</span></code> that allows making adhoc corrections after
+each step.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>step</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">step((x_t,t),</span> <span class="pre">z_t,</span> <span class="pre">p)</span></code> that takes one step in time
+according to the Heun scheme.</p>
+</dd>
+<dt><strong>loop</strong><span class="classifier">function</span></dt><dd><p>Function of the form <code class="xref any docutils literal notranslate"><span class="pre">loop((xs,</span> <span class="pre">t),</span> <span class="pre">p)</span></code> that iteratively calls <code class="xref any docutils literal notranslate"><span class="pre">step</span></code>
+for each <code class="xref any docutils literal notranslate"><span class="pre">xs[nh:]</span></code> and starting time index <code class="xref any docutils literal notranslate"><span class="pre">t</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>A Jax compatible parameter set <code class="xref any docutils literal notranslate"><span class="pre">p</span></code> is provided, either an array
+or some pytree compatible structure.</p></li>
+<li><p>The integrator does not sample normally distributed noise, so this
+must be provided by the user.</p></li>
+<li><p>The history buffer passed to the user functions, on the corrector
+stage of the Heun method, does not contain the predictor stage, for
+performance reasons, unless <code class="xref any docutils literal notranslate"><span class="pre">zero_delays</span></code> is set to <code class="xref any docutils literal notranslate"><span class="pre">True</span></code>.
+A good compromise can be to set all zero delays to dt.</p></li>
+</ul>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">vb</span><span class="o">,</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">_</span><span class="p">,</span> <span class="n">sdde</span> <span class="o">=</span> <span class="n">vb</span><span class="o">.</span><span class="n">make_sdde</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">xt</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="o">-</span><span class="n">xt</span><span class="p">[</span><span class="n">t</span><span class="o">-</span><span class="mi">2</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span><span class="p">,</span><span class="n">t</span> <span class="o">=</span> <span class="n">sdde</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span><span class="o">+</span><span class="mi">10</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span>
+<span class="go">Array([ 11.,  11.,  11.,   0., -11., -22.], dtype=float32)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.loops.make_continuation">
+<span class="sig-name descname"><span class="pre">make_continuation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">run_chunk</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk_len</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_lag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_from</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_svar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stochastic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.loops.make_continuation" title="Link to this definition">¶</a></dt>
+<dd><p>Helper function to lower memory usage for longer simulations with time delays.
+WIP</p>
+<p>Takes a function</p>
+<blockquote>
+<div><p>run_chunk(buf, params) -&gt; (buf, chunk_states)</p>
+</div></blockquote>
+<p>and returns another</p>
+<blockquote>
+<div><p>continue_chunk(buf, params, rng_key) -&gt; (buf, chunk_states)</p>
+</div></blockquote>
+<p>The continue_chunk function wraps run_chunk and manages
+moving the latest states to the first part of buf and filling
+the rest with samples from N(0,1) if required.</p>
+</dd></dl>
+
+</section>
+<section id="module-vbjax.connectome">
+<span id="connectome"></span><h1>connectome<a class="headerlink" href="#module-vbjax.connectome" title="Link to this heading">¶</a></h1>
+<p>Utilities for connectomes.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.connectome.make_conn_latent_mvnorm">
+<span class="sig-name descname"><span class="pre">make_conn_latent_mvnorm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">SCs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_full</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.connectome.make_conn_latent_mvnorm" title="Link to this definition">¶</a></dt>
+<dd><p>Make a latent multivariate normal distribution over connectomes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>SCs</strong><span class="classifier">(nconn, n, n) array</span></dt><dd><p>Array of connectomes in a given parcellation.</p>
+</dd>
+<dt><strong>nc</strong><span class="classifier">int, optional</span></dt><dd><p>Number of components to use for the latent space.</p>
+</dd>
+<dt><strong>return_full: bool, optional</strong></dt><dd><p>Whether or not to return extra information on the SVD.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>u_mean</strong><span class="classifier">(nc, ), array_like</span></dt><dd><p>Mean of distribution in latent space.</p>
+</dd>
+<dt><strong>u_cov</strong><span class="classifier">(nc, nc), array_like</span></dt><dd><p>Covariance of distribution in latent space.</p>
+</dd>
+<dt><strong>xfm</strong><span class="classifier">function</span></dt><dd><p>Maps latent vector to full connectome.</p>
+</dd>
+<dt><strong>u_cov</strong><span class="classifier">(nc, nc) array</span></dt><dd><p>Covariance of the multivariate normal. Returned if return_full=True.</p>
+</dd>
+<dt><strong>u</strong><span class="classifier">(nconn, nconn) array</span></dt><dd><p>Left singular vectors corresponding to connectomes embedded.
+Returned if return_full=True.</p>
+</dd>
+<dt><strong>s</strong><span class="classifier">(nconn) array</span></dt><dd><p>Singular values. Returned if return_full=True.</p>
+</dd>
+<dt><strong>vt</strong><span class="classifier">(nconn, n*n) array</span></dt><dd><p>Right singular vectors. Returned if return_full=True.</p>
+</dd>
+<dt><strong>nconf</strong><span class="classifier">int</span></dt><dd><p>Number of confusions induced by dimensionality reduction.
+Returned if return_full=True.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-vbjax.layers">
+<span id="layers"></span><h1>layers<a class="headerlink" href="#module-vbjax.layers" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.layers.make_dense_layers">
+<span class="sig-name descname"><span class="pre">make_dense_layers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">in_dim,</span> <span class="pre">latent_dims=[10],</span> <span class="pre">out_dim=None,</span> <span class="pre">init_scl=0.1,</span> <span class="pre">extra_in=0,</span> <span class="pre">act_fn=&lt;PjitFunction</span> <span class="pre">of</span> <span class="pre">&lt;function</span> <span class="pre">leaky_relu&gt;&gt;,</span> <span class="pre">key=Array([</span> <span class="pre">0,</span> <span class="pre">42],</span> <span class="pre">dtype=uint32)</span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.layers.make_dense_layers" title="Link to this definition">¶</a></dt>
+<dd><p>Make a dense neural network with the given latent layer sizes.</p>
+</dd></dl>
+
+</section>
+<section id="module-vbjax.sparse">
+<span id="sparse"></span><h1>sparse<a class="headerlink" href="#module-vbjax.sparse" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.sparse.make_spmv">
+<span class="sig-name descname"><span class="pre">make_spmv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_symmetric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_scipy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.sparse.make_spmv" title="Link to this definition">¶</a></dt>
+<dd><p>Make a closure for a general sparse matrix-vector multiplication.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>A</strong><span class="classifier">scipy.sparse.csr_matrix</span></dt><dd><p>Constant sparse matrix.</p>
+</dd>
+<dt><strong>is_symmetric</strong><span class="classifier">bool, optional, default False</span></dt><dd><p>Whether matrix is symmetric.</p>
+</dd>
+<dt><strong>use_scipy: bool, optional, default False</strong></dt><dd><p>Use scipy.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>spmv</strong><span class="classifier">function</span></dt><dd><p>Function implementing spase matrix vector multiply with
+support for gradients in Jax.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.sparse.csr_to_jax_bcoo">
+<span class="sig-name descname"><span class="pre">csr_to_jax_bcoo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">csr_matrix</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.sparse.csr_to_jax_bcoo" title="Link to this definition">¶</a></dt>
+<dd><p>Convert CSR format to batched COO format.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.sparse.make_sg_spmv">
+<span class="sig-name descname"><span class="pre">make_sg_spmv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">csr_matrix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_pmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sharding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sharding</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.sparse.make_sg_spmv" title="Link to this definition">¶</a></dt>
+<dd><p>Make a SpMV kernel w/ generic scatter-gather operations.</p>
+</dd></dl>
+
+</section>
+<section id="module-vbjax.util">
+<span id="util"></span><h1>util<a class="headerlink" href="#module-vbjax.util" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.util.to_np">
+<span class="sig-name descname"><span class="pre">to_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#vbjax.util.to_np" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.util.to_jax">
+<span class="sig-name descname"><span class="pre">to_jax</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.util.to_jax" title="Link to this definition">¶</a></dt>
+<dd><p>Move NumPy array to JAX via DLPack.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.util.tuple_meshgrid">
+<span class="sig-name descname"><span class="pre">tuple_meshgrid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tup</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.util.tuple_meshgrid" title="Link to this definition">¶</a></dt>
+<dd><p>Applies meshgrid to arrays in a named tuple.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.util.tuple_ravel">
+<span class="sig-name descname"><span class="pre">tuple_ravel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tup</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.util.tuple_ravel" title="Link to this definition">¶</a></dt>
+<dd><p>Flatten arrays in fields of tuple.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.util.tuple_shard">
+<span class="sig-name descname"><span class="pre">tuple_shard</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tup</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.util.tuple_shard" title="Link to this definition">¶</a></dt>
+<dd><p>Shard arrays in fields of tuple.</p>
+</dd></dl>
+
+</section>
+<section id="module-vbjax.shtlc">
+<span id="shtlc"></span><h1>shtlc<a class="headerlink" href="#module-vbjax.shtlc" title="Link to this heading">¶</a></h1>
+<p>SHT based local coupling functions.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.sph_harm">
+<span class="sig-name descname"><span class="pre">sph_harm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">m</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.sph_harm" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.make_grid_shtns">
+<span class="sig-name descname"><span class="pre">make_grid_shtns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lmax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.make_grid_shtns" title="Link to this definition">¶</a></dt>
+<dd><p>Create shtns object and grid as in <a class="reference internal" href="#vbjax.shtlc.make_grid" title="vbjax.shtlc.make_grid"><code class="xref any py py-func docutils literal notranslate"><span class="pre">make_grid</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.make_lm">
+<span class="sig-name descname"><span class="pre">make_lm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lmax</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.make_lm" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.make_grid">
+<span class="sig-name descname"><span class="pre">make_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nlat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlon</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.make_grid" title="Link to this definition">¶</a></dt>
+<dd><p>Create grid for SHT, phi latitude, theta longitude.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.grid_pairwise_distance">
+<span class="sig-name descname"><span class="pre">grid_pairwise_distance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.grid_pairwise_distance" title="Link to this definition">¶</a></dt>
+<dd><p>Compute pairwise distances on grid.  Memory intensive for large grids.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.randn_relaxed">
+<span class="sig-name descname"><span class="pre">randn_relaxed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sht</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.randn_relaxed" title="Link to this definition">¶</a></dt>
+<dd><p>For shtns sht return random spatial array captured by sht.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.kernel_diff">
+<span class="sig-name descname"><span class="pre">kernel_diff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">l</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.kernel_diff" title="Link to this definition">¶</a></dt>
+<dd><p>Compute diffusion kernel, l in shtns order.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.kernel_dist_origin">
+<span class="sig-name descname"><span class="pre">kernel_dist_origin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.kernel_dist_origin" title="Link to this definition">¶</a></dt>
+<dd><p>Compute distance to origin on grid.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.kernel_sh_normalized">
+<span class="sig-name descname"><span class="pre">kernel_sh_normalized</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sht</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.kernel_sh_normalized" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.kernel_laplace">
+<span class="sig-name descname"><span class="pre">kernel_laplace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sht</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.kernel_laplace" title="Link to this definition">¶</a></dt>
+<dd><p>Compute spatial &amp; spectral coefficients for Laplacian kernel.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.kernel_gaussian">
+<span class="sig-name descname"><span class="pre">kernel_gaussian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sht</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.kernel_gaussian" title="Link to this definition">¶</a></dt>
+<dd><p>Compute spatial &amp; spectral coefficients for Gaussian kernel.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.kernel_mexican_hat">
+<span class="sig-name descname"><span class="pre">kernel_mexican_hat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sht</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.kernel_mexican_hat" title="Link to this definition">¶</a></dt>
+<dd><p>Compute spatial &amp; spectral coefficients for Mexican hat kernel.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.kernel_conv_prep">
+<span class="sig-name descname"><span class="pre">kernel_conv_prep</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sht</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.kernel_conv_prep" title="Link to this definition">¶</a></dt>
+<dd><p>Prepares evaluated kernel for SHT convolution.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.kernel_estimate_shtns">
+<span class="sig-name descname"><span class="pre">kernel_estimate_shtns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sht</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.kernel_estimate_shtns" title="Link to this definition">¶</a></dt>
+<dd><p>Estimate effective kernel for kernel k with state x0 for shtns object sht.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.make_shtdiff_np">
+<span class="sig-name descname"><span class="pre">make_shtdiff_np</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lmax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlon</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_L=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">np=&lt;module</span> <span class="pre">'numpy'</span> <span class="pre">from</span> <span class="pre">'/opt/hostedtoolcache/Python/3.14.2/x64/lib/python3.14/site-packages/numpy/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.make_shtdiff_np" title="Link to this definition">¶</a></dt>
+<dd><p>Construct SHT diff implementation in plain NumPy.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="vbjax.shtlc.make_shtdiff">
+<span class="sig-name descname"><span class="pre">make_shtdiff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nlat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmax</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nlon</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">D</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0004</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_L</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#vbjax.shtlc.make_shtdiff" title="Link to this definition">¶</a></dt>
+<dd><p>Construct SHT diff implementation with Jax.</p>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">neural_mass</a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta"><code class="docutils literal notranslate"><span class="pre">JRTheta</span></code></a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.A"><code class="docutils literal notranslate"><span class="pre">A</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.B"><code class="docutils literal notranslate"><span class="pre">B</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.I"><code class="docutils literal notranslate"><span class="pre">I</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.J"><code class="docutils literal notranslate"><span class="pre">J</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.a"><code class="docutils literal notranslate"><span class="pre">a</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.a_1"><code class="docutils literal notranslate"><span class="pre">a_1</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.a_2"><code class="docutils literal notranslate"><span class="pre">a_2</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.a_3"><code class="docutils literal notranslate"><span class="pre">a_3</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.a_4"><code class="docutils literal notranslate"><span class="pre">a_4</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.b"><code class="docutils literal notranslate"><span class="pre">b</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.mu"><code class="docutils literal notranslate"><span class="pre">mu</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.nu_max"><code class="docutils literal notranslate"><span class="pre">nu_max</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.r"><code class="docutils literal notranslate"><span class="pre">r</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRTheta.v0"><code class="docutils literal notranslate"><span class="pre">v0</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRState"><code class="docutils literal notranslate"><span class="pre">JRState</span></code></a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRState.y0"><code class="docutils literal notranslate"><span class="pre">y0</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRState.y1"><code class="docutils literal notranslate"><span class="pre">y1</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRState.y2"><code class="docutils literal notranslate"><span class="pre">y2</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRState.y3"><code class="docutils literal notranslate"><span class="pre">y3</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRState.y4"><code class="docutils literal notranslate"><span class="pre">y4</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.JRState.y5"><code class="docutils literal notranslate"><span class="pre">y5</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#vbjax.neural_mass.jr_dfun"><code class="docutils literal notranslate"><span class="pre">jr_dfun()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BVEPTheta"><code class="docutils literal notranslate"><span class="pre">BVEPTheta</span></code></a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.BVEPTheta.I1"><code class="docutils literal notranslate"><span class="pre">I1</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BVEPTheta.tau0"><code class="docutils literal notranslate"><span class="pre">tau0</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BVEPTheta.x0"><code class="docutils literal notranslate"><span class="pre">x0</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#vbjax.neural_mass.bvep_dfun"><code class="docutils literal notranslate"><span class="pre">bvep_dfun()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRTheta"><code class="docutils literal notranslate"><span class="pre">MPRTheta</span></code></a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRTheta.Delta"><code class="docutils literal notranslate"><span class="pre">Delta</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRTheta.I"><code class="docutils literal notranslate"><span class="pre">I</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRTheta.J"><code class="docutils literal notranslate"><span class="pre">J</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRTheta.cr"><code class="docutils literal notranslate"><span class="pre">cr</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRTheta.cv"><code class="docutils literal notranslate"><span class="pre">cv</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRTheta.eta"><code class="docutils literal notranslate"><span class="pre">eta</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRTheta.tau"><code class="docutils literal notranslate"><span class="pre">tau</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRState"><code class="docutils literal notranslate"><span class="pre">MPRState</span></code></a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRState.V"><code class="docutils literal notranslate"><span class="pre">V</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.MPRState.r"><code class="docutils literal notranslate"><span class="pre">r</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#vbjax.neural_mass.mpr_dfun"><code class="docutils literal notranslate"><span class="pre">mpr_dfun()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.mpr_r_positive"><code class="docutils literal notranslate"><span class="pre">mpr_r_positive()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta"><code class="docutils literal notranslate"><span class="pre">BOLDTheta</span></code></a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.alpha"><code class="docutils literal notranslate"><span class="pre">alpha</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.e0"><code class="docutils literal notranslate"><span class="pre">e0</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.epsilon"><code class="docutils literal notranslate"><span class="pre">epsilon</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.k1"><code class="docutils literal notranslate"><span class="pre">k1</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.k2"><code class="docutils literal notranslate"><span class="pre">k2</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.k3"><code class="docutils literal notranslate"><span class="pre">k3</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.nu_0"><code class="docutils literal notranslate"><span class="pre">nu_0</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.r_0"><code class="docutils literal notranslate"><span class="pre">r_0</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.recip_alpha"><code class="docutils literal notranslate"><span class="pre">recip_alpha</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.recip_e0"><code class="docutils literal notranslate"><span class="pre">recip_e0</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.recip_tau_f"><code class="docutils literal notranslate"><span class="pre">recip_tau_f</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.recip_tau_o"><code class="docutils literal notranslate"><span class="pre">recip_tau_o</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.recip_tau_s"><code class="docutils literal notranslate"><span class="pre">recip_tau_s</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.tau_f"><code class="docutils literal notranslate"><span class="pre">tau_f</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.tau_o"><code class="docutils literal notranslate"><span class="pre">tau_o</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.tau_s"><code class="docutils literal notranslate"><span class="pre">tau_s</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.te"><code class="docutils literal notranslate"><span class="pre">te</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.BOLDTheta.v0"><code class="docutils literal notranslate"><span class="pre">v0</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#vbjax.neural_mass.compute_bold_theta"><code class="docutils literal notranslate"><span class="pre">compute_bold_theta()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.bold_dfun"><code class="docutils literal notranslate"><span class="pre">bold_dfun()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DCMTheta"><code class="docutils literal notranslate"><span class="pre">DCMTheta</span></code></a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.DCMTheta.A"><code class="docutils literal notranslate"><span class="pre">A</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DCMTheta.B"><code class="docutils literal notranslate"><span class="pre">B</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DCMTheta.C"><code class="docutils literal notranslate"><span class="pre">C</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#vbjax.neural_mass.dcm_dfun"><code class="docutils literal notranslate"><span class="pre">dcm_dfun()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DopaTheta"><code class="docutils literal notranslate"><span class="pre">DopaTheta</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DopaState"><code class="docutils literal notranslate"><span class="pre">DopaState</span></code></a><ul>
+<li><a class="reference internal" href="#vbjax.neural_mass.DopaState.Dp"><code class="docutils literal notranslate"><span class="pre">Dp</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DopaState.Sa"><code class="docutils literal notranslate"><span class="pre">Sa</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DopaState.Sg"><code class="docutils literal notranslate"><span class="pre">Sg</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DopaState.V"><code class="docutils literal notranslate"><span class="pre">V</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DopaState.r"><code class="docutils literal notranslate"><span class="pre">r</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.DopaState.u"><code class="docutils literal notranslate"><span class="pre">u</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#vbjax.neural_mass.dopa_dfun"><code class="docutils literal notranslate"><span class="pre">dopa_dfun()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.dopa_net_dfun"><code class="docutils literal notranslate"><span class="pre">dopa_net_dfun()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.dopa_r_positive"><code class="docutils literal notranslate"><span class="pre">dopa_r_positive()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.dopa_gfun_mulr"><code class="docutils literal notranslate"><span class="pre">dopa_gfun_mulr()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.neural_mass.dopa_gfun_add"><code class="docutils literal notranslate"><span class="pre">dopa_gfun_add()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-vbjax.monitor">monitor</a><ul>
+<li><a class="reference internal" href="#vbjax.monitor.make_offline"><code class="docutils literal notranslate"><span class="pre">make_offline()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.monitor.make_timeavg"><code class="docutils literal notranslate"><span class="pre">make_timeavg()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.monitor.compute_sarvas_gain"><code class="docutils literal notranslate"><span class="pre">compute_sarvas_gain()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.monitor.make_gain"><code class="docutils literal notranslate"><span class="pre">make_gain()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.monitor.make_bold"><code class="docutils literal notranslate"><span class="pre">make_bold()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.monitor.make_cov"><code class="docutils literal notranslate"><span class="pre">make_cov()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.monitor.make_fc"><code class="docutils literal notranslate"><span class="pre">make_fc()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.monitor.make_fft"><code class="docutils literal notranslate"><span class="pre">make_fft()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-vbjax.loops">loops</a><ul>
+<li><a class="reference internal" href="#vbjax.loops.euler_step"><code class="docutils literal notranslate"><span class="pre">euler_step()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.loops.heun_step"><code class="docutils literal notranslate"><span class="pre">heun_step()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.loops.rk4_step"><code class="docutils literal notranslate"><span class="pre">rk4_step()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.loops.make_sde"><code class="docutils literal notranslate"><span class="pre">make_sde()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.loops.make_ode"><code class="docutils literal notranslate"><span class="pre">make_ode()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.loops.make_dde"><code class="docutils literal notranslate"><span class="pre">make_dde()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.loops.make_sdde"><code class="docutils literal notranslate"><span class="pre">make_sdde()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.loops.make_continuation"><code class="docutils literal notranslate"><span class="pre">make_continuation()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-vbjax.connectome">connectome</a><ul>
+<li><a class="reference internal" href="#vbjax.connectome.make_conn_latent_mvnorm"><code class="docutils literal notranslate"><span class="pre">make_conn_latent_mvnorm()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-vbjax.layers">layers</a><ul>
+<li><a class="reference internal" href="#vbjax.layers.make_dense_layers"><code class="docutils literal notranslate"><span class="pre">make_dense_layers()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-vbjax.sparse">sparse</a><ul>
+<li><a class="reference internal" href="#vbjax.sparse.make_spmv"><code class="docutils literal notranslate"><span class="pre">make_spmv()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.sparse.csr_to_jax_bcoo"><code class="docutils literal notranslate"><span class="pre">csr_to_jax_bcoo()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.sparse.make_sg_spmv"><code class="docutils literal notranslate"><span class="pre">make_sg_spmv()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-vbjax.util">util</a><ul>
+<li><a class="reference internal" href="#vbjax.util.to_np"><code class="docutils literal notranslate"><span class="pre">to_np()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.util.to_jax"><code class="docutils literal notranslate"><span class="pre">to_jax()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.util.tuple_meshgrid"><code class="docutils literal notranslate"><span class="pre">tuple_meshgrid()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.util.tuple_ravel"><code class="docutils literal notranslate"><span class="pre">tuple_ravel()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.util.tuple_shard"><code class="docutils literal notranslate"><span class="pre">tuple_shard()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-vbjax.shtlc">shtlc</a><ul>
+<li><a class="reference internal" href="#vbjax.shtlc.sph_harm"><code class="docutils literal notranslate"><span class="pre">sph_harm()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.make_grid_shtns"><code class="docutils literal notranslate"><span class="pre">make_grid_shtns()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.make_lm"><code class="docutils literal notranslate"><span class="pre">make_lm()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.make_grid"><code class="docutils literal notranslate"><span class="pre">make_grid()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.grid_pairwise_distance"><code class="docutils literal notranslate"><span class="pre">grid_pairwise_distance()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.randn_relaxed"><code class="docutils literal notranslate"><span class="pre">randn_relaxed()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.kernel_diff"><code class="docutils literal notranslate"><span class="pre">kernel_diff()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.kernel_dist_origin"><code class="docutils literal notranslate"><span class="pre">kernel_dist_origin()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.kernel_sh_normalized"><code class="docutils literal notranslate"><span class="pre">kernel_sh_normalized()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.kernel_laplace"><code class="docutils literal notranslate"><span class="pre">kernel_laplace()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.kernel_gaussian"><code class="docutils literal notranslate"><span class="pre">kernel_gaussian()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.kernel_mexican_hat"><code class="docutils literal notranslate"><span class="pre">kernel_mexican_hat()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.kernel_conv_prep"><code class="docutils literal notranslate"><span class="pre">kernel_conv_prep()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.kernel_estimate_shtns"><code class="docutils literal notranslate"><span class="pre">kernel_estimate_shtns()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.make_shtdiff_np"><code class="docutils literal notranslate"><span class="pre">make_shtdiff_np()</span></code></a></li>
+<li><a class="reference internal" href="#vbjax.shtlc.make_shtdiff"><code class="docutils literal notranslate"><span class="pre">make_shtdiff()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="integrators.html"
+                          title="previous chapter">Numerical Integration Guide</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/modules.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="integrators.html" title="Numerical Integration Guide"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">vbjax 0.1.dev1+ge3c84a251 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">neural_mass</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2023, Marmaduke Woodman.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

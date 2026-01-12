@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Tutorial &#8212; vbjax 0.1.dev1+ge3c84a251 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=3ee1c6c6" />
+    <link rel="stylesheet" type="text/css" href="_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <script src="_static/documentation_options.js?v=ad5ced72"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Numerical Integration Guide" href="integrators.html" />
+    <link rel="prev" title="Welcome to vbjax’s documentation!" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="integrators.html" title="Numerical Integration Guide"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to vbjax’s documentation!"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">vbjax 0.1.dev1+ge3c84a251 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Tutorial</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="tutorial">
+<h1>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="integrators.html">Numerical Integration Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#quick-start-examples">Quick Start Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#api-reference">API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#integration-methods">Integration Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#comparison-with-scipy">Comparison with SciPy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#advanced-usage">Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#performance-tips">Performance Tips</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#common-issues-and-solutions">Common Issues and Solutions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html#zero-delay-optimization">Zero Delay Optimization</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<section id="module-00_intro">
+<span id="examples"></span><h2>Examples<a class="headerlink" href="#module-00_intro" title="Link to this heading">¶</a></h2>
+<p><strong>Example 1</strong>: A simple network of coupled Montbrio model nodes.</p>
+<p>Starting with a few imports</p>
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text">../examples/00_intro.py</span><a class="headerlink" href="#id1" title="Link to this code">¶</a></div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">vb</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="s1">&#39;images&#39;</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>This example shows how to use the <code class="xref any docutils literal notranslate"><span class="pre">vbjax</span></code> library to simulate a network of
+Montbrio model nodes. The network is defined by the function <code class="xref any docutils literal notranslate"><span class="pre">network</span></code> which
+takes as arguments the state of the network and the parameters of the model.
+The function returns the time derivative of the state of the network.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">network</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="mf">0.03</span><span class="o">*</span><span class="n">x</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">vb</span><span class="o">.</span><span class="n">mpr_dfun</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The function <a class="reference internal" href="integrators.html#make_sde" title="make_sde"><code class="xref any py py-func docutils literal notranslate"><span class="pre">make_sde</span></code></a> is used to create a function <code class="xref any docutils literal notranslate"><span class="pre">loop</span></code> that simulates the
+network for a given time interval and a given set of initial conditions.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">_</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">vb</span><span class="o">.</span><span class="n">make_sde</span><span class="p">(</span><span class="n">dt</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">dfun</span><span class="o">=</span><span class="n">network</span><span class="p">,</span> <span class="n">gfun</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The function <code class="xref any docutils literal notranslate"><span class="pre">vb.randn</span></code> is used to generate a set of noise samples. 
+The dimesions are <code class="xref any docutils literal notranslate"><span class="pre">(time,</span> <span class="pre">state,</span> <span class="pre">node)</span></code>. The first noise sample is used as the
+initial condition of the network. The remaining noise samples are used to
+generate the noise term of the stochastic differential equation.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">zs</span> <span class="o">=</span> <span class="n">vb</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">32</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The function <code class="xref any docutils literal notranslate"><span class="pre">loop</span></code> takes as arguments the initial conditions of the network,
+vector of noise samples, and the parameters of the model. The function returns
+the state of the network at each time step.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">xs</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">zs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">zs</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">vb</span><span class="o">.</span><span class="n">mpr_default_theta</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The function <code class="xref any docutils literal notranslate"><span class="pre">vb.plot_states</span></code> is used to plot the state of the network. The
+function takes as arguments the state of the network, the format of the plot,
+and the name of the output file.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">vb</span><span class="o">.</span><span class="n">plot_states</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="s1">&#39;rV&#39;</span><span class="p">,</span> <span class="n">jpg</span><span class="o">=</span><span class="s1">&#39;images/example1&#39;</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<figure class="align-default">
+<a class="reference internal image-reference" href="_images/example1.jpg"><img alt="_images/example1.jpg" src="_images/example1.jpg" style="width: 480.0px; height: 360.0px;" />
+</a>
+</figure>
+<p id="module-01_sweep"><strong>Example 2</strong>: Consider a network of coupled Montbrio model nodes and sweep
+over the parameters of the model.</p>
+<p>Starting with a few imports</p>
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text">../examples/01_sweep.py</span><a class="headerlink" href="#id2" title="Link to this code">¶</a></div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">vb</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pylab</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>  
+<span class="kn">import</span><span class="w"> </span><span class="nn">jax</span><span class="o">,</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="s1">&#39;images&#39;</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>This example shows how to use the <code class="xref any docutils literal notranslate"><span class="pre">vbjax</span></code> library to simulate a network of
+Montbrio model nodes. The network is defined by the function <code class="xref any docutils literal notranslate"><span class="pre">network</span></code> which
+takes as arguments the state of the network and the parameters of the model.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">network</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">r</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">x</span>
+    <span class="n">k</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">mpr_p</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">k</span><span class="o">*</span><span class="n">r</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="n">k</span><span class="o">*</span><span class="n">v</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">vb</span><span class="o">.</span><span class="n">mpr_dfun</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">mpr_p</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The function noise is used to generate the noise term of the stochastic</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">noise</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">sigma</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="k">return</span> <span class="n">sigma</span>
+</pre></div>
+</div>
+<p>The function run is used to simulate the network for a given set of parameters.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">pars</span><span class="p">,</span> <span class="n">mpr_p</span><span class="o">=</span><span class="n">vb</span><span class="o">.</span><span class="n">mpr_default_theta</span><span class="p">):</span>
+    <span class="n">k</span><span class="p">,</span> <span class="n">sig</span><span class="p">,</span> <span class="n">eta</span> <span class="o">=</span> <span class="n">pars</span>                      <span class="c1"># explored pars</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">k</span><span class="p">,</span> <span class="n">sig</span><span class="p">,</span> <span class="n">mpr_p</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">eta</span><span class="o">=</span><span class="n">eta</span><span class="p">)</span>     <span class="c1"># set mpr</span>
+    <span class="n">xs</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">rv0</span><span class="p">,</span> <span class="n">zs</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>                   <span class="c1"># run sim</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">xs</span><span class="p">[</span><span class="mi">400</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>                 <span class="c1"># eval metric</span>
+    <span class="k">return</span> <span class="n">std</span>                              <span class="c1"># done</span>
+</pre></div>
+</div>
+<p>Then prepare the simulation</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">n_nodes</span> <span class="o">=</span> <span class="mi">8</span>
+</pre></div>
+</div>
+<p>define the number of nodes in the network.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">using_cpu</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">local_devices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;cpu&#39;</span>
+<span class="k">if</span> <span class="n">using_cpu</span><span class="p">:</span>
+    <span class="n">run_batches</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">pmap</span><span class="p">(</span><span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">run</span><span class="p">,</span> <span class="n">in_axes</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">in_axes</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">run_batches</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">run</span><span class="p">,</span> <span class="n">in_axes</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>defines the engine to be used for the simulation. If the simulation is run on
+the CPU, then the simulation is parallelized over the cores of the CPU using <code class="xref any docutils literal notranslate"><span class="pre">jax.pmap</span></code>.
+Otherwise, the simulation is parallelized over the GPU using <code class="xref any docutils literal notranslate"><span class="pre">jax.vmap</span></code>.</p>
+<p>then we prepare the network and the noise samples</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># prepare network</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">vb</span><span class="o">.</span><span class="n">make_sde</span><span class="p">(</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">network</span><span class="p">,</span> <span class="n">noise</span><span class="p">)</span>
+<span class="n">rv0</span> <span class="o">=</span> <span class="n">vb</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_nodes</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The rest run the simulation on set of parameters and plot the results.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># sweep sigma but just a few values are enough</span>
+<span class="n">sigmas</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">]</span>
+<span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">ng</span> <span class="o">=</span> <span class="n">vb</span><span class="o">.</span><span class="n">cores</span><span class="o">*</span><span class="mi">4</span> <span class="k">if</span> <span class="n">using_cpu</span> <span class="k">else</span> <span class="mi">32</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sig_i</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">sigmas</span><span class="p">):</span>
+    <span class="c1"># create grid of k (on logarithmic scale) and eta</span>
+    <span class="n">log_ks</span><span class="p">,</span> <span class="n">etas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mgrid</span><span class="p">[</span><span class="o">-</span><span class="mf">9.0</span><span class="p">:</span><span class="o">-</span><span class="mf">2.0</span><span class="p">:</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="n">ng</span><span class="p">,</span> <span class="o">-</span><span class="mf">4.0</span><span class="p">:</span><span class="o">-</span><span class="mf">6.0</span><span class="p">:</span><span class="mi">1</span><span class="n">j</span><span class="o">*</span><span class="n">ng</span><span class="p">]</span>
+
+    <span class="c1"># reshape grid to big batch of values</span>
+    <span class="n">pars</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">c_</span><span class="p">[</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_ks</span><span class="o">.</span><span class="n">ravel</span><span class="p">()),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">log_ks</span><span class="o">.</span><span class="n">size</span><span class="p">)</span><span class="o">*</span><span class="n">sig_i</span><span class="p">,</span>
+        <span class="n">etas</span><span class="o">.</span><span class="n">ravel</span><span class="p">()]</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># cpu w/ pmap expects a chunk for each core</span>
+    <span class="k">if</span> <span class="n">using_cpu</span><span class="p">:</span>
+        <span class="n">pars</span> <span class="o">=</span> <span class="n">pars</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">vb</span><span class="o">.</span><span class="n">cores</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">transpose</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+    <span class="c1"># now run</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">run_batches</span><span class="p">(</span><span class="n">pars</span><span class="p">)</span><span class="o">.</span><span class="n">block_until_ready</span><span class="p">()</span>
+    <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+<span class="n">toc</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;elapsed time for sweep </span><span class="si">{</span><span class="n">toc</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">tic</span><span class="si">:</span><span class="s1">0.1f</span><span class="si">}</span><span class="s1"> s&#39;</span><span class="p">)</span>
+
+
+<span class="n">pl</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">pl</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">sig_i</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">sigmas</span><span class="p">,</span> <span class="n">results</span><span class="p">)):</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">pl</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">log_ks</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span> <span class="n">vmin</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">vmax</span><span class="o">=</span><span class="mf">0.7</span><span class="p">)</span>
+</pre></div>
+</div>
+<figure class="align-default">
+<a class="reference internal image-reference" href="_images/sweep.png"><img alt="_images/sweep.png" src="_images/sweep.png" style="width: 800.0px; height: 200.0px;" />
+</a>
+</figure>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Tutorial</a><ul>
+<li><a class="reference internal" href="#module-00_intro">Examples</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="index.html"
+                          title="previous chapter">Welcome to vbjax’s documentation!</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="integrators.html"
+                          title="next chapter">Numerical Integration Guide</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/tutorial.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="integrators.html" title="Numerical Integration Guide"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to vbjax’s documentation!"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">vbjax 0.1.dev1+ge3c84a251 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Tutorial</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2023, Marmaduke Woodman.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

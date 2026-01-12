@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Welcome to vbjax’s documentation! &#8212; vbjax 0.1.dev1+ge3c84a251 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=3ee1c6c6" />
+    <link rel="stylesheet" type="text/css" href="_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <script src="_static/documentation_options.js?v=ad5ced72"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Tutorial" href="tutorial.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="tutorial.html" title="Tutorial"
+             accesskey="N">next</a> |</li>
+        <li class="nav-item nav-item-0"><a href="#">vbjax 0.1.dev1+ge3c84a251 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Welcome to vbjax’s documentation!</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="welcome-to-vbjax-s-documentation">
+<h1>Welcome to vbjax’s documentation!<a class="headerlink" href="#welcome-to-vbjax-s-documentation" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p><code class="xref any docutils literal notranslate"><span class="pre">vbjax</span></code> is a Jax-based package for working with virtual brain style models.</p>
+</section>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
+<p>Installs with <code class="xref any docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">&quot;vbjax&quot;</span></code>, but you can use the source,</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ins-amu/vbjax
+<span class="nb">cd</span><span class="w"> </span>vbjax
+pip<span class="w"> </span>install<span class="w"> </span>.<span class="o">[</span>dev<span class="o">]</span>
+</pre></div>
+</div>
+<p>The primary additional dependency of vbjax is
+[JAX](github.com/google/jax), which itself depends only on
+NumPy, SciPy &amp; opt-einsum, so it should be safe to add to your
+existing projects.</p>
+<section id="gee-pee-you">
+<h3>gee pee you<a class="headerlink" href="#gee-pee-you" title="Link to this heading">¶</a></h3>
+<p><strong>CUDA</strong></p>
+<p>If you have a CUDA-enabled GPU, you install the requisite dependencies like so</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span><span class="s2">&quot;jax[cuda11_pip]&quot;</span><span class="w"> </span>-f<span class="w"> </span>https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+</pre></div>
+</div>
+<p><strong>M1/M2</strong> 🍎</p>
+<p>On newer Apple machines w/ M1 or M2 GPUs, JAX supports using the GPU experimentally
+by installing just two extra packages:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>ml-dtypes<span class="o">==</span><span class="m">0</span>.2.0<span class="w"> </span>jax-metal
+</pre></div>
+</div>
+<p>About a third of vbjax tests fail due to absence of certain operations like n-dim
+scatter/gather &amp; FFTs, and it may not be faster because these CPUs already have
+excellent memory bandwidth &amp; latency hiding.</p>
+<p><strong>CUDA</strong> 🐳</p>
+<p><em>BUT</em> because GPU software stack versions make aligning stars look like child’s play,
+container images are available and auto-built w/
+[GitHub Actions](.github/workflows/docker-image.yml), so you can use w/ Docker</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-it<span class="w"> </span>ghcr.io/ins-amu/vbjax:main<span class="w"> </span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import vbjax; print(vbjax.__version__)&#39;</span>
+</pre></div>
+</div>
+<p>The images are built on Nvidia runtime images, so <code class="xref any docutils literal notranslate"><span class="pre">--gpus</span> <span class="pre">all</span></code> is enough
+for Jax to discover the GPU(s).</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+<section id="tutorial">
+<h2>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="integrators.html">Numerical Integration Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#module-00_intro">Examples</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</section>
+<section id="modules">
+<h2>Modules<a class="headerlink" href="#modules" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">neural_mass</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.JRTheta"><code class="docutils literal notranslate"><span class="pre">JRTheta</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.JRState"><code class="docutils literal notranslate"><span class="pre">JRState</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.jr_dfun"><code class="docutils literal notranslate"><span class="pre">jr_dfun()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.BVEPTheta"><code class="docutils literal notranslate"><span class="pre">BVEPTheta</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.bvep_dfun"><code class="docutils literal notranslate"><span class="pre">bvep_dfun()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.MPRTheta"><code class="docutils literal notranslate"><span class="pre">MPRTheta</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.MPRState"><code class="docutils literal notranslate"><span class="pre">MPRState</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.mpr_dfun"><code class="docutils literal notranslate"><span class="pre">mpr_dfun()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.mpr_r_positive"><code class="docutils literal notranslate"><span class="pre">mpr_r_positive()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.BOLDTheta"><code class="docutils literal notranslate"><span class="pre">BOLDTheta</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.compute_bold_theta"><code class="docutils literal notranslate"><span class="pre">compute_bold_theta()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.bold_dfun"><code class="docutils literal notranslate"><span class="pre">bold_dfun()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.DCMTheta"><code class="docutils literal notranslate"><span class="pre">DCMTheta</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.dcm_dfun"><code class="docutils literal notranslate"><span class="pre">dcm_dfun()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.DopaTheta"><code class="docutils literal notranslate"><span class="pre">DopaTheta</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.DopaState"><code class="docutils literal notranslate"><span class="pre">DopaState</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.dopa_dfun"><code class="docutils literal notranslate"><span class="pre">dopa_dfun()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.dopa_net_dfun"><code class="docutils literal notranslate"><span class="pre">dopa_net_dfun()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.dopa_r_positive"><code class="docutils literal notranslate"><span class="pre">dopa_r_positive()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.dopa_gfun_mulr"><code class="docutils literal notranslate"><span class="pre">dopa_gfun_mulr()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.neural_mass.dopa_gfun_add"><code class="docutils literal notranslate"><span class="pre">dopa_gfun_add()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#module-vbjax.monitor">monitor</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.monitor.make_offline"><code class="docutils literal notranslate"><span class="pre">make_offline()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.monitor.make_timeavg"><code class="docutils literal notranslate"><span class="pre">make_timeavg()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.monitor.compute_sarvas_gain"><code class="docutils literal notranslate"><span class="pre">compute_sarvas_gain()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.monitor.make_gain"><code class="docutils literal notranslate"><span class="pre">make_gain()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.monitor.make_bold"><code class="docutils literal notranslate"><span class="pre">make_bold()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.monitor.make_cov"><code class="docutils literal notranslate"><span class="pre">make_cov()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.monitor.make_fc"><code class="docutils literal notranslate"><span class="pre">make_fc()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.monitor.make_fft"><code class="docutils literal notranslate"><span class="pre">make_fft()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#module-vbjax.loops">loops</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.loops.euler_step"><code class="docutils literal notranslate"><span class="pre">euler_step()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.loops.heun_step"><code class="docutils literal notranslate"><span class="pre">heun_step()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.loops.rk4_step"><code class="docutils literal notranslate"><span class="pre">rk4_step()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.loops.make_sde"><code class="docutils literal notranslate"><span class="pre">make_sde()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.loops.make_ode"><code class="docutils literal notranslate"><span class="pre">make_ode()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.loops.make_dde"><code class="docutils literal notranslate"><span class="pre">make_dde()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.loops.make_sdde"><code class="docutils literal notranslate"><span class="pre">make_sdde()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.loops.make_continuation"><code class="docutils literal notranslate"><span class="pre">make_continuation()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#module-vbjax.connectome">connectome</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.connectome.make_conn_latent_mvnorm"><code class="docutils literal notranslate"><span class="pre">make_conn_latent_mvnorm()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#module-vbjax.layers">layers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.layers.make_dense_layers"><code class="docutils literal notranslate"><span class="pre">make_dense_layers()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#module-vbjax.sparse">sparse</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.sparse.make_spmv"><code class="docutils literal notranslate"><span class="pre">make_spmv()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.sparse.csr_to_jax_bcoo"><code class="docutils literal notranslate"><span class="pre">csr_to_jax_bcoo()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.sparse.make_sg_spmv"><code class="docutils literal notranslate"><span class="pre">make_sg_spmv()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#module-vbjax.util">util</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.util.to_np"><code class="docutils literal notranslate"><span class="pre">to_np()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.util.to_jax"><code class="docutils literal notranslate"><span class="pre">to_jax()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.util.tuple_meshgrid"><code class="docutils literal notranslate"><span class="pre">tuple_meshgrid()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.util.tuple_ravel"><code class="docutils literal notranslate"><span class="pre">tuple_ravel()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.util.tuple_shard"><code class="docutils literal notranslate"><span class="pre">tuple_shard()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#module-vbjax.shtlc">shtlc</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.sph_harm"><code class="docutils literal notranslate"><span class="pre">sph_harm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.make_grid_shtns"><code class="docutils literal notranslate"><span class="pre">make_grid_shtns()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.make_lm"><code class="docutils literal notranslate"><span class="pre">make_lm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.make_grid"><code class="docutils literal notranslate"><span class="pre">make_grid()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.grid_pairwise_distance"><code class="docutils literal notranslate"><span class="pre">grid_pairwise_distance()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.randn_relaxed"><code class="docutils literal notranslate"><span class="pre">randn_relaxed()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.kernel_diff"><code class="docutils literal notranslate"><span class="pre">kernel_diff()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.kernel_dist_origin"><code class="docutils literal notranslate"><span class="pre">kernel_dist_origin()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.kernel_sh_normalized"><code class="docutils literal notranslate"><span class="pre">kernel_sh_normalized()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.kernel_laplace"><code class="docutils literal notranslate"><span class="pre">kernel_laplace()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.kernel_gaussian"><code class="docutils literal notranslate"><span class="pre">kernel_gaussian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.kernel_mexican_hat"><code class="docutils literal notranslate"><span class="pre">kernel_mexican_hat()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.kernel_conv_prep"><code class="docutils literal notranslate"><span class="pre">kernel_conv_prep()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.kernel_estimate_shtns"><code class="docutils literal notranslate"><span class="pre">kernel_estimate_shtns()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.make_shtdiff_np"><code class="docutils literal notranslate"><span class="pre">make_shtdiff_np()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#vbjax.shtlc.make_shtdiff"><code class="docutils literal notranslate"><span class="pre">make_shtdiff()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="#">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Welcome to vbjax’s documentation!</a><ul>
+<li><a class="reference internal" href="#introduction">Introduction</a></li>
+<li><a class="reference internal" href="#installation">Installation</a><ul>
+<li><a class="reference internal" href="#gee-pee-you">gee pee you</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tutorial">Tutorial</a></li>
+<li><a class="reference internal" href="#modules">Modules</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="tutorial.html"
+                          title="next chapter">Tutorial</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="tutorial.html" title="Tutorial"
+             >next</a> |</li>
+        <li class="nav-item nav-item-0"><a href="#">vbjax 0.1.dev1+ge3c84a251 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Welcome to vbjax’s documentation!</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2023, Marmaduke Woodman.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

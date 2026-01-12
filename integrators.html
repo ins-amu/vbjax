@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Numerical Integration Guide &#8212; vbjax 0.1.dev1+ge3c84a251 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=3ee1c6c6" />
+    <link rel="stylesheet" type="text/css" href="_static/nature.css?v=279e0f84" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <script src="_static/documentation_options.js?v=ad5ced72"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="neural_mass" href="modules.html" />
+    <link rel="prev" title="Tutorial" href="tutorial.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="modules.html" title="neural_mass"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="tutorial.html" title="Tutorial"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">vbjax 0.1.dev1+ge3c84a251 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="tutorial.html" accesskey="U">Tutorial</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Numerical Integration Guide</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="numerical-integration-guide">
+<h1>Numerical Integration Guide<a class="headerlink" href="#numerical-integration-guide" title="Link to this heading">¶</a></h1>
+<p>This guide covers the numerical integration methods available in vbjax for solving:</p>
+<ul class="simple">
+<li><p><strong>Ordinary Differential Equations (ODEs)</strong></p></li>
+<li><p><strong>Stochastic Differential Equations (SDEs)</strong></p></li>
+<li><p><strong>Delay Differential Equations (DDEs)</strong></p></li>
+<li><p><strong>Stochastic Delay Differential Equations (SDDEs)</strong></p></li>
+</ul>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>vbjax
+</pre></div>
+</div>
+</section>
+<section id="quick-start-examples">
+<h2>Quick Start Examples<a class="headerlink" href="#quick-start-examples" title="Link to this heading">¶</a></h2>
+<section id="simple-ode">
+<h3>Simple ODE<a class="headerlink" href="#simple-ode" title="Link to this heading">¶</a></h3>
+<p>Solve the exponential decay equation: dx/dt = -x</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax.numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">jnp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_ode</span>
+
+<span class="c1"># Define the differential equation: dx/dt = -x</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dfun</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">x</span>
+
+<span class="c1"># Setup</span>
+<span class="n">dt</span> <span class="o">=</span> <span class="mf">0.01</span>
+<span class="n">t_max</span> <span class="o">=</span> <span class="mf">5.0</span>
+<span class="n">ts</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_max</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span>
+<span class="n">x0</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+<span class="c1"># Create integrator and solve</span>
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_ode</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;rk4&#39;</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;x(0) = </span><span class="si">{</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, x(T) = </span><span class="si">{</span><span class="n">x</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="system-of-odes-harmonic-oscillator">
+<h3>System of ODEs: Harmonic Oscillator<a class="headerlink" href="#system-of-odes-harmonic-oscillator" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">harmonic_oscillator</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;state = [position, velocity]&quot;&quot;&quot;</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">state</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">v</span><span class="p">,</span> <span class="o">-</span><span class="n">x</span><span class="p">])</span>  <span class="c1"># [dx/dt, dv/dt]</span>
+
+<span class="n">x0</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_ode</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">harmonic_oscillator</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;rk4&#39;</span><span class="p">)</span>
+<span class="n">states</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="stochastic-differential-equation">
+<h3>Stochastic Differential Equation<a class="headerlink" href="#stochastic-differential-equation" title="Link to this heading">¶</a></h3>
+<p>Ornstein-Uhlenbeck process with pre-generated noise:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">jax</span><span class="w"> </span><span class="kn">import</span> <span class="n">random</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_sde</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">drift</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">p</span> <span class="o">*</span> <span class="n">x</span>  <span class="c1"># Drift coefficient</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">diffusion</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="k">return</span> <span class="mf">0.5</span>  <span class="c1"># Diffusion coefficient</span>
+
+<span class="c1"># Generate noise beforehand</span>
+<span class="n">key</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">n_steps</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">t_max</span> <span class="o">/</span> <span class="n">dt</span><span class="p">)</span>
+<span class="n">zs</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">(</span><span class="n">n_steps</span><span class="p">,))</span>
+
+<span class="c1"># Solve</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_sde</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">drift</span><span class="p">,</span> <span class="n">diffusion</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">x0</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">zs</span><span class="o">=</span><span class="n">zs</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">theta</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="delay-differential-equation">
+<h3>Delay Differential Equation<a class="headerlink" href="#delay-differential-equation" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_dde</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">delayed_system</span><span class="p">(</span><span class="n">xt</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;DDE: dx/dt = -x(t-τ)&quot;&quot;&quot;</span>
+    <span class="n">tau_steps</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="n">x_delayed</span> <span class="o">=</span> <span class="n">xt</span><span class="p">[</span><span class="n">t</span> <span class="o">-</span> <span class="n">tau_steps</span><span class="p">]</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">x_delayed</span>
+
+<span class="c1"># Setup with delay</span>
+<span class="n">dt</span> <span class="o">=</span> <span class="mf">0.01</span>
+<span class="n">tau</span> <span class="o">=</span> <span class="mf">1.0</span>  <span class="c1"># delay time</span>
+<span class="n">tau_steps</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">tau</span> <span class="o">/</span> <span class="n">dt</span><span class="p">)</span>
+<span class="n">n_steps</span> <span class="o">=</span> <span class="mi">100</span>
+
+<span class="c1"># Create history buffer</span>
+<span class="n">buffer_size</span> <span class="o">=</span> <span class="n">tau_steps</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">n_steps</span>
+<span class="n">history</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">buffer_size</span><span class="p">)</span>
+<span class="n">history</span> <span class="o">=</span> <span class="n">history</span><span class="o">.</span><span class="n">at</span><span class="p">[</span><span class="n">tau_steps</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
+
+<span class="c1"># Solve</span>
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_dde</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">tau_steps</span><span class="p">,</span> <span class="n">delayed_system</span><span class="p">)</span>
+<span class="n">buf_final</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">history</span><span class="p">,</span> <span class="n">tau_steps</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="api-reference">
+<h2>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h2>
+<section id="make-ode">
+<h3>make_ode<a class="headerlink" href="#make-ode" title="Link to this heading">¶</a></h3>
+<p>Create an ordinary differential equation integrator.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="make_ode">
+<span class="sig-name descname"><span class="pre">make_ode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'heun'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#make_ode" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dt</strong> (<em>float</em>) – Time step size</p></li>
+<li><p><strong>dfun</strong> (<em>callable</em>) – Function <code class="docutils literal notranslate"><span class="pre">dfun(x,</span> <span class="pre">p)</span></code> that returns dx/dt</p></li>
+<li><p><strong>method</strong> (<em>str</em>) – Integration method - <code class="docutils literal notranslate"><span class="pre">'euler'</span></code>, <code class="docutils literal notranslate"><span class="pre">'heun'</span></code>, or <code class="docutils literal notranslate"><span class="pre">'rk4'</span></code></p></li>
+<li><p><strong>adhoc</strong> (<em>callable</em>) – Optional function <code class="docutils literal notranslate"><span class="pre">f(x,</span> <span class="pre">p)</span></code> for post-step corrections</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tuple of (step, loop) functions</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+<p><strong>Returns:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">step</span></code>: Single step function <code class="docutils literal notranslate"><span class="pre">step(x,</span> <span class="pre">t,</span> <span class="pre">p)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">loop</span></code>: Full integration function <code class="docutils literal notranslate"><span class="pre">loop(x0,</span> <span class="pre">ts,</span> <span class="pre">p)</span></code></p></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">dfun</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">p</span> <span class="o">*</span> <span class="n">x</span>  <span class="c1"># dx/dt = -p*x</span>
+
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_ode</span><span class="p">(</span><span class="n">dt</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">dfun</span><span class="o">=</span><span class="n">dfun</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;rk4&#39;</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">x0</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">ts</span><span class="o">=</span><span class="n">jnp</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">),</span> <span class="n">p</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="make-sde">
+<h3>make_sde<a class="headerlink" href="#make-sde" title="Link to this heading">¶</a></h3>
+<p>Create a stochastic differential equation integrator using the stochastic Heun method.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="make_sde">
+<span class="sig-name descname"><span class="pre">make_sde</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_euler</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unroll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#make_sde" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dt</strong> (<em>float</em>) – Time step size</p></li>
+<li><p><strong>dfun</strong> (<em>callable</em>) – Drift function <code class="docutils literal notranslate"><span class="pre">dfun(x,</span> <span class="pre">p)</span></code> returning drift coefficient</p></li>
+<li><p><strong>gfun</strong> (<em>callable</em><em> or </em><em>float</em>) – Diffusion function <code class="docutils literal notranslate"><span class="pre">gfun(x,</span> <span class="pre">p)</span></code> or constant diffusion</p></li>
+<li><p><strong>adhoc</strong> (<em>callable</em>) – Optional post-step correction function</p></li>
+<li><p><strong>return_euler</strong> (<em>bool</em>) – If True, also return Euler estimates</p></li>
+<li><p><strong>unroll</strong> (<em>int</em>) – Loop unroll factor for performance</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tuple of (step, loop) functions</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+<p><strong>Returns:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">step</span></code>: Single step function <code class="docutils literal notranslate"><span class="pre">step(x,</span> <span class="pre">z_t,</span> <span class="pre">p)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">loop</span></code>: Full integration function <code class="docutils literal notranslate"><span class="pre">loop(x0,</span> <span class="pre">zs,</span> <span class="pre">p)</span></code> where <code class="docutils literal notranslate"><span class="pre">zs</span></code> are noise samples</p></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">drift</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">theta</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">theta</span> <span class="o">*</span> <span class="n">x</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">diffusion</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="k">return</span> <span class="mf">0.5</span>
+
+<span class="c1"># Generate noise</span>
+<span class="n">key</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">zs</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">(</span><span class="n">n_steps</span><span class="p">,))</span>
+
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_sde</span><span class="p">(</span><span class="n">dt</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">dfun</span><span class="o">=</span><span class="n">drift</span><span class="p">,</span> <span class="n">gfun</span><span class="o">=</span><span class="n">diffusion</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">x0</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">zs</span><span class="o">=</span><span class="n">zs</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="make-dde">
+<h3>make_dde<a class="headerlink" href="#make-dde" title="Link to this heading">¶</a></h3>
+<p>Create a delay differential equation integrator.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="make_dde">
+<span class="sig-name descname"><span class="pre">make_dde</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unroll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#make_dde" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dt</strong> (<em>float</em>) – Time step size</p></li>
+<li><p><strong>nh</strong> (<em>int</em>) – Maximum delay in time steps</p></li>
+<li><p><strong>dfun</strong> (<em>callable</em>) – <p>Function <code class="docutils literal notranslate"><span class="pre">dfun(xt,</span> <span class="pre">x,</span> <span class="pre">t,</span> <span class="pre">p)</span></code> where:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">xt</span></code>: History buffer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">x</span></code>: Current state</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">t</span></code>: Current time index in buffer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">p</span></code>: Parameters</p></li>
+</ul>
+</p></li>
+<li><p><strong>unroll</strong> (<em>int</em>) – Loop unroll factor</p></li>
+<li><p><strong>adhoc</strong> (<em>callable</em>) – Optional post-step correction</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tuple of (step, loop) functions</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">dfun</span><span class="p">(</span><span class="n">xt</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">tau_steps</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">xt</span><span class="p">[</span><span class="n">t</span> <span class="o">-</span> <span class="n">tau_steps</span><span class="p">]</span>  <span class="c1"># dx/dt = -x(t-τ)</span>
+
+<span class="n">tau_steps</span> <span class="o">=</span> <span class="mi">100</span>
+<span class="n">buffer_size</span> <span class="o">=</span> <span class="n">tau_steps</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">n_steps</span>
+<span class="n">history</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">buffer_size</span><span class="p">)</span>
+
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_dde</span><span class="p">(</span><span class="n">dt</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">nh</span><span class="o">=</span><span class="n">tau_steps</span><span class="p">,</span> <span class="n">dfun</span><span class="o">=</span><span class="n">dfun</span><span class="p">)</span>
+<span class="n">buf</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">history</span><span class="p">,</span> <span class="n">tau_steps</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="make-sdde">
+<h3>make_sdde<a class="headerlink" href="#make-sdde" title="Link to this heading">¶</a></h3>
+<p>Create a stochastic delay differential equation integrator.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="make_sdde">
+<span class="sig-name descname"><span class="pre">make_sdde</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gfun</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unroll</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_delays</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adhoc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#make_sdde" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dt</strong> (<em>float</em>) – Time step size</p></li>
+<li><p><strong>nh</strong> (<em>int</em>) – Maximum delay in time steps (set to 0 for no delay)</p></li>
+<li><p><strong>dfun</strong> (<em>callable</em>) – Drift function <code class="docutils literal notranslate"><span class="pre">dfun(xt,</span> <span class="pre">x,</span> <span class="pre">t,</span> <span class="pre">p)</span></code></p></li>
+<li><p><strong>gfun</strong> (<em>callable</em><em> or </em><em>float</em>) – Diffusion function or constant</p></li>
+<li><p><strong>unroll</strong> (<em>int</em>) – Loop unroll factor</p></li>
+<li><p><strong>zero_delays</strong> (<em>bool</em>) – Include predictor in history (performance vs accuracy)</p></li>
+<li><p><strong>adhoc</strong> (<em>callable</em>) – Optional post-step correction</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tuple of (step, loop) functions</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">nh=0</span></code>, the function automatically uses the optimized SDE integrator
+for better performance and accuracy.</p>
+</div>
+</dd></dl>
+
+</section>
+</section>
+<section id="integration-methods">
+<h2>Integration Methods<a class="headerlink" href="#integration-methods" title="Link to this heading">¶</a></h2>
+<section id="accuracy-comparison">
+<h3>Accuracy Comparison<a class="headerlink" href="#accuracy-comparison" title="Link to this heading">¶</a></h3>
+<p>For a smooth ODE with step size dt:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 15.0%" />
+<col style="width: 10.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Method</p></th>
+<th class="head"><p>Order</p></th>
+<th class="head"><p>Error</p></th>
+<th class="head"><p>Speed</p></th>
+<th class="head"><p>Use Case</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Euler</p></td>
+<td><p>1</p></td>
+<td><p>O(dt)</p></td>
+<td><p>Fastest</p></td>
+<td><p>Quick prototyping, very smooth problems</p></td>
+</tr>
+<tr class="row-odd"><td><p>Heun</p></td>
+<td><p>2</p></td>
+<td><p>O(dt²)</p></td>
+<td><p>Medium</p></td>
+<td><p>Good balance, <strong>default choice</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>RK4</p></td>
+<td><p>4</p></td>
+<td><p>O(dt⁴)</p></td>
+<td><p>Slower</p></td>
+<td><p>High accuracy requirements</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="method-selection-guide">
+<h3>Method Selection Guide<a class="headerlink" href="#method-selection-guide" title="Link to this heading">¶</a></h3>
+<p><strong>Euler Method:</strong></p>
+<ul class="simple">
+<li><p>Fastest execution</p></li>
+<li><p>Use for very smooth problems or when speed is critical</p></li>
+<li><p>Good for quick prototyping</p></li>
+</ul>
+<p><strong>Heun Method (default):</strong></p>
+<ul class="simple">
+<li><p>Best balance of speed and accuracy</p></li>
+<li><p>Recommended for most applications</p></li>
+<li><p>2nd order accurate</p></li>
+</ul>
+<p><strong>RK4 (Runge-Kutta 4th order):</strong></p>
+<ul class="simple">
+<li><p>Highest accuracy among available methods</p></li>
+<li><p>Use when precision is critical</p></li>
+<li><p>Required for stiff or complex dynamics</p></li>
+</ul>
+</section>
+</section>
+<section id="comparison-with-scipy">
+<h2>Comparison with SciPy<a class="headerlink" href="#comparison-with-scipy" title="Link to this heading">¶</a></h2>
+<section id="advantages-of-vbjax">
+<h3>Advantages of vbjax<a class="headerlink" href="#advantages-of-vbjax" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>10-100x faster</strong> with JIT compilation</p></li>
+<li><p>GPU/TPU support</p></li>
+<li><p>Automatic differentiation through integrators</p></li>
+<li><p>Vectorization over multiple initial conditions using <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code></p></li>
+</ul>
+</section>
+<section id="advantages-of-scipy">
+<h3>Advantages of SciPy<a class="headerlink" href="#advantages-of-scipy" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Adaptive step size methods</p></li>
+<li><p>Better for stiff problems</p></li>
+<li><p>More mature error control</p></li>
+<li><p>Wider method selection (RK45, DOP853, etc.)</p></li>
+</ul>
+</section>
+<section id="recommendation">
+<h3>Recommendation<a class="headerlink" href="#recommendation" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Use <strong>vbjax</strong> for speed-critical applications, parameter fitting (with gradients), or GPU acceleration</p></li>
+<li><p>Use <strong>SciPy</strong> for one-off integrations or stiff problems requiring adaptive methods</p></li>
+</ul>
+</section>
+<section id="accuracy-validation-example">
+<h3>Accuracy Validation Example<a class="headerlink" href="#accuracy-validation-example" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.integrate</span><span class="w"> </span><span class="kn">import</span> <span class="n">solve_ivp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">vbjax</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_ode</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">lorenz</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">sigma</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">beta</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">x3</span> <span class="o">=</span> <span class="n">x</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span>
+        <span class="n">sigma</span> <span class="o">*</span> <span class="p">(</span><span class="n">x2</span> <span class="o">-</span> <span class="n">x1</span><span class="p">),</span>
+        <span class="n">x1</span> <span class="o">*</span> <span class="p">(</span><span class="n">rho</span> <span class="o">-</span> <span class="n">x3</span><span class="p">)</span> <span class="o">-</span> <span class="n">x2</span><span class="p">,</span>
+        <span class="n">x1</span> <span class="o">*</span> <span class="n">x2</span> <span class="o">-</span> <span class="n">beta</span> <span class="o">*</span> <span class="n">x3</span>
+    <span class="p">])</span>
+
+<span class="c1"># JAX solution</span>
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_ode</span><span class="p">(</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">lorenz</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;rk4&#39;</span><span class="p">)</span>
+<span class="n">x_jax</span> <span class="o">=</span> <span class="n">loop</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+
+<span class="c1"># SciPy solution</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">lorenz_scipy</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">lorenz</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">params</span><span class="p">))</span>
+
+<span class="n">sol</span> <span class="o">=</span> <span class="n">solve_ivp</span><span class="p">(</span><span class="n">lorenz_scipy</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_max</span><span class="p">],</span> <span class="n">x0</span><span class="p">,</span>
+                <span class="n">t_eval</span><span class="o">=</span><span class="n">ts</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;RK45&#39;</span><span class="p">)</span>
+<span class="n">x_scipy</span> <span class="o">=</span> <span class="n">sol</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">T</span>
+
+<span class="c1"># Compare</span>
+<span class="n">diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">x_jax</span> <span class="o">-</span> <span class="n">x_scipy</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Max difference: </span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">diff</span><span class="p">)</span><span class="si">:</span><span class="s2">.2e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="c1"># Typical: ~1e-6 to 1e-8</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="advanced-usage">
+<h2>Advanced Usage<a class="headerlink" href="#advanced-usage" title="Link to this heading">¶</a></h2>
+<section id="automatic-differentiation">
+<h3>Automatic Differentiation<a class="headerlink" href="#automatic-differentiation" title="Link to this heading">¶</a></h3>
+<p>Compute gradients through the integrator:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">solve_ode</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+    <span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_ode</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="o">-</span><span class="n">p</span> <span class="o">*</span> <span class="n">x</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;rk4&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">loop</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+
+<span class="c1"># Gradient of final state w.r.t. parameters</span>
+<span class="n">grad_fn</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">solve_ode</span><span class="p">(</span><span class="n">p</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">gradient</span> <span class="o">=</span> <span class="n">grad_fn</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="vectorization-over-initial-conditions">
+<h3>Vectorization Over Initial Conditions<a class="headerlink" href="#vectorization-over-initial-conditions" title="Link to this heading">¶</a></h3>
+<p>Solve for multiple initial conditions in parallel using <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Solve for multiple initial conditions in parallel</span>
+<span class="n">x0_batch</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">])</span>
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_ode</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;rk4&#39;</span><span class="p">)</span>
+
+<span class="c1"># Vectorize over first argument (x0)</span>
+<span class="n">loop_vmap</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">vmap</span><span class="p">(</span><span class="n">loop</span><span class="p">,</span> <span class="n">in_axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+<span class="n">x_batch</span> <span class="o">=</span> <span class="n">loop_vmap</span><span class="p">(</span><span class="n">x0_batch</span><span class="p">,</span> <span class="n">ts</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+<span class="c1"># Shape: (4, len(ts)) for each initial condition</span>
+</pre></div>
+</div>
+</section>
+<section id="custom-post-step-corrections">
+<h3>Custom Post-Step Corrections<a class="headerlink" href="#custom-post-step-corrections" title="Link to this heading">¶</a></h3>
+<p>Enforce constraints after each integration step:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">adhoc</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enforce positivity constraint&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">jnp</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_ode</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">dfun</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;rk4&#39;</span><span class="p">,</span> <span class="n">adhoc</span><span class="o">=</span><span class="n">adhoc</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="performance-tips">
+<h2>Performance Tips<a class="headerlink" href="#performance-tips" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Use JIT compilation</strong>: The <code class="docutils literal notranslate"><span class="pre">loop</span></code> functions are pre-compiled with <code class="docutils literal notranslate"><span class="pre">&#64;jax.jit</span></code></p></li>
+<li><p><strong>Batch initial conditions</strong>: Use <code class="docutils literal notranslate"><span class="pre">jax.vmap</span></code> to solve multiple ICs in parallel</p></li>
+<li><p><strong>GPU acceleration</strong>: Set <code class="docutils literal notranslate"><span class="pre">JAX_PLATFORM_NAME=gpu</span></code> for GPU execution</p></li>
+<li><p><strong>Unroll parameter</strong>: Adjust <code class="docutils literal notranslate"><span class="pre">unroll</span></code> in SDEs/DDEs for better performance</p></li>
+<li><p><strong>Memory</strong>: For long simulations with delays, use <code class="docutils literal notranslate"><span class="pre">make_continuation</span></code> helper</p></li>
+</ol>
+</section>
+<section id="common-issues-and-solutions">
+<h2>Common Issues and Solutions<a class="headerlink" href="#common-issues-and-solutions" title="Link to this heading">¶</a></h2>
+<section id="tracererror-or-concretizationerror">
+<h3>TracerError or ConcretizationError<a class="headerlink" href="#tracererror-or-concretizationerror" title="Link to this heading">¶</a></h3>
+<p><strong>Problem</strong>: Error when using Python control flow or NumPy operations.</p>
+<p><strong>Solution</strong>:</p>
+<ul class="simple">
+<li><p>Use JAX functions (<code class="docutils literal notranslate"><span class="pre">jnp</span></code> not <code class="docutils literal notranslate"><span class="pre">np</span></code>)</p></li>
+<li><p>Avoid Python control flow</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">jax.lax.cond</span></code> for conditionals</p></li>
+</ul>
+</section>
+<section id="numerical-instability">
+<h3>Numerical Instability<a class="headerlink" href="#numerical-instability" title="Link to this heading">¶</a></h3>
+<p><strong>Problem</strong>: Solutions explode or become NaN.</p>
+<p><strong>Solution</strong>:</p>
+<ul class="simple">
+<li><p>Reduce <code class="docutils literal notranslate"><span class="pre">dt</span></code> (time step)</p></li>
+<li><p>Use higher-order method (RK4 instead of Euler)</p></li>
+<li><p>Check problem formulation</p></li>
+</ul>
+</section>
+<section id="slow-first-run">
+<h3>Slow First Run<a class="headerlink" href="#slow-first-run" title="Link to this heading">¶</a></h3>
+<p><strong>Problem</strong>: First execution is very slow.</p>
+<p><strong>Solution</strong>:</p>
+<ul class="simple">
+<li><p>This is JIT compilation (normal behavior)</p></li>
+<li><p>Subsequent runs will be much faster</p></li>
+<li><p>Warmup with a dummy run if needed</p></li>
+</ul>
+</section>
+<section id="memory-error-with-ddes">
+<h3>Memory Error with DDEs<a class="headerlink" href="#memory-error-with-ddes" title="Link to this heading">¶</a></h3>
+<p><strong>Problem</strong>: Out of memory for long delay simulations.</p>
+<p><strong>Solution</strong>:</p>
+<ul class="simple">
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">make_continuation</span></code> for long simulations</p></li>
+<li><p>Reduce buffer size if possible</p></li>
+<li><p>Process data in chunks</p></li>
+</ul>
+</section>
+</section>
+<section id="zero-delay-optimization">
+<h2>Zero Delay Optimization<a class="headerlink" href="#zero-delay-optimization" title="Link to this heading">¶</a></h2>
+<p>When using <code class="docutils literal notranslate"><span class="pre">make_sdde</span></code> with <code class="docutils literal notranslate"><span class="pre">nh=0</span></code> (no delay), the integrator automatically
+switches to the optimized SDE implementation for better performance and accuracy.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Automatically uses optimized SDE integrator when nh=0</span>
+<span class="n">step</span><span class="p">,</span> <span class="n">loop</span> <span class="o">=</span> <span class="n">make_sdde</span><span class="p">(</span><span class="n">dt</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">nh</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">dfun</span><span class="o">=</span><span class="n">dfun</span><span class="p">,</span> <span class="n">gfun</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+
+<span class="c1"># This is equivalent to and faster than the full SDDE machinery</span>
+</pre></div>
+</div>
+<p>This optimization is transparent to the user and ensures the best performance
+for your specific use case.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Numerical Integration Guide</a><ul>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#quick-start-examples">Quick Start Examples</a><ul>
+<li><a class="reference internal" href="#simple-ode">Simple ODE</a></li>
+<li><a class="reference internal" href="#system-of-odes-harmonic-oscillator">System of ODEs: Harmonic Oscillator</a></li>
+<li><a class="reference internal" href="#stochastic-differential-equation">Stochastic Differential Equation</a></li>
+<li><a class="reference internal" href="#delay-differential-equation">Delay Differential Equation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#api-reference">API Reference</a><ul>
+<li><a class="reference internal" href="#make-ode">make_ode</a><ul>
+<li><a class="reference internal" href="#make_ode"><code class="docutils literal notranslate"><span class="pre">make_ode()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#make-sde">make_sde</a><ul>
+<li><a class="reference internal" href="#make_sde"><code class="docutils literal notranslate"><span class="pre">make_sde()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#make-dde">make_dde</a><ul>
+<li><a class="reference internal" href="#make_dde"><code class="docutils literal notranslate"><span class="pre">make_dde()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#make-sdde">make_sdde</a><ul>
+<li><a class="reference internal" href="#make_sdde"><code class="docutils literal notranslate"><span class="pre">make_sdde()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#integration-methods">Integration Methods</a><ul>
+<li><a class="reference internal" href="#accuracy-comparison">Accuracy Comparison</a></li>
+<li><a class="reference internal" href="#method-selection-guide">Method Selection Guide</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#comparison-with-scipy">Comparison with SciPy</a><ul>
+<li><a class="reference internal" href="#advantages-of-vbjax">Advantages of vbjax</a></li>
+<li><a class="reference internal" href="#advantages-of-scipy">Advantages of SciPy</a></li>
+<li><a class="reference internal" href="#recommendation">Recommendation</a></li>
+<li><a class="reference internal" href="#accuracy-validation-example">Accuracy Validation Example</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#advanced-usage">Advanced Usage</a><ul>
+<li><a class="reference internal" href="#automatic-differentiation">Automatic Differentiation</a></li>
+<li><a class="reference internal" href="#vectorization-over-initial-conditions">Vectorization Over Initial Conditions</a></li>
+<li><a class="reference internal" href="#custom-post-step-corrections">Custom Post-Step Corrections</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#performance-tips">Performance Tips</a></li>
+<li><a class="reference internal" href="#common-issues-and-solutions">Common Issues and Solutions</a><ul>
+<li><a class="reference internal" href="#tracererror-or-concretizationerror">TracerError or ConcretizationError</a></li>
+<li><a class="reference internal" href="#numerical-instability">Numerical Instability</a></li>
+<li><a class="reference internal" href="#slow-first-run">Slow First Run</a></li>
+<li><a class="reference internal" href="#memory-error-with-ddes">Memory Error with DDEs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#zero-delay-optimization">Zero Delay Optimization</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="tutorial.html"
+                          title="previous chapter">Tutorial</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="modules.html"
+                          title="next chapter">neural_mass</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/integrators.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="modules.html" title="neural_mass"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="tutorial.html" title="Tutorial"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">vbjax 0.1.dev1+ge3c84a251 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="tutorial.html" >Tutorial</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Numerical Integration Guide</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2023, Marmaduke Woodman.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>
