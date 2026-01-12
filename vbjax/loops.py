@@ -246,6 +246,90 @@ def make_dde(dt, nh, dfun, unroll=10, adhoc=None):
     return make_sdde(dt, nh, dfun, 0, unroll, adhoc=adhoc)
 
 
+def make_sdde_colored(dt, nh, dfun, gfun, noise_rate, unroll=1, zero_delays=False, adhoc=None):
+    """
+    Helper for creating an SDDE integrator with colored noise.
+
+    The noise evolves as an Ornstein-Uhlenbeck process.
+    State is augmented to ((buf, t), e).
+    """
+    sqrt_dt = np.sqrt(dt)
+    heun = True
+
+    if nh == 0:
+        def sde_dfun(x, p):
+            return dfun(None, x, 0, p)
+
+        # When nh=0, use make_sde (which handles colored noise via make_sde_colored)
+        sde_step, sde_loop = make_sde(dt, sde_dfun, gfun, adhoc=adhoc, return_euler=False, unroll=unroll, noise_rate=noise_rate)
+
+        def step(buf_t_e, z_t, p):
+            buf_t, e = buf_t_e
+            buf, t = buf_t
+            x = tmap(lambda buf: buf[nh + t], buf)
+            (nx, ne) = sde_step((x, e), z_t, p)
+            buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
+            return ((buf, t+1), ne), nx
+
+        def loop(buf_e, p, t=0):
+            buf, e = buf_e
+            op = lambda xt, tz: step(xt, tz, p)
+            dWt = tmap(lambda b: b[nh+1:], buf)
+            ((buf, _), ne), nxs = jax.lax.scan(op, ((buf, t), e), dWt, unroll=unroll)
+            return (buf, ne), nxs
+        return step, loop
+
+    if not hasattr(gfun, '__call__'):
+        sig = gfun
+        gfun = lambda *_: sig
+
+    if adhoc is None:
+        adhoc = lambda x,p : x
+
+    E = np.exp(-noise_rate * dt)
+    one_minus_E2 = 1.0 - E**2
+
+    def step(buf_t_e, z_t, p):
+        buf_t, e = buf_t_e
+        buf, t = buf_t
+        x = tmap(lambda buf: buf[nh + t], buf)
+
+        noise_x = tmap(lambda e: e * dt, e)
+
+        d1 = dfun(buf, x, nh + t, p)
+        xi = tmap(lambda x,d,n: x + dt*d + n, x, d1, noise_x)
+        xi = adhoc(xi, p)
+
+        if zero_delays:
+            buf = tmap(lambda buf, xi: buf.at[nh + t + 1].set(xi), buf, xi)
+        d2 = dfun(buf, xi, nh + t + 1, p)
+        nx = tmap(lambda x,d1,d2,n: x + dt*0.5*(d1 + d2) + n, x, d1, d2, noise_x)
+        nx = adhoc(nx, p)
+
+        buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
+
+        sigma = gfun(x, p)
+        def compute_h(sig, z):
+            return sig * np.sqrt(noise_rate * one_minus_E2) * z
+        if isinstance(sigma, float) or (hasattr(sigma, 'ndim') and sigma.ndim == 0):
+                h = tmap(lambda z: compute_h(sigma, z), z_t)
+        else:
+                h = tmap(compute_h, sigma, z_t)
+
+        ne = tmap(lambda e, h: e * E + h, e, h)
+
+        return ((buf, t+1), ne), nx
+
+    def loop(buf_e, p, t=0):
+        buf, e = buf_e
+        op = lambda xt, tz: step(xt, tz, p)
+        dWt = tmap(lambda b: b[nh+1:], buf)
+        ((buf, _), ne), nxs = jax.lax.scan(op, ((buf, t), e), dWt, unroll=unroll)
+        return (buf, ne), nxs
+
+    return step, loop
+
+
 def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None, noise_rate=None):
     """Use a stochastic Heun scheme to integrate autonomous
     stochastic delay differential equations (SDEs).
@@ -299,6 +383,9 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None, noise
 
     """
 
+    if noise_rate is not None:
+        return make_sdde_colored(dt, nh, dfun, gfun, noise_rate, unroll, zero_delays, adhoc)
+
     heun = True
     sqrt_dt = np.sqrt(dt)
     nh = int(nh)
@@ -307,25 +394,7 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None, noise
         def sde_dfun(x, p):
             return dfun(None, x, 0, p)
         
-        # When nh=0, use make_sde (which handles colored noise via recursion to make_sde_colored)
         sde_step, sde_loop = make_sde(dt, sde_dfun, gfun, adhoc=adhoc, return_euler=False, unroll=unroll, noise_rate=noise_rate)
-        
-        if noise_rate is not None:
-             def step(buf_t_e, z_t, p):
-                buf_t, e = buf_t_e
-                buf, t = buf_t
-                x = tmap(lambda buf: buf[nh + t], buf)
-                (nx, ne) = sde_step((x, e), z_t, p)
-                buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
-                return ((buf, t+1), ne), nx
-
-             def loop(buf_e, p, t=0):
-                buf, e = buf_e
-                op = lambda xt, tz: step(xt, tz, p)
-                dWt = tmap(lambda b: b[nh+1:], buf)
-                ((buf, _), ne), nxs = jax.lax.scan(op, ((buf, t), e), dWt, unroll=unroll)
-                return (buf, ne), nxs
-             return step, loop
 
         def step(buf_t, z_t, p):
             buf, t = buf_t
@@ -350,51 +419,6 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None, noise
     if adhoc is None:
         adhoc = lambda x,p : x
 
-    if noise_rate is not None:
-        E = np.exp(-noise_rate * dt)
-        one_minus_E2 = 1.0 - E**2
-
-        def step(buf_t_e, z_t, p):
-            buf_t, e = buf_t_e
-            buf, t = buf_t
-            x = tmap(lambda buf: buf[nh + t], buf)
-
-            noise_x = tmap(lambda e: e * dt, e)
-
-            d1 = dfun(buf, x, nh + t, p)
-            xi = tmap(lambda x,d,n: x + dt*d + n, x, d1, noise_x)
-            xi = adhoc(xi, p)
-
-            # heun is always True
-            if zero_delays:
-                buf = tmap(lambda buf, xi: buf.at[nh + t + 1].set(xi), buf, xi)
-            d2 = dfun(buf, xi, nh + t + 1, p)
-            nx = tmap(lambda x,d1,d2,n: x + dt*0.5*(d1 + d2) + n, x, d1, d2, noise_x)
-            nx = adhoc(nx, p)
-
-            buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
-
-            sigma = gfun(x, p)
-            def compute_h(sig, z):
-                return sig * np.sqrt(noise_rate * one_minus_E2) * z
-            if isinstance(sigma, float) or (hasattr(sigma, 'ndim') and sigma.ndim == 0):
-                 h = tmap(lambda z: compute_h(sigma, z), z_t)
-            else:
-                 h = tmap(compute_h, sigma, z_t)
-
-            ne = tmap(lambda e, h: e * E + h, e, h)
-
-            return ((buf, t+1), ne), nx
-
-        def loop(buf_e, p, t=0):
-            buf, e = buf_e
-            op = lambda xt, tz: step(xt, tz, p)
-            dWt = tmap(lambda b: b[nh+1:], buf)
-            ((buf, _), ne), nxs = jax.lax.scan(op, ((buf, t), e), dWt, unroll=unroll)
-            return (buf, ne), nxs
-
-        return step, loop
-
     def step(buf_t, z_t, p):
         buf, t = buf_t
         x = tmap(lambda buf: buf[nh + t], buf)
@@ -404,19 +428,21 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None, noise
         xi = adhoc(xi, p)
         if heun:
             if zero_delays:
+                # severe performance hit (5x+)
                 buf = tmap(lambda buf, xi: buf.at[nh + t + 1].set(xi), buf, xi)
             d2 = dfun(buf, xi, nh + t + 1, p)
             nx = tmap(lambda x,d1,d2,n: x + dt*0.5*(d1 + d2) + n, x, d1, d2, noise)
             nx = adhoc(nx, p)
         else:
             nx = xi
+        # jax.debug.print("buf len is {b}, going to write to {i}", b=buf.shape[0], i=nh+t+1)
         buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
         return (buf, t+1), nx
 
     def loop(buf, p, t=0):
         "xt is the buffer, zt is (ts, zs), p is parameters."
         op = lambda xt, tz: step(xt, tz, p)
-        dWt = tmap(lambda b: b[nh+1:], buf)
+        dWt = tmap(lambda b: b[nh+1:], buf) # history is buf[nh:], current state is buf[nh], randn samples are buf[nh+1:]
         (buf, _), nxs = jax.lax.scan(op, (buf, t), dWt, unroll=unroll)
         return buf, nxs
 
