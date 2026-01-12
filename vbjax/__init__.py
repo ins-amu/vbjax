@@ -21,6 +21,7 @@ cores = _use_many_cores()
 
 # import stuff
 from .loops import make_sde, make_ode, make_dde, make_sdde, heun_step, make_continuation
+from .implicit import jacobi, make_implicit_sde
 from .shtlc import make_shtdiff
 from .neural_mass import (
     JRState, JRTheta, jr_dfun, jr_default_theta,

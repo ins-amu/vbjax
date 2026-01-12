@@ -1,0 +1,135 @@
+
+import jax
+import jax.numpy as np
+import vbjax
+import pytest
+
+def test_jacobi():
+    A = np.array([[4.0, 1.0], [1.0, 3.0]])
+    b = np.array([1.0, 2.0])
+    x, n_iter = vbjax.jacobi(A, b, tol=1e-6)
+    expected = np.linalg.solve(A, b)
+    assert np.allclose(x, expected, atol=1e-5)
+
+def test_make_implicit_sde_linear():
+    # dy = -k * y * dt
+    k = 1.0
+    def f(y, k):
+        return -k * y
+
+    def j_fn(y, k):
+        return -k * np.eye(y.size)
+
+    y0 = np.array([1.0])
+    dt = 0.1
+    tf = 1.0
+
+    # 0.5 = Crank-Nicolson -> trapezoidal rule
+    step, loop = vbjax.make_implicit_sde(dt, f, j_fn, 0.0, th=0.5)
+
+    # Create noise (zeros since deterministic test)
+    n_steps = int(tf / dt)
+    zs = np.zeros((n_steps, 1))
+
+    ys = loop(y0, zs, k)
+
+    ts = np.arange(1, n_steps + 1) * dt
+    exact = y0 * np.exp(-ts)
+
+    factor = (1 - k*dt/2) / (1 + k*dt/2)
+    expected_numeric = y0 * (factor ** np.arange(1, n_steps + 1))
+
+    error = np.abs(ys.flatten() - expected_numeric)
+    assert np.max(error) < 1e-5
+
+    # Also check against exact just to be sure it's close
+    error_exact = np.abs(ys.flatten() - exact)
+    assert np.max(error_exact) < 1e-2
+
+
+def test_make_implicit_sde_autodiff():
+    # dy = -y^3
+    def f(y, p):
+        return -y**3
+
+    # Auto-diff Jacobian
+    j_fn = jax.jacfwd(f)
+
+    y0 = np.array([1.0])
+    dt = 0.1
+    tf = 1.0
+
+    step, loop = vbjax.make_implicit_sde(dt, f, j_fn, 0.0, th=1.0) # Backward Euler
+
+    n_steps = int(tf / dt)
+    zs = np.zeros((n_steps, 1))
+
+    ys = loop(y0, zs, None)
+
+    # Backward Euler: y_{n+1} = y_n - h * y_{n+1}^3
+    # Check consistency
+    for i in range(n_steps):
+        prev = y0 if i == 0 else ys[i-1]
+        curr = ys[i]
+        res = curr + dt * curr**3 - prev
+        assert np.abs(res) < 1e-4
+
+@pytest.mark.benchmark(group="stiff_solver")
+def test_benchmark_heun_stiff(benchmark):
+    k = 1000.0
+    dt = 0.0001 # Stability limit requires small dt
+    tf = 1.0
+    n_steps = int(tf / dt)
+
+    def f(y, k):
+        return -k * y
+
+    def g(y, k):
+        return 0.1
+
+    y0 = np.ones(100)
+    zs = jax.random.normal(jax.random.PRNGKey(0), (n_steps, 100))
+
+    _, loop = vbjax.make_sde(dt, f, g)
+
+    # Warmup / Compile
+    loop(y0, zs, k).block_until_ready()
+
+    def run():
+        return loop(y0, zs, k).block_until_ready()
+
+    benchmark(run)
+
+@pytest.mark.benchmark(group="stiff_solver")
+def test_benchmark_implicit_stiff(benchmark):
+    k = 1000.0
+    dt = 0.01 # Implicit can take larger steps
+    tf = 1.0
+    n_steps = int(tf / dt)
+
+    def f(y, k):
+        return -k * y
+
+    def j_fn(y, k):
+        return -k * np.eye(y.size)
+
+    def g(y, k):
+        return 0.1
+
+    y0 = np.ones(100)
+    zs = jax.random.normal(jax.random.PRNGKey(0), (n_steps, 100))
+
+    step, loop = vbjax.make_implicit_sde(dt, f, j_fn, g, th=0.5)
+
+    # Warmup / Compile
+    loop(y0, zs, k).block_until_ready()
+
+    def run():
+        return loop(y0, zs, k).block_until_ready()
+
+    benchmark(run)
+
+if __name__ == "__main__":
+    test_jacobi()
+    test_make_implicit_sde_linear()
+    test_make_implicit_sde_autodiff()
