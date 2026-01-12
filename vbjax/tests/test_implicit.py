@@ -34,10 +34,7 @@ def test_make_implicit_sde_linear():
     ys = loop(y0, zs, k)
 
     ts = np.arange(1, n_steps + 1) * dt
-    exact = y0 * np.exp(-ts) # Actually Trapezoidal rule approximation will differ slightly from exact exp
-    # Trapezoidal: y_{n+1} = y_n + h/2 (f_n + f_{n+1}) = y_n - k*h/2 (y_n + y_{n+1})
-    # y_{n+1} (1 + kh/2) = y_n (1 - kh/2)
-    # y_{n+1} = y_n * (1 - kh/2) / (1 + kh/2)
+    exact = y0 * np.exp(-ts)
 
     factor = (1 - k*dt/2) / (1 + k*dt/2)
     expected_numeric = y0 * (factor ** np.arange(1, n_steps + 1))
@@ -70,13 +67,67 @@ def test_make_implicit_sde_autodiff():
     ys = loop(y0, zs, None)
 
     # Backward Euler: y_{n+1} = y_n - h * y_{n+1}^3
-    # Solve y_{n+1} + h * y_{n+1}^3 - y_n = 0
     # Check consistency
     for i in range(n_steps):
         prev = y0 if i == 0 else ys[i-1]
         curr = ys[i]
         res = curr + dt * curr**3 - prev
         assert np.abs(res) < 1e-4
+
+@pytest.mark.benchmark(group="stiff_solver")
+def test_benchmark_heun_stiff(benchmark):
+    k = 1000.0
+    dt = 0.0001 # Stability limit requires small dt
+    tf = 1.0
+    n_steps = int(tf / dt)
+
+    def f(y, k):
+        return -k * y
+
+    def g(y, k):
+        return 0.1
+
+    y0 = np.ones(100)
+    zs = jax.random.normal(jax.random.PRNGKey(0), (n_steps, 100))
+
+    _, loop = vbjax.make_sde(dt, f, g)
+
+    # Warmup / Compile
+    loop(y0, zs, k).block_until_ready()
+
+    def run():
+        return loop(y0, zs, k).block_until_ready()
+
+    benchmark(run)
+
+@pytest.mark.benchmark(group="stiff_solver")
+def test_benchmark_implicit_stiff(benchmark):
+    k = 1000.0
+    dt = 0.01 # Implicit can take larger steps
+    tf = 1.0
+    n_steps = int(tf / dt)
+
+    def f(y, k):
+        return -k * y
+
+    def j_fn(y, k):
+        return -k * np.eye(y.size)
+
+    def g(y, k):
+        return 0.1
+
+    y0 = np.ones(100)
+    zs = jax.random.normal(jax.random.PRNGKey(0), (n_steps, 100))
+
+    step, loop = vbjax.make_implicit_sde(dt, f, j_fn, g, th=0.5)
+
+    # Warmup / Compile
+    loop(y0, zs, k).block_until_ready()
+
+    def run():
+        return loop(y0, zs, k).block_until_ready()
+
+    benchmark(run)
 
 if __name__ == "__main__":
     test_jacobi()
