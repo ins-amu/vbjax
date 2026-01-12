@@ -111,7 +111,6 @@ def test_heun_pytree():
     _, xs = loop(xs, None)
     assert xs.x.shape == z.x[:-(nh+1)].shape
 
-    # TODO test also w/ gfun generating pytree
     def g(x, p):
         return State(x=0.01, y=0.02)
     _, loop = vb.make_sdde(dt, nh, f, g)
