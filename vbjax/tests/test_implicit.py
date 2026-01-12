@@ -5,74 +5,80 @@ import vbjax
 import pytest
 
 def test_jacobi():
-    # Solve Ax = b
-    # A = [[4, 1], [1, 3]]
-    # b = [1, 2]
-    # Exact solution:
-    # 4x + y = 1
-    # x + 3y = 2
-    # x = 2 - 3y
-    # 4(2-3y) + y = 1 => 8 - 12y + y = 1 => -11y = -7 => y = 7/11
-    # x = 2 - 21/11 = 1/11
-
     A = np.array([[4.0, 1.0], [1.0, 3.0]])
     b = np.array([1.0, 2.0])
-
     x, n_iter = vbjax.jacobi(A, b, tol=1e-6)
-
     expected = np.linalg.solve(A, b)
     assert np.allclose(x, expected, atol=1e-5)
-    print(f"Jacobi solved in {n_iter} iterations. x={x}")
 
-
-def test_theta_linear():
-    # Test implicit scheme on a simple linear ODE: y' = -y
-    # Analytical solution: y(t) = y0 * exp(-t)
-
+def test_make_implicit_sde_linear():
+    # dy = -k * y * dt
     k = 1.0
     def f(y, k):
         return -k * y
 
     def j_fn(y, k):
-        # Jacobian is scalar -k
-        # If y is vector, Jacobian is diagonal -k * I
         return -k * np.eye(y.size)
 
     y0 = np.array([1.0])
-    h = 0.1
+    dt = 0.1
     tf = 1.0
 
-    # Run with Theta=0.5 (Crank-Nicolson)
-    ts, ys = vbjax.theta(f, j_fn, y0, h, tf, k, th=0.5)
+    # 0.5 = Crank-Nicolson -> trapezoidal rule
+    step, loop = vbjax.make_implicit_sde(dt, f, j_fn, 0.0, th=0.5)
 
-    exact = y0 * np.exp(-ts)
-    error = np.abs(ys.flatten() - exact)
+    # Create noise (zeros since deterministic test)
+    n_steps = int(tf / dt)
+    zs = np.zeros((n_steps, 1))
 
-    print(f"Max error (Theta=0.5): {np.max(error)}")
-    assert np.max(error) < 1e-2
+    ys = loop(y0, zs, k)
+
+    ts = np.arange(1, n_steps + 1) * dt
+    exact = y0 * np.exp(-ts) # Actually Trapezoidal rule approximation will differ slightly from exact exp
+    # Trapezoidal: y_{n+1} = y_n + h/2 (f_n + f_{n+1}) = y_n - k*h/2 (y_n + y_{n+1})
+    # y_{n+1} (1 + kh/2) = y_n (1 - kh/2)
+    # y_{n+1} = y_n * (1 - kh/2) / (1 + kh/2)
+
+    factor = (1 - k*dt/2) / (1 + k*dt/2)
+    expected_numeric = y0 * (factor ** np.arange(1, n_steps + 1))
+
+    error = np.abs(ys.flatten() - expected_numeric)
+    assert np.max(error) < 1e-5
+
+    # Also check against exact just to be sure it's close
+    error_exact = np.abs(ys.flatten() - exact)
+    assert np.max(error_exact) < 1e-2
 
 
-def test_theta_auto_jacobian():
-    # Same as above but using jax.jacfwd
-    k = 1.0
-    def f(y, k):
-        return -k * y
+def test_make_implicit_sde_autodiff():
+    # dy = -y^3
+    def f(y, p):
+        return -y**3
 
-    j_fn = jax.jacfwd(f, argnums=0)
+    # Auto-diff Jacobian
+    j_fn = jax.jacfwd(f)
 
     y0 = np.array([1.0])
-    h = 0.1
+    dt = 0.1
     tf = 1.0
 
-    ts, ys = vbjax.theta(f, j_fn, y0, h, tf, k, th=0.5)
+    step, loop = vbjax.make_implicit_sde(dt, f, j_fn, 0.0, th=1.0) # Backward Euler
 
-    exact = y0 * np.exp(-ts)
-    error = np.abs(ys.flatten() - exact)
+    n_steps = int(tf / dt)
+    zs = np.zeros((n_steps, 1))
 
-    print(f"Max error (Theta=0.5, AutoDiff): {np.max(error)}")
-    assert np.max(error) < 1e-2
+    ys = loop(y0, zs, None)
+
+    # Backward Euler: y_{n+1} = y_n - h * y_{n+1}^3
+    # Solve y_{n+1} + h * y_{n+1}^3 - y_n = 0
+    # Check consistency
+    for i in range(n_steps):
+        prev = y0 if i == 0 else ys[i-1]
+        curr = ys[i]
+        res = curr + dt * curr**3 - prev
+        assert np.abs(res) < 1e-4
 
 if __name__ == "__main__":
     test_jacobi()
-    test_theta_linear()
-    test_theta_auto_jacobian()
+    test_make_implicit_sde_linear()
+    test_make_implicit_sde_autodiff()

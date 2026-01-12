@@ -52,70 +52,72 @@ def jacobi(A, b, w=2.0/3.0, tol=1e-9, max_iters=100):
 
 
 def _theta_dy(f, j, h, th, y0, y1, f_y0, pars, tol=1e-4):
-    J = np.eye(y1.size) - h * th * j(y1, *pars)
-    F = y0 + h * (th * f(y1, *pars) + f_y0) - y1
+    J = np.eye(y1.size) - h * th * j(y1, pars)
+    F = y0 + h * (th * f(y1, pars) + f_y0) - y1
 
     dy, _ = jacobi(J, F, w=2.0/3.0, tol=tol, max_iters=10)
     return dy
 
+def _compute_noise(gfun, x, p, sqrt_dt, z_t):
+    g = gfun(x, p)
+    return g * sqrt_dt * z_t
 
-def theta(f, j, y0, h, tf, *pars, th=0.5, sigma=0.0, tol=1e-4, key=None):
+
+def make_implicit_sde(dt, dfun, jfun, gfun, th=0.5, tol=1e-4, max_iters=10):
     """
-    Implicit Theta integration scheme.
+    Construct an implicit SDE integrator using the Theta method.
 
     Parameters
     ----------
-    f : callable
-        Drift function f(y, *pars).
-    j : callable
-        Jacobian function j(y, *pars).
-    y0 : array
-        Initial state.
-    h : float
+    dt : float
         Time step.
-    tf : float
-        Final time.
-    *pars : list
-        Parameters passed to f and j.
+    dfun : callable
+        Drift function dfun(x, p).
+    jfun : callable
+        Jacobian of drift function jfun(x, p).
+    gfun : callable or float
+        Diffusion function gfun(x, p) or constant sigma.
     th : float
-        Theta parameter (0.5 for trapezoidal/Crank-Nicolson, 1.0 for backward Euler).
-    sigma : float or array
-        Noise standard deviation.
+        Theta parameter (0.5 for Crank-Nicolson, 1.0 for backward Euler).
     tol : float
         Tolerance for the Newton-Jacobi iteration.
-    key : jax.random.PRNGKey, optional
-        Random key for noise generation. If None, a default key is used.
+    max_iters : int
+        Maximum iterations for the Newton loop.
 
     Returns
     -------
-    ts : array
-        Time points.
-    ys : array
-        Trajectory.
+    step : callable
+        Step function step(x, z_t, p).
+    loop : callable
+        Loop function loop(x0, zs, p).
     """
-    if key is None:
-        key = jax.random.PRNGKey(42)
 
-    num_steps = int(tf / h)
-    add_noise = np.any(sigma > 0.0)
+    if not hasattr(gfun, '__call__'):
+        sig = gfun
+        gfun = lambda *_: sig
 
-    def scan_body(carry, _):
-        y0, rng_key = carry
+    sqrt_dt = np.sqrt(dt)
 
-        f_y0 = (1 - th) * f(y0, *pars)
-        y1 = y0 + h * f_y0
+    def step(x, z_t, p):
+        # Euler guess
+        f_val = dfun(x, p)
+        f_y0 = (1 - th) * f_val
+        y1_euler = x + dt * f_val # Initial guess using explicit Euler
 
+        # Refine if implicit
         def refine(y1):
-             dy = _theta_dy(f, j, h, th, y0, y0, f_y0, pars, tol=tol)
-             y1 = y0 + dy
+             # First Newton step
+             # We use y1 (Euler guess) to compute Jacobian and Residual
+             dy = _theta_dy(dfun, jfun, dt, th, x, y1, f_y0, p, tol=tol)
+             y1 = y1 + dy
 
              def refinement_cond(state):
                  y1, dy, n_iter = state
-                 return (n_iter < 10) & (np.linalg.norm(dy) > tol)
+                 return (n_iter < max_iters) & (np.linalg.norm(dy) > tol)
 
              def refinement_body(state):
                  y1, _, n_iter = state
-                 dy = _theta_dy(f, j, h, th, y0, y1, f_y0, pars, tol=tol)
+                 dy = _theta_dy(dfun, jfun, dt, th, x, y1, f_y0, p, tol=tol)
                  y1 = y1 + dy
                  return y1, dy, n_iter + 1
 
@@ -123,23 +125,19 @@ def theta(f, j, y0, h, tf, *pars, th=0.5, sigma=0.0, tol=1e-4, key=None):
              final_state = jax.lax.while_loop(refinement_cond, refinement_body, init_state)
              return final_state[0]
 
-        y1 = jax.lax.cond(th > 0.0, refine, lambda x: x, y1)
+        y1 = jax.lax.cond(th > 0.0, refine, lambda x: x, y1_euler)
 
-        rng_key, step_key = jax.random.split(rng_key)
-        noise = jax.lax.cond(
-            add_noise,
-            lambda k: np.sqrt(sigma) * jax.random.normal(k, y0.shape),
-            lambda k: np.zeros_like(y0),
-            step_key
-        )
+        noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
         y1 = y1 + noise
 
-        return (y1, rng_key), y1
+        return y1
 
-    _, ys = jax.lax.scan(scan_body, (y0, key), None, length=num_steps)
+    @jax.jit
+    def loop(x0, zs, p):
+        def op(x, z):
+            x = step(x, z, p)
+            return x, x
+        _, xs = jax.lax.scan(op, x0, zs)
+        return xs
 
-    # Prepend y0
-    ys = np.concatenate([y0[None, ...], ys], axis=0)
-    ts = np.arange(num_steps + 1) * h
-
-    return ts, ys
+    return step, loop
