@@ -264,7 +264,7 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
         Function of the form `step((x_t,t), z_t, p)` that takes one step in time
         according to the Heun scheme.
     loop : function
-        Function of the form `loop((xs, t), p)` that iteratively calls `step`
+        Function of the form `loop(xs, p, t=0)` that iteratively calls `step`
         for each `xs[nh:]` and starting time index `t`.
 
     Notes
@@ -283,7 +283,7 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     >>> _, sdde = vb.make_sdde(1.0, 2, lambda xt, x, t, p: -xt[t-2], 0.0)
     >>> x,t = sdde(np.ones(6)+10, None)
     >>> x
-    Array([ 11.,  11.,  11.,   0., -11., -22.], dtype=float32)
+    Array([ 11. ,  11. ,  11. ,   0. , -11. , -16.5], dtype=float32)
 
     """
 
