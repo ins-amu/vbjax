@@ -89,6 +89,7 @@ user to focus on defining the `network` and then getting time series.
 
 Jax makes it easy to compute Jacobians,
 ```python
+import jax.numpy as jp
 y0 = jp.r_[0.1, -2.0]
 
 def eig1_tau(tau):
