@@ -28,8 +28,8 @@ The primary additional dependency of vbjax is
 NumPy, SciPy & opt-einsum, so it should be safe to add to your
 existing projects.
 
-gee pee you
-------------
+Hardware Acceleration
+---------------------
 
 **CUDA**
 
