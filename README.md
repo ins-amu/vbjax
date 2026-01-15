@@ -379,16 +379,18 @@ and check it works
 gpu:0
 ```
 JSC also makes Singularity available, so the prebuilt image can be used
-```
-TODO
+```bash
+singularity pull vbjax.sif docker://ghcr.io/ins-amu/vbjax:main
+singularity run --nv vbjax.sif python3 -c 'import vbjax; print(vbjax.__version__)'
 ```
 </details>
 
 <details><summary>CEA</summary>
 
 The prebuilt image is the best route:
-```
-TODO
+```bash
+singularity pull vbjax.sif docker://ghcr.io/ins-amu/vbjax:main
+singularity run --nv vbjax.sif python3 -c 'import vbjax; print(vbjax.__version__)'
 ```
 </details>
 
