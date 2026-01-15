@@ -189,6 +189,8 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    method : str
+        One of 'euler', 'heun', 'rk4'.
 
     Returns
     =======
@@ -232,7 +234,33 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
 
 
 def make_dde(dt, nh, dfun, unroll=10, adhoc=None):
-    "Invokes make_sdde w/ gfun 0."
+    """
+    Invokes make_sdde w/ gfun 0.
+
+    Parameters
+    ==========
+    dt : float
+        Time step
+    nh : int
+        Maximum delay in time steps.
+    dfun : function
+        Function of the form `dfun(xt, x, t, p)` that computes drift coefficients of
+        the stochastic differential equation.
+    unroll : int
+        Force unrolls the time stepping loop.
+    adhoc : function or None
+        Function of the form `f(x,p)` that allows making adhoc corrections after
+        each step.
+
+    Returns
+    =======
+    step : function
+        Function of the form `step((x_t,t), z_t, p)` that takes one step in time
+        according to the Heun scheme.
+    loop : function
+        Function of the form `loop((xs, t), p)` that iteratively calls `step`
+        for each `xs[nh:]` and starting time index `t`.
+    """
     return make_sdde(dt, nh, dfun, 0, unroll, adhoc=adhoc)
 
 
