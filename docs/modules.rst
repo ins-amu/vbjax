@@ -38,9 +38,6 @@ layers
    :undoc-members:
    :show-inheritance:
 
-
-
-
 sparse
 ------
 
@@ -61,6 +58,54 @@ shtlc
 -----
 
 .. automodule:: vbjax.shtlc
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+coupling
+--------
+
+.. automodule:: vbjax.coupling
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+diagnostics
+-----------
+
+.. automodule:: vbjax.diagnostics
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+embed
+-----
+
+.. automodule:: vbjax.embed
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+implicit
+--------
+
+.. automodule:: vbjax.implicit
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+regmap
+------
+
+.. automodule:: vbjax.regmap
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+signal
+------
+
+.. automodule:: vbjax.signal
    :members:
    :undoc-members:
    :show-inheritance:
