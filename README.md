@@ -378,18 +378,6 @@ and check it works
 (jax) [woodman1@jsfl02 ~]$ srun -A icei-hbp-2021-0002 -p develgpus --pty python3 -c 'import jax.numpy as np ; print(np.zeros(32).device())'
 gpu:0
 ```
-JSC also makes Singularity available, so the prebuilt image can be used
-```
-TODO
-```
-</details>
-
-<details><summary>CEA</summary>
-
-The prebuilt image is the best route:
-```
-TODO
-```
 </details>
 
 ## Development
