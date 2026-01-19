@@ -23,7 +23,7 @@ Bayesian estimation using NumPyro is an optional dependency,
 pip install "vbjax[bayes]"
 ```
 
-### gee pee you
+### Hardware Acceleration
 
 #### CUDA
 If you have a CUDA-enabled GPU, you install the requisite dependencies like so
@@ -316,7 +316,7 @@ This is a pretty simple example but it's meant to show that any model
 you build with vbjax like this is usable with optimization or NumPyro's
 MCMC algorithms.
 
-### ƪ(ړײ)‎ƪ​​ moar examples‽
+### More Examples
 
 More complex examples are in the [examples](examples) folder:
 
@@ -378,18 +378,12 @@ and check it works
 (jax) [woodman1@jsfl02 ~]$ srun -A icei-hbp-2021-0002 -p develgpus --pty python3 -c 'import jax.numpy as np ; print(np.zeros(32).device())'
 gpu:0
 ```
-JSC also makes Singularity available, so the prebuilt image can be used
-```
-TODO
-```
+JSC also makes Singularity available, so the prebuilt image can be used.
 </details>
 
 <details><summary>CEA</summary>
 
-The prebuilt image is the best route:
-```
-TODO
-```
+The prebuilt image is the best route.
 </details>
 
 ## Development
