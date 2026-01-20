@@ -344,6 +344,7 @@ pip3 install "jaxlib==0.3.8+cuda11.cudnn805" -U -f https://storage.googleapis.co
 This provides an older version of JAX unfortunately. 
 
 The Sarus runtime can be used to make use of latest versions of vbjax and jax:
+
 ```bash
 $ module load daint-gpu
 $ module load sarus
@@ -378,18 +379,12 @@ and check it works
 (jax) [woodman1@jsfl02 ~]$ srun -A icei-hbp-2021-0002 -p develgpus --pty python3 -c 'import jax.numpy as np ; print(np.zeros(32).device())'
 gpu:0
 ```
-JSC also makes Singularity available, so the prebuilt image can be used
-```
-TODO
-```
+JSC also makes Singularity available, so the prebuilt image can be used.
 </details>
 
 <details><summary>CEA</summary>
 
-The prebuilt image is the best route:
-```
-TODO
-```
+The prebuilt image is the best route.
 </details>
 
 ## Development
