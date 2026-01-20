@@ -130,8 +130,9 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     Notes
     =====
 
-    In both cases, a Jax compatible parameter set `p` is provided, either an array
-    or some pytree compatible structure.
+    A Jax compatible parameter set `p` is provided to `dfun`, `gfun`, `adhoc`,
+    `step` and `loop`, which can be either an array or some pytree compatible
+    structure.
 
     Note that the integrator does not sample normally distributed noise, so this
     must be provided by the user.
@@ -140,7 +141,7 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     >>> import vbjax as vb
     >>> _, sde = vb.make_sde(1.0, lambda x, p: -x, 0.1)
     >>> sde(1.0, vb.randn(4), None)
-    Array([ 0.5093468 ,  0.30794007,  0.07600437, -0.03876263], dtype=float32)
+    Array([0.49858478, 0.27264896, 0.15110962, 0.0832321 ], dtype=float32)
 
     """
 
@@ -176,7 +177,7 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
 
 
 def make_ode(dt, dfun, adhoc=None, method='heun'):
-    """Use a Heun scheme to integrate autonomous ordinary differential
+    """Use a Heun, Euler or RK4 scheme to integrate autonomous ordinary differential
     equations (ODEs).
 
     Parameters
@@ -189,12 +190,14 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    method : str
+        Integration method. One of 'euler', 'heun' (default), or 'rk4'.
 
     Returns
     =======
     step : function
         Function of the form `step(x, t, p)` that takes one step in time
-        according to the Heun scheme.
+        according to the chosen scheme.
     loop : function
         Function of the form `loop(x0, ts, p)` that iteratively calls `step`
         for all time steps `ts`.
@@ -202,8 +205,8 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     Notes
     =====
 
-    In both cases, a Jax compatible parameter set `p` is provided, either an array
-    or some pytree compatible structure.
+    A Jax compatible parameter set `p` is provided to `dfun`, `adhoc`, `step`
+    and `loop`, which can be either an array or some pytree compatible structure.
 
     >>> import vbjax as vb, jax.numpy as np
     >>> _, ode = vb.make_ode(1.0, lambda x, p: -x)
@@ -283,7 +286,7 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     >>> _, sdde = vb.make_sdde(1.0, 2, lambda xt, x, t, p: -xt[t-2], 0.0)
     >>> x,t = sdde(np.ones(6)+10, None)
     >>> x
-    Array([ 11.,  11.,  11.,   0., -11., -22.], dtype=float32)
+    Array([ 11. ,  11. ,  11. ,   0. , -11. , -16.5], dtype=float32)
 
     """
 
