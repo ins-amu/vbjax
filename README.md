@@ -379,16 +379,16 @@ and check it works
 gpu:0
 ```
 JSC also makes Singularity available, so the prebuilt image can be used
-```
-TODO
+```bash
+singularity run docker://ghcr.io/ins-amu/vbjax:main
 ```
 </details>
 
 <details><summary>CEA</summary>
 
 The prebuilt image is the best route:
-```
-TODO
+```bash
+singularity run docker://ghcr.io/ins-amu/vbjax:main
 ```
 </details>
 
