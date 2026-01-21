@@ -15,6 +15,11 @@ JRState = collections.namedtuple(
     field_names='y0 y1 y2 y3 y4 y5'.split(' '))
     
 def jr_dfun(ys, c, p):
+    """
+    Jansen-Rit mass model.
+
+    Ref: Jansen, B. H., & Rit, V. G. (1995). Electroencephalogram and visual evoked potential generation in a mathematical model of coupled cortical columns. Biological cybernetics, 73(4), 357-366.
+    """
     y0, y1, y2, y3, y4, y5 = ys
 
     sigm_y1_y2 = 2.0 * p.nu_max / (1.0 + np.exp(p.r * (p.v0 - (y1 - y2))))
@@ -41,6 +46,11 @@ bvep_default_theta = BVEPTheta(
 )
 
 def bvep_dfun(ys, c, p: BVEPTheta):
+    """
+    Epileptor model for BVEP (Virtual Epileptic Patient).
+
+    Ref: Jirsa, V. K., et al. (2014). On the nature of seizure dynamics. Brain, 137(8), 2210-2230.
+    """
     x, z = ys
     x2 = x*x
     dx = 1 - x*x2 - 2*x2 - z + p.I1
@@ -70,6 +80,11 @@ MPRState = collections.namedtuple(
 mpr_default_state = MPRState(r=0.0, V=-2.0)
 
 def mpr_dfun(ys, c, p):
+    """
+    Montbrio-Pazo-Roxin model.
+
+    Ref: Montbrió, E., Pazó, D., & Roxin, A. (2015). Macroscopic description for networks of spiking neurons. Physical Review X, 5(2), 021028.
+    """
     r, V = ys
 
     # bound rate to be positive
@@ -120,6 +135,11 @@ def compute_bold_theta(
 bold_default_theta = compute_bold_theta()
 
 def bold_dfun(sfvq, x, p: BOLDTheta):
+    """
+    Balloon-Windkessel BOLD model.
+
+    Ref: Friston, K. J., et al. (2000). Nonlinear event-related responses in fMRI. Magnetic resonance in medicine, 44(1), 162-167.
+    """
     s, f, v, q = sfvq
     ds = x - p.recip_tau_s * s - p.recip_tau_f * (f - 1)
     df = s

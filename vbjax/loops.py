@@ -358,14 +358,15 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
 def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=True):
     """
     Helper function to lower memory usage for longer simulations with time delays.
-    WIP
+
+    This function creates a step function that manages the rolling buffer state
+    required for delay differential equations, allowing for continuous simulation
+    in chunks.
 
     Takes a function
-
         run_chunk(buf, params) -> (buf, chunk_states)
 
     and returns another
-
         continue_chunk(buf, params, rng_key) -> (buf, chunk_states)
 
     The continue_chunk function wraps run_chunk and manages
