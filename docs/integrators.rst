@@ -120,12 +120,13 @@ make_ode
 
 Create an ordinary differential equation integrator.
 
-.. function:: make_ode(dt, dfun, method='heun', adhoc=None)
+.. function:: make_ode(dt, dfun, adhoc=None, method='heun', unroll=10)
 
    :param float dt: Time step size
    :param callable dfun: Function ``dfun(x, p)`` that returns dx/dt
-   :param str method: Integration method - ``'euler'``, ``'heun'``, or ``'rk4'``
    :param callable adhoc: Optional function ``f(x, p)`` for post-step corrections
+   :param str method: Integration method - ``'euler'``, ``'heun'``, or ``'rk4'``
+   :param int unroll: Loop unroll factor for performance
    :return: Tuple of (step, loop) functions
    :rtype: tuple
 
