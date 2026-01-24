@@ -5,7 +5,6 @@ Tutorial
    :maxdepth: 2
    :caption: Contents:
 
-   integrators
 
 Examples 
 --------
