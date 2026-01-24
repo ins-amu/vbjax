@@ -73,6 +73,8 @@ for Jax to discover the GPU(s).
    :maxdepth: 2
    :caption: Contents:
 
+   integrators
+
 
 Tutorial
 ########
@@ -83,13 +85,6 @@ Tutorial
 
    tutorial
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
 Modules
 ########
 
@@ -98,4 +93,11 @@ Modules
    :caption: Contents:
 
    modules
+
+Indices and tables
+##################
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
    
