@@ -1,4 +1,4 @@
-__version__ = 'v0.0.18'
+__version__ = 'v0.0.19'
 
 if __name__ == '__main__':
     print(__version__)
