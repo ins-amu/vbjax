@@ -189,6 +189,8 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    method : str, default 'heun'
+        Integration method. Options are 'euler', 'heun', or 'rk4'.
 
     Returns
     =======
@@ -232,7 +234,33 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
 
 
 def make_dde(dt, nh, dfun, unroll=10, adhoc=None):
-    "Invokes make_sdde w/ gfun 0."
+    """Use a Heun scheme to integrate autonomous delay differential
+    equations (DDEs).
+
+    Parameters
+    ==========
+    dt : float
+        Time step
+    nh : int
+        Maximum delay in time steps.
+    dfun : function
+        Function of the form `dfun(xt, x, t, p)` that computes derivatives of the
+        delay differential equation.
+    unroll: int, default 10
+        Force unrolls the time stepping loop.
+    adhoc : function or None
+        Function of the form `f(x,p)` that allows making adhoc corrections after
+        each step.
+
+    Returns
+    =======
+    step : function
+        Function of the form `step((x_t,t), z_t, p)` that takes one step in time
+        according to the Heun scheme.
+    loop : function
+        Function of the form `loop((xs, t), p)` that iteratively calls `step`
+        for each `xs[nh:]` and starting time index `t`.
+    """
     return make_sdde(dt, nh, dfun, 0, unroll, adhoc=adhoc)
 
 
@@ -257,6 +285,11 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     adhoc : function or None
         Function of the form `f(x,p)` that allows making adhoc corrections after
         each step.
+    unroll: int, default 1
+        Force unrolls the time stepping loop.
+    zero_delays: bool, default False
+        Whether to include the predictor stage in the history buffer for the corrector stage.
+        Setting to True improves accuracy for short delays but incurs a performance penalty.
 
     Returns
     =======
