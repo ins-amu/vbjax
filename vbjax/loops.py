@@ -189,6 +189,8 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    method : str
+        Integration method, one of 'euler', 'heun', 'rk4'. Default 'heun'.
 
     Returns
     =======
@@ -358,7 +360,7 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
 def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=True):
     """
     Helper function to lower memory usage for longer simulations with time delays.
-    WIP
+    WIP: This API is provisional and may change.
 
     Takes a function
 
@@ -371,6 +373,26 @@ def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=
     The continue_chunk function wraps run_chunk and manages
     moving the latest states to the first part of buf and filling
     the rest with samples from N(0,1) if required.
+
+    Parameters
+    ==========
+    run_chunk : function
+        The loop function returned by make_dde or make_sdde.
+    chunk_len : int
+        Number of time steps to compute in one chunk.
+    max_lag : int
+        Maximum delay in time steps (nh).
+    n_from : int
+        Number of nodes/variables.
+    n_svar : int
+        Number of state variables per node.
+    stochastic : bool
+        If True, fills the buffer with random noise.
+
+    Returns
+    =======
+    continue_chunk : function
+        Function to run the next chunk.
 
     """
     from vbjax import randn
