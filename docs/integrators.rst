@@ -120,12 +120,12 @@ make_ode
 
 Create an ordinary differential equation integrator.
 
-.. function:: make_ode(dt, dfun, method='heun', adhoc=None)
+.. function:: make_ode(dt, dfun, adhoc=None, method='heun')
 
    :param float dt: Time step size
    :param callable dfun: Function ``dfun(x, p)`` that returns dx/dt
-   :param str method: Integration method - ``'euler'``, ``'heun'``, or ``'rk4'``
    :param callable adhoc: Optional function ``f(x, p)`` for post-step corrections
+   :param str method: Integration method - ``'euler'``, ``'heun'``, or ``'rk4'``
    :return: Tuple of (step, loop) functions
    :rtype: tuple
 
@@ -241,6 +241,27 @@ Create a stochastic delay differential equation integrator.
    .. note::
       When ``nh=0``, the function automatically uses the optimized SDE integrator
       for better performance and accuracy.
+
+make_continuation
+^^^^^^^^^^^^^^^^^
+
+Helper function to lower memory usage for longer simulations with time delays.
+
+.. function:: make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=True)
+
+   :param callable run_chunk: The loop function returned by make_dde or make_sdde
+   :param int chunk_len: Number of time steps to compute in one chunk
+   :param int max_lag: Maximum delay in time steps (nh)
+   :param int n_from: Number of nodes/variables
+   :param int n_svar: Number of state variables per node
+   :param bool stochastic: If True, fills the buffer with random noise
+   :return: Function to run the next chunk
+   :rtype: callable
+
+   **WIP**: This API is provisional and may change.
+
+   The continuation function wraps ``run_chunk`` and manages moving the latest states
+   to the first part of the buffer and filling the rest with samples from N(0,1) if required.
 
 Integration Methods
 -------------------
