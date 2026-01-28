@@ -189,6 +189,8 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    method : str
+        Integration method. One of 'euler', 'heun', 'rk4'. Default is 'heun'.
 
     Returns
     =======
@@ -232,7 +234,31 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
 
 
 def make_dde(dt, nh, dfun, unroll=10, adhoc=None):
-    "Invokes make_sdde w/ gfun 0."
+    """Use a Heun scheme to integrate autonomous delay differential
+    equations (DDEs).
+
+    Parameters
+    ==========
+    dt : float
+        Time step
+    nh : int
+        Maximum delay in time steps.
+    dfun : function
+        Function of the form `dfun(xt, x, t, p)` that computes derivatives of
+        the delay differential equation.
+    unroll : int
+        Loop unroll factor for performance. Default is 10.
+    adhoc : function or None
+        Function of the form `f(x,p)` that allows making adhoc corrections after
+        each step.
+
+    Returns
+    =======
+    step : function
+        Function of the form `step((x_t,t), z_t, p)` that takes one step in time.
+    loop : function
+        Function of the form `loop((xs, t), p)` that iteratively calls `step`.
+    """
     return make_sdde(dt, nh, dfun, 0, unroll, adhoc=adhoc)
 
 
@@ -254,6 +280,11 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
         of the stochastic differential equation. If a numerical value is
         provided, this is used as a constant diffusion coefficient for additive
         linear SDE.
+    unroll : int
+        Loop unroll factor for performance. Default is 1.
+    zero_delays : bool
+        If True, the history buffer passed to the user functions, on the corrector
+        stage of the Heun method, contains the predictor stage.
     adhoc : function or None
         Function of the form `f(x,p)` that allows making adhoc corrections after
         each step.
