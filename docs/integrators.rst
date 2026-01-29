@@ -242,6 +242,45 @@ Create a stochastic delay differential equation integrator.
       When ``nh=0``, the function automatically uses the optimized SDE integrator
       for better performance and accuracy.
 
+make_continuation
+^^^^^^^^^^^^^^^^^
+
+Helper for long simulations with delays to manage memory.
+
+.. function:: make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=True)
+
+   :param callable run_chunk: Inner loop function from ``make_sdde`` or ``make_dde``
+   :param int chunk_len: Length of simulation chunk
+   :param int max_lag: Maximum delay in time steps
+   :param int n_from: Number of nodes
+   :param int n_svar: Number of state variables
+   :param bool stochastic: Whether to inject noise
+   :return: Continuation function ``continue_chunk(buf, p, key)``
+   :rtype: callable
+
+   **Example:**
+
+   .. code-block:: python
+
+      # Setup SDDE
+      dt = 0.1
+      nh = 100  # max delay steps
+      chunk_len = 1000
+      n_nodes = 32
+      n_vars = 2
+
+      step, loop = make_sdde(dt, nh, dfun, gfun)
+
+      # Create continuation wrapper
+      cont_loop = make_continuation(loop, chunk_len, nh, n_nodes, n_vars)
+
+      # Run in chunks
+      buffer_size = nh + 1 + chunk_len
+      buf = jnp.zeros((buffer_size, n_vars, n_nodes))
+      key = jax.random.PRNGKey(0)
+
+      final_buf, chunk_state = cont_loop(buf, params, key)
+
 Integration Methods
 -------------------
 
