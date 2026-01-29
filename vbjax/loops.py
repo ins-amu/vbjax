@@ -358,19 +358,37 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
 def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=True):
     """
     Helper function to lower memory usage for longer simulations with time delays.
-    WIP
 
-    Takes a function
+    This function enables running long simulations in chunks, which helps manage memory usage
+    by maintaining a rolling buffer of history required for delay differential equations.
+    It wraps a chunk-processing function (e.g., from `make_sdde`) and handles the
+    buffer updates and noise generation between chunks.
 
-        run_chunk(buf, params) -> (buf, chunk_states)
+    Parameters
+    ==========
+    run_chunk : callable
+        The inner loop function `run_chunk(buf, p)` that simulates a single chunk.
+        Typically returned by `make_sdde` or `make_dde`.
+    chunk_len : int
+        Length of the simulation chunk in time steps.
+    max_lag : int
+        Maximum delay in time steps (`nh`).
+    n_from : int
+        Number of network nodes or regions.
+    n_svar : int
+        Number of state variables per node.
+    stochastic : bool, default True
+        If True, injects new Gaussian noise into the buffer for the next chunk.
 
-    and returns another
+    Returns
+    =======
+    continue_chunk : callable
+        A function `continue_chunk(buf, p, key)` that:
+        1. Rolls the buffer to discard old history and move recent states to the beginning.
+        2. Fills the future part of the buffer with new noise (if stochastic).
+        3. Calls `run_chunk` to simulate the next segment.
 
-        continue_chunk(buf, params, rng_key) -> (buf, chunk_states)
-
-    The continue_chunk function wraps run_chunk and manages
-    moving the latest states to the first part of buf and filling
-    the rest with samples from N(0,1) if required.
+        Signature: `continue_chunk(buf, p, key) -> (new_buf, chunk_states)`
 
     """
     from vbjax import randn
