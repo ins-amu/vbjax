@@ -175,7 +175,7 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     return step, loop
 
 
-def make_ode(dt, dfun, adhoc=None, method='heun'):
+def make_ode(dt, dfun, adhoc=None, method='heun', unroll=1):
     """Use a Heun scheme to integrate autonomous ordinary differential
     equations (ODEs).
 
@@ -189,6 +189,8 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    unroll : int
+        Loop unroll factor (default 1).
 
     Returns
     =======
@@ -226,7 +228,7 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
         def op(x, t):
             x = step(x, t, p)
             return x, x
-        return jax.lax.scan(op, x0, ts)[1]
+        return jax.lax.scan(op, x0, ts, unroll=unroll)[1]
 
     return step, loop
 
