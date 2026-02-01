@@ -189,6 +189,8 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    method : str
+        Integration method, one of 'euler', 'heun', 'rk4'. Default is 'heun'.
 
     Returns
     =======
@@ -232,13 +234,52 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
 
 
 def make_dde(dt, nh, dfun, unroll=10, adhoc=None):
-    "Invokes make_sdde w/ gfun 0."
+    """
+    Create a delay differential equation integrator.
+
+    Parameters
+    ==========
+    dt : float
+        Time step size
+    nh : int
+        Maximum delay in time steps
+    dfun : callable
+        Function ``dfun(xt, x, t, p)`` where:
+        - ``xt``: History buffer
+        - ``x``: Current state
+        - ``t``: Current time index in buffer
+        - ``p``: Parameters
+    unroll : int
+        Loop unroll factor
+    adhoc : callable
+        Optional post-step correction
+
+    Returns
+    =======
+    step : function
+        Function of the form `step((x_t,t), z_t, p)` that takes one step in time
+        according to the Heun scheme.
+    loop : function
+        Function of the form `loop(buf, p, t=0)` that iteratively calls `step`
+        for each time step in `buf`.
+
+    Example
+    =======
+    >>> import vbjax as vb, jax.numpy as np
+    >>> def dfun(xt, x, t, p):
+    ...     tau_steps = p
+    ...     return -xt[t - tau_steps]  # dx/dt = -x(t-tau)
+    >>> _, dde = vb.make_dde(0.01, 100, dfun)
+    >>> hist = np.ones(200)
+    >>> buf, x = dde(hist, 100)
+
+    """
     return make_sdde(dt, nh, dfun, 0, unroll, adhoc=adhoc)
 
 
 def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     """Use a stochastic Heun scheme to integrate autonomous
-    stochastic delay differential equations (SDEs).
+    stochastic delay differential equations (SDDEs).
 
     Parameters
     ==========
@@ -254,6 +295,11 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
         of the stochastic differential equation. If a numerical value is
         provided, this is used as a constant diffusion coefficient for additive
         linear SDE.
+    unroll : int
+        Loop unroll factor.
+    zero_delays : bool
+        If True, the predictor stage of the Heun method includes the current state
+        in the history buffer. This is more accurate but slower.
     adhoc : function or None
         Function of the form `f(x,p)` that allows making adhoc corrections after
         each step.
@@ -264,12 +310,14 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
         Function of the form `step((x_t,t), z_t, p)` that takes one step in time
         according to the Heun scheme.
     loop : function
-        Function of the form `loop((xs, t), p)` that iteratively calls `step`
-        for each `xs[nh:]` and starting time index `t`.
+        Function of the form `loop(buf, p, t=0)` that iteratively calls `step`
+        for each time step in `buf`.
 
     Notes
     =====
 
+    - When ``nh=0``, the function automatically uses the optimized SDE integrator
+      for better performance and accuracy.
     - A Jax compatible parameter set `p` is provided, either an array
       or some pytree compatible structure.
     - The integrator does not sample normally distributed noise, so this
