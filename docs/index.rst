@@ -28,8 +28,8 @@ The primary additional dependency of vbjax is
 NumPy, SciPy & opt-einsum, so it should be safe to add to your
 existing projects.
 
-gee pee you
-------------
+Hardware Acceleration
+---------------------
 
 **CUDA**
 
@@ -40,7 +40,7 @@ If you have a CUDA-enabled GPU, you install the requisite dependencies like so
    pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 
-**M1/M2** 🍎
+**Apple Silicon (M1/M2)**
 
 On newer Apple machines w/ M1 or M2 GPUs, JAX supports using the GPU experimentally
 by installing just two extra packages:
@@ -54,7 +54,7 @@ About a third of vbjax tests fail due to absence of certain operations like n-di
 scatter/gather & FFTs, and it may not be faster because these CPUs already have
 excellent memory bandwidth & latency hiding.
 
-**CUDA** 🐳 
+**Docker (CUDA)**
 
 *BUT* because GPU software stack versions make aligning stars look like child's play,
 container images are available and auto-built w/
@@ -71,7 +71,9 @@ for Jax to discover the GPU(s).
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Guides:
+
+   integrators
 
 
 Tutorial
@@ -84,7 +86,7 @@ Tutorial
    tutorial
 
 Indices and tables
-==================
+##################
 
 * :ref:`genindex`
 * :ref:`modindex`

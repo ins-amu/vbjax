@@ -1,8 +1,8 @@
 import os
 import sys
 from setuptools_scm import get_version
-sys.path.insert(0, os.path.abspath('../vbjax'))
-sys.path.insert(0,os.path.abspath("../examples"))
+sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath("../examples"))
 
 # -- Project information -----------------------------------------------------
 
