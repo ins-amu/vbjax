@@ -189,6 +189,9 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
     adhoc : function or None
         Function of the form `f(x, p)` that allows making adhoc corrections
         to states after a step.
+    method : str
+        Integration method - ``'euler'``, ``'heun'``, or ``'rk4'``.
+        Default is ``'heun'``.
 
     Returns
     =======
@@ -232,7 +235,44 @@ def make_ode(dt, dfun, adhoc=None, method='heun'):
 
 
 def make_dde(dt, nh, dfun, unroll=10, adhoc=None):
-    "Invokes make_sdde w/ gfun 0."
+    """Use a Heun scheme to integrate autonomous delay differential equations (DDEs).
+
+    This is a convenience wrapper around ``make_sdde`` with zero noise.
+
+    Parameters
+    ==========
+    dt : float
+        Time step
+    nh : int
+        Maximum delay in time steps.
+    dfun : function
+        Function of the form `dfun(xt, x, t, p)` that computes drift coefficients of
+        the differential equation.
+    unroll : int
+        Loop unroll factor for performance. Default is 10.
+    adhoc : function or None
+        Function of the form `f(x,p)` that allows making adhoc corrections after
+        each step.
+
+    Returns
+    =======
+    step : function
+        Function of the form `step((x_t,t), z_t, p)` that takes one step in time
+        according to the Heun scheme.
+    loop : function
+        Function of the form `loop((xs, t), p)` that iteratively calls `step`
+        for each `xs[nh:]` and starting time index `t`.
+
+    Example
+    =======
+    >>> import vbjax as vb, jax.numpy as np
+    >>> def dfun(xt, x, t, p):
+    ...    return -xt[t-2]
+    >>> _, dde = vb.make_dde(1.0, 2, dfun)
+    >>> x,t = dde(np.ones(6)+10, None)
+    >>> x
+    Array([ 11.,  11.,  11.,   0., -11., -22.], dtype=float32)
+    """
     return make_sdde(dt, nh, dfun, 0, unroll, adhoc=adhoc)
 
 
@@ -257,6 +297,10 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     adhoc : function or None
         Function of the form `f(x,p)` that allows making adhoc corrections after
         each step.
+    unroll : int
+        Loop unroll factor for performance. Default is 1.
+    zero_delays : bool
+        Include predictor in history (performance vs accuracy). Default is False.
 
     Returns
     =======
@@ -358,19 +402,29 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
 def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=True):
     """
     Helper function to lower memory usage for longer simulations with time delays.
-    WIP
 
-    Takes a function
+    Parameters
+    ==========
+    run_chunk : function
+        Function of the form `run_chunk(buf, params) -> (buf, chunk_states)`.
+    chunk_len : int
+        Length of the chunk.
+    max_lag : int
+        Maximum delay lag.
+    n_from : int
+        Number of state variables.
+    n_svar : int
+        Number of state variables.
+    stochastic : bool
+        If True, fills the buffer with random noise.
 
-        run_chunk(buf, params) -> (buf, chunk_states)
-
-    and returns another
-
-        continue_chunk(buf, params, rng_key) -> (buf, chunk_states)
-
-    The continue_chunk function wraps run_chunk and manages
-    moving the latest states to the first part of buf and filling
-    the rest with samples from N(0,1) if required.
+    Returns
+    =======
+    continue_chunk : function
+        Function of the form `continue_chunk(buf, params, rng_key) -> (buf, chunk_states)`.
+        The continue_chunk function wraps run_chunk and manages
+        moving the latest states to the first part of buf and filling
+        the rest with samples from N(0,1) if required.
 
     """
     from vbjax import randn
