@@ -29,6 +29,9 @@ classifiers = [
 bayes = [
     "numpyro"
 ]
+ml = [
+    "flax"
+]
 dev = [
     "jax-dataclasses",
     "pytest",
