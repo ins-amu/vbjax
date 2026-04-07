@@ -10,6 +10,7 @@ import jax.numpy as np
 zero = 0
 tmap = jax.tree_util.tree_map
 
+
 def euler_step(x, dfun, dt, *args, add=zero, adhoc=None):
     """
     Use a Euler scheme to step state with a right hand sides dfun(.)
@@ -29,22 +30,23 @@ def heun_step(x, dfun, dt, *args, add=zero, adhoc=None, return_euler=False):
     """Use a Heun scheme to step state with a right hand sides dfun(.)
     and additional forcing term add.
     """
-    adhoc = adhoc or (lambda x,*args: x)
+    adhoc = adhoc or (lambda x, *args: x)
     d1 = dfun(x, *args)
     if add is not zero:
-        xi = tmap(lambda x,d,a: x + dt*d + a, x, d1, add)
+        xi = tmap(lambda x, d, a: x + dt * d + a, x, d1, add)
     else:
-        xi = tmap(lambda x,d: x + dt*d, x, d1)
+        xi = tmap(lambda x, d: x + dt * d, x, d1)
     xi = adhoc(xi, *args)
     d2 = dfun(xi, *args)
     if add is not zero:
-        nx = tmap(lambda x,d1,d2,a: x + dt*0.5*(d1 + d2) + a, x, d1, d2, add)
+        nx = tmap(lambda x, d1, d2, a: x + dt * 0.5 * (d1 + d2) + a, x, d1, d2, add)
     else:
-        nx = tmap(lambda x,d1,d2: x + dt*0.5*(d1 + d2), x, d1, d2)
+        nx = tmap(lambda x, d1, d2: x + dt * 0.5 * (d1 + d2), x, d1, d2)
     nx = adhoc(nx, *args)
     if return_euler:
         return xi, nx
     return nx
+
 
 def rk4_step(x, dfun, dt, *args, add=zero, adhoc=None):
     """
@@ -81,18 +83,20 @@ def rk4_step(x, dfun, dt, *args, add=zero, adhoc=None):
 
 def _compute_noise(gfun, x, p, sqrt_dt, z_t):
     g = gfun(x, p)
-    try: # maybe g & z_t are just arrays
+    try:  # maybe g & z_t are just arrays
         noise = g * sqrt_dt * z_t
-    except TypeError: # one of them is a pytree
-        if isinstance(g, float): # z_t is a pytree, g is a scalar
+    except TypeError:  # one of them is a pytree
+        if isinstance(g, float):  # z_t is a pytree, g is a scalar
             noise = tmap(lambda z: g * sqrt_dt * z, z_t)
         # otherwise, both must be pytrees and they must match
-        elif not jax.tree_util.tree_all(jax.tree_util.tree_structure(g) == 
-                                        jax.tree_util.tree_structure(z_t)):
+        elif not jax.tree_util.tree_all(
+            jax.tree_util.tree_structure(g) == jax.tree_util.tree_structure(z_t)
+        ):
             raise ValueError("gfun and z_t must have the same pytree structure.")
         else:
-            noise = tmap(lambda g,z: g * sqrt_dt * z, g, z_t)
+            noise = tmap(lambda g, z: g * sqrt_dt * z, g, z_t)
     return noise
+
 
 def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     """Use a stochastic Heun scheme to integrate autonomous stochastic
@@ -147,15 +151,15 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     sqrt_dt = np.sqrt(dt)
 
     # gfun is a numerical value or a function f(x,p) -> sig
-    if not hasattr(gfun, '__call__'):
+    if not hasattr(gfun, "__call__"):
         sig = gfun
         gfun = lambda *_: sig
 
     def step(x, z_t, p):
         noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
         return heun_step(
-            x, dfun, dt, p, add=noise, adhoc=adhoc,
-            return_euler=return_euler)
+            x, dfun, dt, p, add=noise, adhoc=adhoc, return_euler=return_euler
+        )
 
     @jax.jit
     def loop(x0, zs, p):
@@ -167,6 +171,7 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
             else:
                 ex = None
             return x, (ex, x)
+
         _, xs = jax.lax.scan(op, x0, zs, unroll=unroll)
         if not return_euler:
             _, xs = xs
@@ -175,7 +180,7 @@ def make_sde(dt, dfun, gfun, adhoc=None, return_euler=False, unroll=10):
     return step, loop
 
 
-def make_ode(dt, dfun, adhoc=None, method='heun', unroll=1):
+def make_ode(dt, dfun, adhoc=None, method="heun", unroll=1):
     """Use a Heun scheme to integrate autonomous ordinary differential
     equations (ODEs).
 
@@ -191,6 +196,8 @@ def make_ode(dt, dfun, adhoc=None, method='heun', unroll=1):
         to states after a step.
     unroll : int
         Loop unroll factor (default 1).
+    method : str
+        Integration method - ``'euler'``, ``'heun'``, or ``'rk4'``. Default is ``'heun'``.
 
     Returns
     =======
@@ -213,7 +220,7 @@ def make_ode(dt, dfun, adhoc=None, method='heun', unroll=1):
     Array([0.5   , 0.25  , 0.125 , 0.0625], dtype=float32, weak_type=True)
 
     """
-    
+
     step_fn = {
         "euler": euler_step,
         "heun": heun_step,
@@ -228,19 +235,59 @@ def make_ode(dt, dfun, adhoc=None, method='heun', unroll=1):
         def op(x, t):
             x = step(x, t, p)
             return x, x
+
         return jax.lax.scan(op, x0, ts, unroll=unroll)[1]
 
     return step, loop
 
 
 def make_dde(dt, nh, dfun, unroll=10, adhoc=None):
-    "Invokes make_sdde w/ gfun 0."
+    """
+    Create a delay differential equation integrator.
+
+    Parameters
+    ==========
+    dt : float
+        Time step size
+    nh : int
+        Maximum delay in time steps
+    dfun : callable
+        Function ``dfun(xt, x, t, p)`` where:
+        - ``xt``: History buffer
+        - ``x``: Current state
+        - ``t``: Current time index in buffer
+        - ``p``: Parameters
+    unroll : int
+        Loop unroll factor
+    adhoc : callable
+        Optional post-step correction
+
+    Returns
+    =======
+    step : function
+        Function of the form `step((x_t,t), z_t, p)` that takes one step in time
+        according to the Heun scheme.
+    loop : function
+        Function of the form `loop(buf, p, t=0)` that iteratively calls `step`
+        for each time step in `buf`.
+
+    Example
+    =======
+    >>> import vbjax as vb, jax.numpy as np
+    >>> def dfun(xt, x, t, p):
+    ...     tau_steps = p
+    ...     return -xt[t - tau_steps]  # dx/dt = -x(t-tau)
+    >>> _, dde = vb.make_dde(0.01, 100, dfun)
+    >>> hist = np.ones(200)
+    >>> buf, x = dde(hist, 100)
+
+    """
     return make_sdde(dt, nh, dfun, 0, unroll, adhoc=adhoc)
 
 
 def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
     """Use a stochastic Heun scheme to integrate autonomous
-    stochastic delay differential equations (SDEs).
+    stochastic delay differential equations (SDDEs).
 
     Parameters
     ==========
@@ -256,6 +303,11 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
         of the stochastic differential equation. If a numerical value is
         provided, this is used as a constant diffusion coefficient for additive
         linear SDE.
+    unroll : int
+        Loop unroll factor.
+    zero_delays : bool
+        If True, the predictor stage of the Heun method includes the current state
+        in the history buffer. This is more accurate but slower.
     adhoc : function or None
         Function of the form `f(x,p)` that allows making adhoc corrections after
         each step.
@@ -266,12 +318,14 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
         Function of the form `step((x_t,t), z_t, p)` that takes one step in time
         according to the Heun scheme.
     loop : function
-        Function of the form `loop((xs, t), p)` that iteratively calls `step`
-        for each `xs[nh:]` and starting time index `t`.
+        Function of the form `loop(buf, p, t=0)` that iteratively calls `step`
+        for each time step in `buf`.
 
     Notes
     =====
 
+    - When ``nh=0``, the function automatically uses the optimized SDE integrator
+      for better performance and accuracy.
     - A Jax compatible parameter set `p` is provided, either an array
       or some pytree compatible structure.
     - The integrator does not sample normally distributed noise, so this
@@ -299,58 +353,64 @@ def make_sdde(dt, nh, dfun, gfun, unroll=1, zero_delays=False, adhoc=None):
         def sde_dfun(x, p):
             # For zero delay, buffer is irrelevant, time index is irrelevant
             return dfun(None, x, 0, p)
-        
-        sde_step, sde_loop = make_sde(dt, sde_dfun, gfun, adhoc=adhoc, return_euler=False, unroll=unroll)
-        
+
+        sde_step, sde_loop = make_sde(
+            dt, sde_dfun, gfun, adhoc=adhoc, return_euler=False, unroll=unroll
+        )
+
         def step(buf_t, z_t, p):
             buf, t = buf_t
             x = tmap(lambda buf: buf[nh + t], buf)
             nx = sde_step(x, z_t, p)
             buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
-            return (buf, t+1), nx
-        
+            return (buf, t + 1), nx
+
         def loop(buf, p, t=0):
             "xt is the buffer, zt is (ts, zs), p is parameters."
             op = lambda xt, tz: step(xt, tz, p)
-            dWt = tmap(lambda b: b[nh+1:], buf)
+            dWt = tmap(lambda b: b[nh + 1 :], buf)
             (buf, _), nxs = jax.lax.scan(op, (buf, t), dWt, unroll=unroll)
             return buf, nxs
-        
+
         return step, loop
 
     # gfun is a numerical value or a function f(x,p) -> sig
-    if not hasattr(gfun, '__call__'):
+    if not hasattr(gfun, "__call__"):
         sig = gfun
         gfun = lambda *_: sig
 
     if adhoc is None:
-        adhoc = lambda x,p : x
+        adhoc = lambda x, p: x
 
     def step(buf_t, z_t, p):
         buf, t = buf_t
         x = tmap(lambda buf: buf[nh + t], buf)
         noise = _compute_noise(gfun, x, p, sqrt_dt, z_t)
         d1 = dfun(buf, x, nh + t, p)
-        xi = tmap(lambda x,d,n: x + dt*d + n, x, d1, noise)
+        xi = tmap(lambda x, d, n: x + dt * d + n, x, d1, noise)
         xi = adhoc(xi, p)
         if heun:
             if zero_delays:
                 # severe performance hit (5x+)
                 buf = tmap(lambda buf, xi: buf.at[nh + t + 1].set(xi), buf, xi)
             d2 = dfun(buf, xi, nh + t + 1, p)
-            nx = tmap(lambda x,d1,d2,n: x + dt*0.5*(d1 + d2) + n, x, d1, d2, noise)
+            nx = tmap(
+                lambda x, d1, d2, n: x + dt * 0.5 * (d1 + d2) + n, x, d1, d2, noise
+            )
             nx = adhoc(nx, p)
         else:
             nx = xi
         # jax.debug.print("buf len is {b}, going to write to {i}", b=buf.shape[0], i=nh+t+1)
         buf = tmap(lambda buf, nx: buf.at[nh + t + 1].set(nx), buf, nx)
-        return (buf, t+1), nx
+        return (buf, t + 1), nx
 
     # @jax.jit
     def loop(buf, p, t=0):
         "xt is the buffer, zt is (ts, zs), p is parameters."
         op = lambda xt, tz: step(xt, tz, p)
-        dWt = tmap(lambda b: b[nh+1:], buf) # history is buf[nh:], current state is buf[nh], randn samples are buf[nh+1:]
+        dWt = tmap(
+            lambda b: b[nh + 1 :], buf
+        )  # history is buf[nh:], current state is buf[nh], randn samples are buf[nh+1:]
         (buf, _), nxs = jax.lax.scan(op, (buf, t), dWt, unroll=unroll)
         return buf, nxs
 
@@ -389,12 +449,13 @@ def make_continuation(run_chunk, chunk_len, max_lag, n_from, n_svar, stochastic=
         # now fill the rest of the buffer with N(0,1) samples if stochastic
         # buf = buf.at[max_lag+1:].set( vb.randn(chunk_len-1, 2, n_from, key=key) )
         if stochastic:
-            fill_val = randn(i0,n_svar,n_from, key=key)
-            buf = set(buf, fill_val, (i1,0,0))
+            fill_val = randn(i0, n_svar, n_from, key=key)
+            buf = set(buf, fill_val, (i1, 0, 0))
         else:
             # leave the buf since gfun() returns zero
             pass
 
         buf, rv = run_chunk(buf, p)
         return buf, rv
+
     return continue_chunk
