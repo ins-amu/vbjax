@@ -89,6 +89,7 @@ user to focus on defining the `network` and then getting time series.
 
 Jax makes it easy to compute Jacobians,
 ```python
+import jax.numpy as jp
 y0 = jp.r_[0.1, -2.0]
 
 def eig1_tau(tau):
@@ -379,16 +380,16 @@ and check it works
 gpu:0
 ```
 JSC also makes Singularity available, so the prebuilt image can be used
-```
-TODO
+```bash
+singularity run docker://ghcr.io/ins-amu/vbjax:main
 ```
 </details>
 
 <details><summary>CEA</summary>
 
 The prebuilt image is the best route:
-```
-TODO
+```bash
+singularity run docker://ghcr.io/ins-amu/vbjax:main
 ```
 </details>
 

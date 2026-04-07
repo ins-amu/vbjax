@@ -22,6 +22,16 @@ def test_ode():
     assert xs.shape == (64, 32)
 
 
+def test_ode_unroll():
+    f = lambda x, _: -x
+    dt = 0.1
+    # Check if unroll parameter is accepted and works
+    _, run = vb.make_ode(dt, f, unroll=5)
+    x0 = np.r_[:32].astype('f')
+    xs = run(x0, np.r_[:64], None)
+    assert xs.shape == (64, 32)
+
+
 def test_dde():
     def dfun(xt, x, t, p):
         xd = xt[0, t-100]
@@ -179,6 +189,25 @@ def test_ode_convergence_order():
     # RK4 should have at least 3x better convergence (conservative for float32)
     assert rk4_ratio > 3.0, \
         f"RK4 convergence ratio {rk4_ratio:.2f} should be > 3.0"
+
+
+def test_ode_unroll():
+    """Test that make_ode accepts unroll parameter"""
+    def dfun(x, p):
+        return -x
+
+    dt = 0.1
+    ts = np.r_[:10]
+
+    # Test with default unroll
+    step, loop = vb.make_ode(dt, dfun)
+    x1 = loop(1.0, ts, None)
+
+    # Test with explicit unroll
+    step, loop = vb.make_ode(dt, dfun, unroll=10)
+    x2 = loop(1.0, ts, None)
+
+    assert np.allclose(x1, x2)
 
 
 # TODO theta method? https://gist.github.com/maedoc/c47acb9d346e31017e05324ffc4582c1
