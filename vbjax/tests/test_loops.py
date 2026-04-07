@@ -22,6 +22,16 @@ def test_ode():
     assert xs.shape == (64, 32)
 
 
+def test_ode_unroll():
+    f = lambda x, _: -x
+    dt = 0.1
+    # Check if unroll parameter is accepted and works
+    _, run = vb.make_ode(dt, f, unroll=5)
+    x0 = np.r_[:32].astype('f')
+    xs = run(x0, np.r_[:64], None)
+    assert xs.shape == (64, 32)
+
+
 def test_dde():
     def dfun(xt, x, t, p):
         xd = xt[0, t-100]
