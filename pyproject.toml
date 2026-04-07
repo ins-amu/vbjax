@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Virtual brains w/ JAX"
 readme = "README.md"
-requries-python = ">=3.7"
+requires-python = ">=3.9"
 dependencies = [
     "numpy",
     "jax",
