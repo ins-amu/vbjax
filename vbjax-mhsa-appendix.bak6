@@ -1,0 +1,93 @@
+\section{Whole Brain MHSA Architecture in vbjax}
+
+This appendix provides detailed documentation of the Cortico-Thalamic Multi-Head Self-Attention (CT-MHSA) implementation in vbjax, covering the data structures, mathematical operations, and architectural components.
+
+\subsection{Data Structures}
+
+The model uses three core namedtuples for organization:
+
+\begin{itemize}
+	\item \textbf{Hyperparameters}: Contains model dimensions ($N_{regions}=84$, $n_{heads}=8$, $d_k=16$, $d_v=16$, $d_{model}=16$), the forgetting factor $\lambda=0.9$, time step $dt=0.1$, signal velocity $v_c=10.0$, and $steps\_per\_token$ for micro-step unrolling.
+	\item \textbf{NetworkState}: Mutable state including the memory matrix $M \in \mathbb{R}^{B \times N \times H \times D_v \times D_k}$, optional history buffer for delayed coupling $(L_{max}, B, N, D)$, current step counter, and lag matrix.
+	\item \textbf{CTMHSAParams}: Learnable weights including $W_Q, W_K, W_V \in \mathbb{R}^{H \times D_{model} \times D_{k/v}}$, readout projection $W_Y \in \mathbb{R}^{H \times D_v \times D_{model}}$, structural connectivity $C \in \mathbb{R}^{N \times N}$, and layer normalization parameters $\gamma, \beta \in \mathbb{R}^{D_{model}}$.
+\end{itemize}
+
+Initialization uses Xavier/Glorot scaling for all linear projections, while memory $M$ is initialized to zeros to prevent early numerical explosion.
+
+\subsection{Attention Mechanism}
+
+The attention computation proceeds in four stages per timestep:
+
+\begin{enumerate}
+	\item \textbf{Projections}: Input $x_t \in \mathbb{R}^{B \times N \times D_{model}}$ is projected to query/key/value tensors via einsum operations, with ReLU activation applied to queries and keys (but not values):
+	      \begin{align}
+		      q_t & = \text{ReLU}(x_t \cdot W_Q) \quad \text{shape: } (B, N, H, D_k) \\
+		      k_t & = \text{ReLU}(x_t \cdot W_K) \quad \text{shape: } (B, N, H, D_k) \\
+		      v_t & = x_t \cdot W_V \quad \text{shape: } (B, N, H, D_v)
+	      \end{align}
+
+	\item \textbf{Memory Update (L2/3)}: The memory matrix is updated using the Delta Rule:
+	      \begin{equation}
+		      M_t = M_{t-1} + \lambda \cdot (v_t \otimes k_t - M_{t-1})
+	      \end{equation}
+	      implemented as outer product $v_t k_t^T$ via \texttt{einsum('bnhv,bnhk->bnhvk', v, k)}. The surprise signal (used for neural monitoring) is computed as the Frobenius norm of $\Delta M = \lambda(v_t k_t^T - M_{t-1})$.
+
+	\item \textbf{Query Retrieval (L5)}: Memory content is retrieved by multiplying with the projected queries (which already have ReLU applied from the projection step):
+	      \begin{equation}
+		      o_t = M_t \cdot q_t \quad \text{shape: } (B, N, H, D_v)
+	      \end{equation}
+
+	\item \textbf{Head Aggregation}: Outputs across attention heads are combined:
+	      \begin{equation}
+		      y_t = \sum_h W_Y^h o_t^h \quad \text{shape: } (B, N, D_{model})
+	      \end{equation}
+	      A residual connection $y_t \leftarrow y_t + x_t$ and layer normalization are applied before output.
+\end{enumerate}
+
+\subsection{Predictive Coding Loss}
+
+The model can be trained with a predictive coding objective that measures the discrepancy between predicted and actual next-step inputs:
+
+\begin{equation}
+	E_t = \frac{1}{2} || x_{t+1} - y_t ||^2
+\end{equation}
+
+This loss encourages the model to generate accurate predictions of future brain states, driving the memory update dynamics to capture statistically salient patterns in the input sequence.
+
+\subsection{Biological Interpretation}
+
+The Delta Rule for memory updates provides a principled model of biological synaptic plasticity. The update $M_t = M_{t-1} + \lambda(v_t k_t^T - M_{t-1})$ mirrors Hebbian learning ("neurons that fire together wire together") through the outer product of values and keys, while the subtraction of the old memory term implements anti-Hebbian homeostatic plasticity that prevents runaway excitation. This formulation connects directly to predictive coding theories in neuroscience, where the brain continuously generates predictions of sensory inputs and updates internal models based on prediction errors. The surprise signal $\| \Delta M \|_F$ serves as a proxy for neural activity measurable via BOLD fMRI or EEG, enabling direct comparison between model dynamics and empirical brain recordings.
+
+\subsection{Network Coupling and Time Evolution}
+
+Signal propagation between brain regions is governed by the structural connectivity matrix $C$:
+
+\begin{equation}
+	x_{t+1, i} = \sum_j C_{ij} \cdot y_{t,j} + \text{ExternalInput}_i
+\end{equation}
+
+When tract length data is provided, delayed coupling is supported via a history buffer. The buffer stores outputs at each step, and indices are computed as $(step - \tau_{ij}) \mod L_{max}$ where $\tau_{ij}$ represents the transmission delay between regions $i$ and $j$.
+
+The full sequence is computed using \texttt{jax.lax.scan}, which performs efficient forward passes over input sequences of shape $(T, B, N, D_{model})$. Inner and outer scan loops handle micro-step unrolling and sequence processing respectively, enabling GPU-accelerated computation of the recurrent dynamics.
+
+\subsection{Cortical Layer Mapping}
+
+The architecture draws inspiration from biological cortical microcircuits. The memory update operation (Eq. above) corresponds to cortical layers 2/3, where associative connections are formed between inputs and stored representations. The query retrieval operation corresponds to layer 5, where pyramidal neurons generate outputs based on stored memory content. This mapping informs the parameter naming ($update\_memory\_l23$, $retrieve\_query\_l5$) in the implementation (see ct\_mhsa.py).
+
+The model further distinguishes between cortical projection neuron types:
+\begin{itemize}
+	\item \textbf{L5 IT (Intratelencephalic)}: Intratelencephalic neurons in layer 5 mediate cortico-cortical projections, connecting different cortical areas and forming the basis of long-range horizontal communication in the model.
+	\item \textbf{L5 ET (Extratelencephalic)}: Extratelencephalic neurons in layer 5 project to subcortical structures including the striatum, thalamus, and brainstem, representing the model's subcortical output pathways.
+	\item \textbf{L6}: Layer 6 corticothalamic feedback neurons provide descending modulatory signals to the thalamus, enabling hierarchical refinement of thalamic processing.
+\end{itemize}
+
+The surprise signal $\| \Delta M \|_F$ provides a measure of prediction error at each timestep, useful for interpretability and linking model dynamics to neural monitoring signals such as BOLD or EEG responses.
+
+\subsection{Thalamic Projections}
+
+The thalamic interactions in the model distinguish between two complementary projection systems that mirror anatomical findings:
+
+\begin{itemize}
+	\item \textbf{Core projections}: Dense, focused projections that carry first-order sensory information. In the model, values ($v_t$) correspond to core projection characteristics, encoding concrete sensory representations that support value-based computation and precise signal propagation.
+	\item \textbf{Matrix projections}: Sparse, diffuse projections that distribute modulatory signals across broader brain regions. In the model, keys ($k_t$) and queries ($q_t$) correspond to matrix projection characteristics, enabling attention-based routing and modulatory signaling across the cortical network.
+\end{itemize}
