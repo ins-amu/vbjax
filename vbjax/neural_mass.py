@@ -15,6 +15,41 @@ JRState = collections.namedtuple(
     field_names='y0 y1 y2 y3 y4 y5'.split(' '))
     
 def jr_dfun(ys, c, p):
+    r"""
+    Jansen-Rit mass model.
+
+    Parameters
+    ----------
+    ys : array
+        State vector of shape (6, ...).
+        The components are:
+        - y0, y3: Excitatory Postsynaptic Potential (EPSP) of pyramidal population and its derivative.
+        - y1, y4: EPSP of excitatory interneurons and its derivative.
+        - y2, y5: Inhibitory Postsynaptic Potential (IPSP) of inhibitory interneurons and its derivative.
+    c : array
+        Coupling input.
+    p : JRTheta
+        Parameters.
+
+    Returns
+    -------
+    dys : array
+        Derivatives of the state vector.
+
+    Notes
+    -----
+    The equations are:
+
+    .. math::
+        \dot{y}_0 &= y_3 \\
+        \dot{y}_1 &= y_4 \\
+        \dot{y}_2 &= y_5 \\
+        \dot{y}_3 &= A a S(y_1 - y_2) - 2 a y_3 - a^2 y_0 \\
+        \dot{y}_4 &= A a (\mu + a_2 J S(a_1 J y_0) + c) - 2 a y_4 - a^2 y_1 \\
+        \dot{y}_5 &= B b (a_4 J S(a_3 J y_0)) - 2 b y_5 - b^2 y_2
+
+    where :math:`S(v) = \frac{2 \nu_{max}}{1 + e^{r(v_0 - v)}}`.
+    """
     y0, y1, y2, y3, y4, y5 = ys
 
     sigm_y1_y2 = 2.0 * p.nu_max / (1.0 + np.exp(p.r * (p.v0 - (y1 - y2))))
@@ -70,6 +105,36 @@ MPRState = collections.namedtuple(
 mpr_default_state = MPRState(r=0.0, V=-2.0)
 
 def mpr_dfun(ys, c, p):
+    r"""
+    Montbrio-Pazo-Roxin mass model.
+
+    Parameters
+    ----------
+    ys : array
+        State vector of shape (2, ...).
+        The components are:
+        - r: Firing rate.
+        - V: Membrane potential.
+    c : tuple or array
+        Coupling input. If tuple, contains (c_rate, c_volt).
+    p : MPRTheta
+        Parameters.
+
+    Returns
+    -------
+    dys : array
+        Derivatives of the state vector.
+
+    Notes
+    -----
+    The equations are:
+
+    .. math::
+        \dot{r} &= \frac{1}{\tau} (\frac{\Delta}{\pi \tau} + 2 r V) \\
+        \dot{V} &= \frac{1}{\tau} (V^2 + \eta + J \tau r + I + I_{c} - \pi^2 r^2 \tau^2)
+
+    where :math:`I_c = c_r c_{rate} + c_v c_{volt}`.
+    """
     r, V = ys
 
     # bound rate to be positive
@@ -120,6 +185,38 @@ def compute_bold_theta(
 bold_default_theta = compute_bold_theta()
 
 def bold_dfun(sfvq, x, p: BOLDTheta):
+    r"""
+    Balloon-Windkessel BOLD model.
+
+    Parameters
+    ----------
+    sfvq : array
+        State vector of shape (4, ...).
+        The components are:
+        - s: Vasodilatory signal.
+        - f: Blood inflow.
+        - v: Blood volume.
+        - q: Deoxyhemoglobin content.
+    x : array
+        Neural activity input.
+    p : BOLDTheta
+        Parameters.
+
+    Returns
+    -------
+    dsfvq : array
+        Derivatives of the state vector.
+
+    Notes
+    -----
+    The equations are:
+
+    .. math::
+        \dot{s} &= x - \frac{s}{\tau_s} - \frac{f - 1}{\tau_f} \\
+        \dot{f} &= s \\
+        \dot{v} &= \frac{f - v^{1/\alpha}}{\tau_o} \\
+        \dot{q} &= \frac{f \frac{1 - (1 - E_0)^{1/f}}{E_0} - v^{1/\alpha} \frac{q}{v}}{\tau_o}
+    """
     s, f, v, q = sfvq
     ds = x - p.recip_tau_s * s - p.recip_tau_f * (f - 1)
     df = s
@@ -133,8 +230,8 @@ DCMTheta = collections.namedtuple(typename='DCMTheta',
                                   field_names='A,B,C')
 
 def dcm_dfun(x, u, p: DCMTheta):
-    """Implements the classical bilinear DCM
-    \\dot{x} = (A + sum_j u_j B_j ) x + C u
+    r"""Implements the classical bilinear DCM
+    \dot{x} = (A + sum_j u_j B_j ) x + C u
     """
     return (p.A + np.sum(u * p.B,axis=-1)) @ x + p.C @ u
 
