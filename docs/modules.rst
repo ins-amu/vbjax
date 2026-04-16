@@ -30,6 +30,19 @@ connectome
    :undoc-members:
    :show-inheritance:
 
+crosscoder
+----------
+
+.. automodule:: vbjax.crosscoder
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: vbjax.crosscoder_plots
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 layers
 ------
 

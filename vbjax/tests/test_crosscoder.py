@@ -1,0 +1,157 @@
+import numpy as np
+import jax
+import jax.numpy as jp
+import pytest
+
+import vbjax as vb
+from vbjax.crosscoder import _denorm
+
+
+def _fake_triu(ns=40, nn=16, seed=0):
+    rng = np.random.default_rng(seed)
+    mats = rng.normal(size=(ns, nn, nn)).astype('f4')
+    mats = 0.5 * (mats + mats.transpose(0, 2, 1))
+    i, j = np.triu_indices(nn, k=1)
+    return mats[:, i, j], mats
+
+
+def test_triu_to_mat_roundtrip():
+    triu, mats = _fake_triu()
+    nn = mats.shape[1]
+    i, j = np.triu_indices(nn, k=1)
+    np.testing.assert_allclose(np.asarray(vb.triu_to_mat(jp.asarray(triu)))[:, i, j], triu)
+    np.testing.assert_allclose(vb.triu_to_mat_np(triu)[:, i, j], triu)
+
+    single = vb.triu_to_mat(jp.asarray(triu[0]))
+    assert single.shape == (nn, nn)
+    np.testing.assert_allclose(single, single.T)
+
+
+def test_add_view_normalizations():
+    triu, _ = _fake_triu()
+    cc = vb.CrossCoder(variational=False)
+    cc.add_view(triu, 'SC', normalize='zscore')
+    cc.add_view(np.abs(triu), 'FA', normalize='logit', nonneg=True)
+    cc.add_view(triu, 'FC', normalize='center')
+
+    np.testing.assert_allclose(float(jp.mean(cc.conns[0])), 0.0, atol=1e-4)
+    assert 0.5 < float(jp.std(cc.conns[0])) < 2.0
+    assert cc.norm_types == ['zscore', 'logit', 'center']
+    assert cc.nonneg == [False, True, False]
+
+
+def test_denorm_roundtrip():
+    triu, _ = _fake_triu()
+    cc = vb.CrossCoder(variational=False)
+    cc.add_view(triu, 'A', normalize='zscore')
+    cc.add_view(np.abs(triu) + 1e-3, 'B', normalize='logit', nonneg=True)
+    for i in range(2):
+        reco = _denorm(cc.conns[i], cc.norm_types[i], cc.means[i],
+                       cc.stds[i], cc.scales[i], cc.nonneg[i])
+        target = np.abs(triu) + 1e-3 if i == 1 else triu
+        np.testing.assert_allclose(np.asarray(reco), target, atol=1e-3)
+
+
+@pytest.mark.parametrize('variational', [False, True])
+def test_train_deterministic_and_variational(variational):
+    triu, _ = _fake_triu(ns=30, nn=10)
+    cc = vb.CrossCoder(variational=variational, chunked_training=True)
+    cc.add_view(triu, 'SC', normalize='center')
+    cc.tts = 20
+    trace, wbs, cr = cc.train(nlat=3, lr=5e-3, niter=100, mb=8,
+                              beta_end=1e-4, anneal_steps=50)
+    assert len(trace) > 1
+    assert 0.0 <= cr <= 1.0
+    assert cc.arch == [3]
+
+    z = cc.encode(3, 'SC', sample=False)
+    assert z.shape == (triu.shape[0], 3)
+    recon = cc.decode(3, 'SC', z)
+    assert recon.shape == triu.shape
+    conn = cc.decode_conn('SC', z)
+    assert conn.shape == (triu.shape[0], 10, 10)
+    np.testing.assert_allclose(np.asarray(conn), np.asarray(conn).transpose(0, 2, 1), atol=1e-5)
+
+
+def test_cross_prediction_matches_loss():
+    triu_a, _ = _fake_triu(ns=20, nn=8, seed=1)
+    triu_b, _ = _fake_triu(ns=20, nn=8, seed=2)
+    cc = vb.CrossCoder(variational=False, chunked_training=False)
+    cc.add_view(triu_a, 'A', normalize='center')
+    cc.add_view(triu_b, 'B', normalize='center')
+    cc.tts = 14
+    cc.train(nlat=2, lr=5e-3, niter=50, mb=8)
+
+    loss_fn, _ = cc.make_loss()
+    l = float(loss_fn(cc.wbs[0], cc.conns))
+    assert np.isfinite(l)
+
+
+def test_calc_mvn_and_decompose():
+    triu, _ = _fake_triu(ns=30, nn=8)
+    cc = vb.CrossCoder(variational=True, chunked_training=True)
+    cc.add_view(triu, 'SC', normalize='zscore')
+    cc.tts = 20
+    cc.train(nlat=3, lr=5e-3, niter=80, mb=8,
+             beta_end=1e-4, anneal_steps=40)
+    mvn = cc.calc_mvn(3)
+    assert isinstance(mvn, vb.MvNorm)
+    assert mvn.mean.shape == (3,) and mvn.cov.shape == (3, 3)
+    samp = mvn.sample(5)
+    assert samp.shape == (5, 3)
+
+    d = cc.decompose_latent(3)
+    assert d['components'].shape[0] == 3
+    assert d['explained_variance'].size == 3
+
+
+def test_pickle_roundtrip(tmp_path):
+    triu, _ = _fake_triu(ns=20, nn=8)
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu, 'SC', normalize='center')
+    cc.tts = 14
+    cc.train(nlat=2, lr=5e-3, niter=30, mb=8)
+
+    fn = tmp_path / 'cc.pkl'
+    cc.to_pkl(str(fn))
+    cc2 = vb.CrossCoder.from_pkl(str(fn))
+    assert cc2.parcs == cc.parcs
+    assert cc2.arch == cc.arch
+    z = cc.encode(2, 'SC')
+    z2 = cc2.encode(2, 'SC')
+    np.testing.assert_allclose(np.asarray(z), np.asarray(z2), atol=1e-5)
+
+
+def test_from_numpy_array():
+    _, mats = _fake_triu(ns=30, nn=12)
+    cc = vb.CrossCoder.from_numpy_array(mats, tts=20, variational=False)
+    assert cc.tts == 20
+    assert cc.nonneg == [True]
+    assert len(cc.parcs) == 1
+    cc.train(nlat=2, lr=5e-3, niter=30, mb=8)
+    assert cc.arch == [2]
+
+
+def test_combine():
+    triu_a, _ = _fake_triu(ns=10, nn=8, seed=3)
+    triu_b, _ = _fake_triu(ns=10, nn=8, seed=4)
+    cc1 = vb.CrossCoder(variational=False)
+    cc1.add_view(triu_a, 'SC', normalize='center')
+    cc2 = vb.CrossCoder(variational=False)
+    cc2.add_view(triu_b, 'SC', normalize='center')
+    cc = vb.CrossCoder.combine(cc1, cc2, shuffle=False)
+    assert cc.conns[0].shape[0] == 20
+    assert cc.tts == 10
+
+
+def test_sweep_crosscoder():
+    triu, _ = _fake_triu(ns=20, nn=8)
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu, 'SC', normalize='center')
+    cc.tts = 14
+    results, best = vb.sweep_crosscoder(
+        cc, dims=[2], n_trials=2,
+        lr_range=(1e-3, 5e-3), niter_range=(20, 30), mb_choices=(8,))
+    assert len(results) == 2
+    assert best is results[0]
+    assert cc.wbs == []
