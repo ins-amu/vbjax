@@ -14,7 +14,19 @@ import numpy
 import tqdm
 import jax
 import jax.numpy as np
+from dataclasses import dataclass, field
+from typing import Any, List
+
 from vbjax import _optimizers as optimizers
+
+
+@dataclass
+class TrainedArch:
+    """One trained cross-coder architecture."""
+    nlat: int
+    wbs: Any                          # list of (encoder, decoder) per view
+    history: dict = field(default_factory=dict)
+    variational: bool = False
 
 
 SEED = 42
@@ -107,13 +119,20 @@ class CrossCoder:
         self.wbs = []
         self.tts = None
         self.history = []
+        self.archs: List[TrainedArch] = []
 
     _pkl_keys = ('variational', 'chunked_training', 'conns', 'means', 'stds',
-                 'scales', 'parcs', 'tts', 'wbs', 'history', 'norm_types', 'nonneg')
+                 'scales', 'parcs', 'tts', 'wbs', 'history', 'norm_types', 'nonneg',
+                 'archs')
 
     def to_pkl(self, fname):
+        data = {k: getattr(self, k) for k in self._pkl_keys}
+        # Convert TrainedArch dataclasses to dicts for pickling
+        if 'archs' in data:
+            data['archs'] = [{'nlat': a.nlat, 'wbs': a.wbs, 'history': a.history,
+                              'variational': a.variational} for a in data['archs']]
         with open(fname, 'wb') as fd:
-            pickle.dump({k: getattr(self, k) for k in self._pkl_keys}, fd)
+            pickle.dump(data, fd)
 
     @classmethod
     def from_pkl(cls, fname):
@@ -133,6 +152,19 @@ class CrossCoder:
             self.scales = [1.0] * len(self.conns)
         if not self.nonneg:
             self.nonneg = [False] * len(self.conns)
+        # Migration: rebuild archs from old-format pickles
+        if not self.archs and self.wbs:
+            for idx, wb in enumerate(self.wbs):
+                hist = self.history[idx] if idx < len(self.history) else {}
+                nlat = hist.get('nlat') if isinstance(hist, dict) else None
+                if nlat is None:
+                    # Infer nlat from weights
+                    nlat = int(wb[0][0][0][1].size if self.variational else wb[0][0][1].size)
+                self.archs.append(TrainedArch(nlat=nlat, wbs=wb, history=hist,
+                                               variational=self.variational))
+        elif self.archs and isinstance(self.archs[0], dict):
+            # New-format pickle with dicts
+            self.archs = [TrainedArch(**a) for a in self.archs]
         return self
 
     @classmethod
@@ -276,8 +308,11 @@ class CrossCoder:
                 train_c, test_c, tts, mb, niter)
 
         self.wbs.append(wbs)
-        self.history.append({'nlat': nlat, 'trace': trace,
-                             'log_freq': log_freq, 'variational': self.variational})
+        hist = {'nlat': nlat, 'trace': trace,
+                'log_freq': log_freq, 'variational': self.variational}
+        self.history.append(hist)
+        self.archs.append(TrainedArch(nlat=nlat, wbs=wbs, history=hist,
+                                       variational=self.variational))
         cr = self.calc_confusion_rate(nlat, tts=tts)
         return trace, wbs, cr
 
@@ -405,9 +440,22 @@ class CrossCoder:
         return trace, get_params(opt_state), log_freq
 
 
+    def _get_arch(self, nlat):
+        """Get TrainedArch by nlat value."""
+        for a in self.archs:
+            if a.nlat == nlat:
+                return a
+        # Fallback: reconstruct from old wbs
+        idx = self.arch.index(nlat)
+        return TrainedArch(nlat=nlat, wbs=self.wbs[idx],
+                           history=self.history[idx] if idx < len(self.history) else {},
+                           variational=self.variational)
+
     @property
     def arch(self):
         "Latent sizes for each trained architecture."
+        if self.archs:
+            return [a.nlat for a in self.archs]
         return [wb[0][0][0][1].size if self.variational else wb[0][0][1].size
                 for wb in self.wbs]
 
@@ -427,7 +475,7 @@ class CrossCoder:
     def calc_confusion_rate(self, arch, tts=None, self_recon_only=True):
         "Fraction of test subjects not fingerprinted correctly."
         tts = tts or self.tts
-        wbs = self.wbs[self.arch.index(arch)]
+        wbs = self._get_arch(arch).wbs
         test_c = [c[tts:] for c in self.conns]
         if not self.variational:
             cr = self._conf_rates_det(wbs, test_c)
@@ -451,24 +499,24 @@ class CrossCoder:
 
     def encode(self, arch, parc, tts=None, sample=False, key=None):
         "Encode the normalized connectomes of a view into latent space."
-        iarch = self.arch.index(arch)
+        ta = self._get_arch(arch)
         iparc = self.parcs.index(parc)
         c = self.conns[iparc] if tts is None else self.conns[iparc][tts:]
         if self.variational:
-            ((w_mu, b_mu), (w_lv, b_lv)), _ = self.wbs[iarch][iparc]
+            ((w_mu, b_mu), (w_lv, b_lv)), _ = ta.wbs[iparc]
             mu = c @ w_mu + b_mu
             if not sample:
                 return mu
             logvar = np.clip(c @ w_lv + b_lv, *_LOGVAR_CLIP)
             key = key if key is not None else jax.random.PRNGKey(SEED)
             return mu + np.exp(0.5 * logvar) * jax.random.normal(key, mu.shape)
-        (ew, eb), _ = self.wbs[iarch][iparc]
+        (ew, eb), _ = ta.wbs[iparc]
         return c @ ew + eb
 
     def decode(self, arch, parc, z, raw=False):
         "Decode latent vectors into flat upper-tri connectomes."
         iparc = self.parcs.index(parc)
-        _, (w_dec, b_dec) = self.wbs[self.arch.index(arch)][iparc]
+        _, (w_dec, b_dec) = self._get_arch(arch).wbs[iparc]
         rec = z @ w_dec + b_dec
         if raw:
             return rec
@@ -498,10 +546,10 @@ class CrossCoder:
 
     def calc_mvn(self, arch, tts=None):
         "Total-variance multivariate normal over the cohort latents."
-        iarch = self.arch.index(arch)
+        ta = self._get_arch(arch)
         tts = tts or self.tts
         us, var = [], []
-        for i, wb in enumerate(self.wbs[iarch]):
+        for i, wb in enumerate(ta.wbs):
             c = self.conns[i][tts:]
             if self.variational:
                 ((w_mu, b_mu), (w_lv, b_lv)), _ = wb
@@ -599,9 +647,13 @@ def sweep_crosscoder(model, dims, n_trials=20, seed=42,
                 while len(model.wbs) > n_wbs_before:
                     model.wbs.pop()
                     model.history.pop()
+                    if model.archs:
+                        model.archs.pop()
                 continue
             model.wbs.pop()
             model.history.pop()
+            if model.archs:
+                model.archs.pop()
 
     results.sort(key=lambda r: r['score'])
     return results, (results[0] if results else None)
