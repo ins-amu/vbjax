@@ -496,15 +496,14 @@ class CrossCoder:
 
             if n_samples > 0:
                 logvar = np.clip(conns[i] @ w_lv + b_lv, *_LOGVAR_CLIP)
+                std = np.exp(0.5 * logvar)
                 key = jax.random.PRNGKey(42)
-                recs = [None] * nv
-                for j, (_, (w_dec, b_dec)) in enumerate(wbs):
-                    stacked = []
-                    for _ in range(n_samples):
-                        key, sub = jax.random.split(key)
-                        z_s = mu + np.exp(0.5 * logvar) * jax.random.normal(sub, mu.shape)
-                        stacked.append(z_s @ w_dec + b_dec)
-                    recs[j] = np.mean(np.stack(stacked), axis=0)
+                eps = jax.random.normal(key, (n_samples,) + mu.shape, dtype=mu.dtype)
+                z_samples = mu[None, ...] + std[None, ...] * eps
+                recs = [
+                    np.mean(z_samples @ w_dec + b_dec, axis=0)
+                    for (_, (w_dec, b_dec)) in wbs
+                ]
             else:
                 recs = [mu @ w_dec + b_dec for (_, (w_dec, b_dec)) in wbs]
 
