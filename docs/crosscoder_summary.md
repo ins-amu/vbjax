@@ -1,4 +1,5 @@
 # Variational Cross Coder (VCC) - CrossCoder Pipeline Summary
+# TODO: Merge with the rest of the docs
 
 This document summarizes the core components and design choices of the `CrossCoder` pipeline for amortized inference of whole-brain connectomes, based on the `vcc_modules.py` codebase.
 
@@ -22,7 +23,7 @@ The "Cross" in CrossCoder comes from the nested loop inside the loss functions. 
 * **Reconstruction Loss (MSE):** The network minimizes Mean Squared Error, which mathematically equates to maximizing the Gaussian log-likelihood of the connectome data.
 * **Variational Regularization (KL Divergence):** The VAE calculates a KL divergence penalty to force the learned distributions to resemble a standard normal distribution $\mathcal{N}(0, 1)$. This prevents the network from memorizing the data by shrinking the variance to zero.
 * **The Reparameterization Trick:** To allow gradients to flow past the random sampling step, the network samples independent noise $\epsilon \sim \mathcal{N}(0, 1)$, then scales it by the predicted standard deviation and shifts it by the predicted mean ($z = \mu + \sigma \cdot \epsilon$).
-* **Beta Annealing:** The KL divergence penalty is scaled by a parameter $eta$. Because connectome MSE sums over thousands of edges, a high $eta$ would overpower the reconstruction. $eta$ starts at 0 (allowing the network to learn to reconstruct first) and is slowly annealed to a tiny value (e.g., $10^{-5}$) to gently organize the latent space without losing detail.
+* **Beta Annealing:** The KL divergence penalty is scaled by a parameter $\eta$. Because connectome MSE sums over thousands of edges, a high $\eta$ would overpower the reconstruction. $\eta$ starts at 0 (allowing the network to learn to reconstruct first) and is slowly annealed to a tiny value (e.g., $10^{-5}$) to gently organize the latent space without losing detail.
 
 ## 4. Training Execution (JAX Specifics)
 * **`jax.lax.scan`:** Instead of a standard Python `for` loop, the VAE training loop uses JAX's `scan` primitive. This compiles the entire iteration block into highly optimized XLA machine code that runs natively on the GPU without returning to Python between steps.
