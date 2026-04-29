@@ -352,7 +352,10 @@ class CrossCoder:
                     body, (opt_state, mbkey), np.arange(n_steps) + i0)
                 return opt_state, mbkey
 
-            pbar = tqdm.tqdm(total=niter + 1)
+            show_progress = bool(
+                getattr(self, "progress", getattr(self, "verbose", False))
+            )
+            pbar = tqdm.tqdm(total=niter + 1, disable=not show_progress)
             i = 0
             while i <= niter:
                 n = min(log_freq, niter + 1 - i)
