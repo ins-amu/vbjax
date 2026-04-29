@@ -660,7 +660,7 @@ class CrossCoder:
         return cc
 
 
-def sweep_crosscoder(model, dims, n_trials=20, seed=42,
+def sweep_crosscoder(model, dims, n_trials=20, seed=42, keep_best=False,
                      lr_range=(1e-5, 1e-2), niter_range=(500, 5000),
                      mb_choices=(32, 64, 128),
                      beta_end_range=(1e-6, 1e-3),
@@ -670,11 +670,14 @@ def sweep_crosscoder(model, dims, n_trials=20, seed=42,
     Random hyperparameter sweep over ``CrossCoder.train``.
 
     Trained weights are discarded after each trial; only summary statistics
-    are kept.  Returns ``(results_sorted_by_score, best)``.
+    are kept.  When *keep_best* is True the best-scoring trial's weights
+    are re-attached to the model after the sweep.
+    Returns ``(results_sorted_by_score, best)``.
     """
     rng = numpy.random.default_rng(seed)
     score_fn = score_fn or (lambda cr, mse, std_min: cr)
     results = []
+    best_saved = None  # (score, wbs, history_entry, archs_entry)
     for dim in dims:
         for _ in range(n_trials):
             lr = float(numpy.exp(rng.uniform(numpy.log(lr_range[0]), numpy.log(lr_range[1]))))
@@ -698,14 +701,22 @@ def sweep_crosscoder(model, dims, n_trials=20, seed=42,
                     final_mse = float(numpy.asarray(trace)[-1, 2])
                 else:
                     final_mse = float(numpy.exp(trace[-1][1]))
+                score = score_fn(cr, final_mse, float(std_z.min()))
                 results.append({
                     'dim': dim, 'lr': lr, 'niter': niter, 'mb': mb,
                     'beta_end': beta_end, 'anneal_steps': anneal,
                     'cr': cr, 'mse': final_mse,
                     'latent_std_min': float(std_z.min()),
                     'latent_std_max': float(std_z.max()),
-                    'score': score_fn(cr, final_mse, float(std_z.min())),
+                    'score': score,
                 })
+                if keep_best and (best_saved is None or score < best_saved[0]):
+                    best_saved = (
+                        score,
+                        model.wbs[-1],
+                        model.history[-1],
+                        model.archs[-1] if model.archs else None,
+                    )
             except Exception:
                 while len(model.wbs) > n_wbs_before:
                     model.wbs.pop()
@@ -719,4 +730,9 @@ def sweep_crosscoder(model, dims, n_trials=20, seed=42,
                 model.archs.pop()
 
     results.sort(key=lambda r: r['score'])
+    if keep_best and best_saved is not None:
+        model.wbs.append(best_saved[1])
+        model.history.append(best_saved[2])
+        if best_saved[3] is not None:
+            model.archs.append(best_saved[3])
     return results, (results[0] if results else None)

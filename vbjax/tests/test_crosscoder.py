@@ -508,3 +508,23 @@ def test_from_pkl_legacy_apvbt(tmp_path):
     assert z_test.shape == (6, 2)  # 20 - 14 test subjects
 
 
+
+def test_sweep_keep_best():
+    """sweep_crosscoder with keep_best=True retains best trial's weights."""
+    triu, _ = _fake_triu(ns=20, nn=8)
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu, 'SC', normalize='center')
+    cc.tts = 14
+    results, best = vb.sweep_crosscoder(
+        cc, dims=[2], n_trials=3,
+        lr_range=(1e-3, 5e-3), niter_range=(20, 30), mb_choices=(8,),
+        keep_best=True)
+    assert len(results) == 3
+    assert cc.wbs  # not empty — best weights kept
+    assert len(cc.wbs) == 1
+    assert cc.arch == [2]
+    # The kept weights should produce a valid confusion rate
+    cr = cc.calc_confusion_rate(2)
+    assert 0.0 <= cr <= 1.0
+
+
