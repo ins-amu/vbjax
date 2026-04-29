@@ -146,6 +146,10 @@ class CrossCoder:
         self.conns = [np.asarray(c) for c in self.conns]
         self.means = [np.asarray(m) for m in self.means]
         self.stds = [float(s) for s in self.stds]
+        # Legacy apvbt pickles have no stds key -> empty list.
+        # Fill with 1.0 per view so downstream defaults work correctly.
+        if len(self.stds) != len(self.conns):
+            self.stds = [1.0] * len(self.conns)
         if not self.norm_types:
             self.norm_types = ['center' if s == 1.0 else 'zscore' for s in self.stds]
         if not self.scales:
