@@ -8,6 +8,8 @@ mode places a Gaussian over the latent and regularises towards a standard
 normal, which helps when training data pools heterogeneous cohorts.
 """
 
+from __future__ import annotations
+
 import pickle
 import functools
 import numpy
@@ -34,7 +36,7 @@ class TrainedArch:
     variational: bool = False
 
 
-def triu_to_mat(triu):
+def triu_to_mat(triu: Any) -> Any:
     "Fold flat upper-triangular vectors into symmetric square matrices."
     squeeze = triu.ndim == 1
     if squeeze:
@@ -47,7 +49,7 @@ def triu_to_mat(triu):
     return mat[0] if squeeze else mat
 
 
-def triu_to_mat_np(triu):
+def triu_to_mat_np(triu: Any) -> Any:
     "NumPy equivalent of :func:`triu_to_mat` for post-training paths."
     squeeze = triu.ndim == 1
     if squeeze:
@@ -61,25 +63,25 @@ def triu_to_mat_np(triu):
     return mat[0] if squeeze else mat
 
 
-def _xavier(key, shape, scale=1.0):
+def _xavier(key: Any, shape: tuple[int, ...], scale: float = 1.0) -> Any:
     return jax.random.normal(key, shape) * np.sqrt(scale / shape[0])
 
 
 class MvNorm:
     "Multivariate normal with persistent PRNG key for sampling."
 
-    def __init__(self, us, mean, cov, key=None):
+    def __init__(self, us: Any, mean: Any, cov: Any, key: Any | None = None) -> None:
         self.us = us
         self.mean = mean
         self.cov = cov
         self.key = key if key is not None else jax.random.PRNGKey(SEED)
 
-    def sample(self, n):
+    def sample(self, n: int) -> Any:
         self.key, k = jax.random.split(self.key)
         return jax.random.multivariate_normal(k, self.mean, self.cov, shape=(n,))
 
 
-def _denorm(flat, ntype, mean, std, scale, nonneg):
+def _denorm(flat: Any, ntype: str, mean: Any, std: float, scale: float, nonneg: bool) -> Any:
     "Invert the per-view normalization applied by :meth:`CrossCoder.add_view`."
     if ntype == 'logit':
         probs = jax.nn.sigmoid(flat * std + mean)
@@ -106,7 +108,7 @@ class CrossCoder:
         and returns to Python only for logging.  Disable for step-wise debug.
     """
 
-    def __init__(self, variational=True, chunked_training=True):
+    def __init__(self, variational: bool = True, chunked_training: bool = True) -> None:
         self.variational = variational
         self.chunked_training = chunked_training
         self.conns = []
@@ -125,7 +127,7 @@ class CrossCoder:
                  'scales', 'parcs', 'tts', 'wbs', 'history', 'norm_types', 'nonneg',
                  'archs')
 
-    def to_pkl(self, fname):
+    def to_pkl(self, fname: str) -> None:
         data = {k: getattr(self, k) for k in self._pkl_keys}
         # Convert TrainedArch dataclasses to dicts for pickling
         if 'archs' in data:
@@ -135,7 +137,7 @@ class CrossCoder:
             pickle.dump(data, fd)
 
     @classmethod
-    def from_pkl(cls, fname):
+    def from_pkl(cls, fname: str) -> CrossCoder:
         with open(fname, 'rb') as fd:
             data = pickle.load(fd)
         self = cls(variational=data.get('variational', False),
@@ -172,8 +174,8 @@ class CrossCoder:
         return self
 
     @classmethod
-    def from_numpy_array(cls, weights, tts=None, parc='Schaefer-17Networks',
-                         variational=False, chunked_training=True, normalize='center'):
+    def from_numpy_array(cls, weights: numpy.ndarray, tts: int | None = None, parc: str = 'Schaefer-17Networks',
+                         variational: bool = False, chunked_training: bool = True, normalize: str = 'center') -> CrossCoder:
         "Build a single-view CrossCoder from an ``(ns, nn, nn)`` connectome stack."
         weights = numpy.maximum(weights, 0.0)
         ns, nn, _ = weights.shape
@@ -183,7 +185,7 @@ class CrossCoder:
         self.add_view(weights[:, i, j], f'{nn}-{parc}', normalize=normalize, nonneg=True)
         return self
 
-    def add_view(self, data, parc_name, normalize='zscore', nonneg=False):
+    def add_view(self, data: Any, parc_name: str, normalize: str = 'zscore', nonneg: bool = False) -> None:
         "Register a view, normalizing its flat upper-tri connectomes."
         data = np.asarray(data)
         scale = 1.0
@@ -217,7 +219,7 @@ class CrossCoder:
         self.norm_types.append(normalize)
         self.nonneg.append(nonneg)
 
-    def shuffle(self, seed=None):
+    def shuffle(self, seed: int | None = None) -> numpy.ndarray:
         "Shuffle all views with a common permutation and return it."
         n = self.conns[0].shape[0]
         key = jax.random.PRNGKey(SEED if seed is None else seed)
@@ -225,7 +227,7 @@ class CrossCoder:
         self.conns = [c[perm] for c in self.conns]
         return numpy.asarray(perm)
 
-    def make_wbs(self, nlat, key=None):
+    def make_wbs(self, nlat: int, key: Any | None = None) -> list:
         "Initialize weights/biases for all views at given latent size."
         if key is None:
             key = jax.random.PRNGKey(SEED)
@@ -247,7 +249,7 @@ class CrossCoder:
         return wbs
 
 
-    def make_loss(self):
+    def make_loss(self) -> tuple:
         "Build the cross-prediction loss and its gradient."
         if self.variational:
             @jax.jit
@@ -281,8 +283,8 @@ class CrossCoder:
         return loss, grad
 
 
-    def train(self, nlat, lr=3e-4, niter=2000, tts=None, mb=64,
-              beta_start=0.0, beta_end=1e-3, anneal_steps=1500, key=None):
+    def train(self, nlat: int, lr: float = 3e-4, niter: int = 2000, tts: int | None = None, mb: int = 64,
+              beta_start: float = 0.0, beta_end: float = 1e-3, anneal_steps: int = 1500, key: Any | None = None) -> tuple:
         """
         Fit a single architecture.  Appends the learned weights and trace
         into ``self.wbs`` / ``self.history`` and returns
@@ -320,9 +322,9 @@ class CrossCoder:
         cr = self.calc_confusion_rate(nlat, tts=tts)
         return trace, wbs, cr
 
-    def _train_var(self, loss_fn, grad_fn, opt_update, get_params, opt_state,
-                   mbkey, train_c, test_c, tts, mb, niter,
-                   beta_start, beta_end, anneal_steps):
+    def _train_var(self, loss_fn: Any, grad_fn: Any, opt_update: Any, get_params: Any, opt_state: Any,
+                   mbkey: Any, train_c: Any, test_c: Any, tts: int, mb: int, niter: int,
+                   beta_start: float, beta_end: float, anneal_steps: int) -> tuple:
         def beta_at(it):
             return np.minimum(
                 beta_start + (beta_end - beta_start) * (it / anneal_steps), beta_end)
@@ -385,8 +387,8 @@ class CrossCoder:
 
         return trace, get_params(opt_state), log_freq
 
-    def _train_det(self, loss_fn, grad_fn, opt_update, get_params, opt_state,
-                   mbkey, train_c, test_c, tts, mb, niter):
+    def _train_det(self, loss_fn: Any, grad_fn: Any, opt_update: Any, get_params: Any, opt_state: Any,
+                   mbkey: Any, train_c: Any, test_c: Any, tts: int, mb: int, niter: int) -> tuple:
         def step(i, opt_state, mbkey):
             mbkey, kb = jax.random.split(mbkey)
             idx = jax.random.randint(kb, (mb,), 0, tts)
@@ -444,7 +446,7 @@ class CrossCoder:
         return trace, get_params(opt_state), log_freq
 
 
-    def _get_arch(self, nlat):
+    def _get_arch(self, nlat: int) -> TrainedArch:
         """Get TrainedArch by nlat value."""
         for a in self.archs:
             if a.nlat == nlat:
@@ -463,7 +465,7 @@ class CrossCoder:
         return [wb[0][0][0][1].size if self.variational else wb[0][0][1].size
                 for wb in self.wbs]
 
-    def _conf_rates_det(self, wbs, conns):
+    def _conf_rates_det(self, wbs: Any, conns: Any) -> numpy.ndarray:
         @jax.jit
         def dist(a, b):
             return np.sum((a[:, None] - b) ** 2, axis=-1)
@@ -476,7 +478,7 @@ class CrossCoder:
                 crs[i, j] = 1 - ok.mean()
         return crs
 
-    def _conf_rates_var(self, wbs, conns, n_samples=0):
+    def _conf_rates_var(self, wbs: Any, conns: Any, n_samples: int = 0) -> numpy.ndarray:
         """Compute (n_views, n_views) confusion rate matrix for variational mode."""
         @jax.jit
         def dist(a, b):
@@ -508,7 +510,7 @@ class CrossCoder:
 
         return crs
 
-    def calc_confusion_rate(self, arch, tts=None, self_recon_only=True, n_samples=0):
+    def calc_confusion_rate(self, arch: int, tts: int | None = None, self_recon_only: bool = True, n_samples: int = 0) -> float:
         "Fraction of test subjects not fingerprinted correctly."
         tts = tts or self.tts
         wbs = self._get_arch(arch).wbs
@@ -522,7 +524,7 @@ class CrossCoder:
             return float(numpy.diag(crs).mean())
         return float(crs.mean())
 
-    def confusion_matrix(self, arch, tts=None, n_samples=0):
+    def confusion_matrix(self, arch: int, tts: int | None = None, n_samples: int = 0) -> numpy.ndarray:
         """Return (n_views, n_views) confusion rate matrix.
 
         Entry (i, j) is the fraction of test subjects from view i whose
@@ -549,7 +551,7 @@ class CrossCoder:
         return self._conf_rates_var(wbs, test_c, n_samples=n_samples)
 
 
-    def encode(self, arch, parc, tts=None, sample=False, key=None):
+    def encode(self, arch: int, parc: str, tts: int | None = None, sample: bool = False, key: Any | None = None) -> Any:
         "Encode the normalized connectomes of a view into latent space."
         ta = self._get_arch(arch)
         iparc = self.parcs.index(parc)
@@ -565,7 +567,7 @@ class CrossCoder:
         (ew, eb), _ = ta.wbs[iparc]
         return c @ ew + eb
 
-    def encode_all(self, arch, tts=None, sample=False, key=None):
+    def encode_all(self, arch: int, tts: int | None = None, sample: bool = False, key: Any | None = None) -> dict[str, Any]:
         """Encode all views into latent space.
 
         Returns
@@ -576,7 +578,7 @@ class CrossCoder:
         return {parc: self.encode(arch, parc, tts=tts, sample=sample, key=key)
                 for parc in self.parcs}
 
-    def decode(self, arch, parc, z, raw=False):
+    def decode(self, arch: int, parc: str, z: Any, raw: bool = False) -> Any:
         "Decode latent vectors into flat upper-tri connectomes."
         iparc = self.parcs.index(parc)
         _, (w_dec, b_dec) = self._get_arch(arch).wbs[iparc]
@@ -586,19 +588,19 @@ class CrossCoder:
         return _denorm(rec, self.norm_types[iparc], self.means[iparc],
                        self.stds[iparc], self.scales[iparc], self.nonneg[iparc])
 
-    def decode_conn(self, arch, parc, z, clip_positive=None):
+    def decode_conn(self, arch: int, parc: str, z: Any, clip_positive: bool | None = None) -> Any:
         "Decode latents into full symmetric connectomes ``(ns, nn, nn)``."
         flat = self.decode(arch, parc, z, raw=False)
         if clip_positive is True:
             flat = np.maximum(flat, 0.0)
         return triu_to_mat(flat)
 
-    def get_triu(self, parc, tts=None):
+    def get_triu(self, parc: str, tts: int | None = None) -> Any:
         "Return normalized flat upper-tri connectomes for a view."
         return self.conns[self.parcs.index(parc)][
             self.tts if tts is None else tts:]
 
-    def get_conn(self, parc, tts=None):
+    def get_conn(self, parc: str, tts: int | None = None) -> Any:
         "Return empirical connectomes ``(ns, nn, nn)`` for a view."
         iparc = self.parcs.index(parc)
         flat = _denorm(self.get_triu(parc, tts), self.norm_types[iparc],
@@ -607,7 +609,7 @@ class CrossCoder:
         return triu_to_mat(flat)
 
 
-    def calc_mvn(self, arch, tts=None):
+    def calc_mvn(self, arch: int, tts: int | None = None) -> MvNorm:
         "Total-variance multivariate normal over the cohort latents."
         ta = self._get_arch(arch)
         tts = tts or self.tts
@@ -628,7 +630,7 @@ class CrossCoder:
             cov = cov + np.diag(np.mean(np.concatenate(var, axis=0), axis=0))
         return MvNorm(us, mean, cov)
 
-    def decompose_latent(self, arch, tts=None):
+    def decompose_latent(self, arch: int, tts: int | None = None) -> dict:
         "SVD of the centered cohort latents for a given architecture."
         mvn = self.calc_mvn(arch, tts)
         X = mvn.us - mvn.mean
@@ -640,7 +642,7 @@ class CrossCoder:
 
 
     @classmethod
-    def combine(cls, cc1, cc2, shuffle=True):
+    def combine(cls, cc1: CrossCoder, cc2: CrossCoder, shuffle: bool = True) -> CrossCoder:
         "Concatenate two CrossCoders with identical views and normalizations."
         assert cc1.variational == cc2.variational
         assert cc1.parcs == cc2.parcs
@@ -660,12 +662,12 @@ class CrossCoder:
         return cc
 
 
-def sweep_crosscoder(model, dims, n_trials=20, seed=42, keep_best=False,
-                     lr_range=(1e-5, 1e-2), niter_range=(500, 5000),
-                     mb_choices=(32, 64, 128),
-                     beta_end_range=(1e-6, 1e-3),
-                     anneal_range=(500, 3000),
-                     score_fn=None):
+def sweep_crosscoder(model: CrossCoder, dims: list[int], n_trials: int = 20, seed: int = 42, keep_best: bool = False,
+                     lr_range: tuple[float, float] = (1e-5, 1e-2), niter_range: tuple[int, int] = (500, 5000),
+                     mb_choices: tuple[int, ...] = (32, 64, 128),
+                     beta_end_range: tuple[float, float] = (1e-6, 1e-3),
+                     anneal_range: tuple[int, int] = (500, 3000),
+                     score_fn: Any | None = None) -> tuple[list[dict], dict | None]:
     """
     Random hyperparameter sweep over ``CrossCoder.train``.
 
