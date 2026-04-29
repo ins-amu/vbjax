@@ -20,6 +20,11 @@ from typing import Any, List
 from vbjax import _optimizers as optimizers
 
 
+SEED = 42
+_LOGVAR_CLIP = (-15.0, 5.0)
+_GRAD_CLIP = 5.0
+
+
 @dataclass
 class TrainedArch:
     """One trained cross-coder architecture."""
@@ -27,11 +32,6 @@ class TrainedArch:
     wbs: Any                          # list of (encoder, decoder) per view
     history: dict = field(default_factory=dict)
     variational: bool = False
-
-
-SEED = 42
-_LOGVAR_CLIP = (-15.0, 5.0)
-_GRAD_CLIP = 5.0
 
 
 def triu_to_mat(triu):
