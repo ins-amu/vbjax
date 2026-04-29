@@ -68,7 +68,7 @@ def test_train_deterministic_and_variational(variational):
     assert z.shape == (triu.shape[0], 3)
     recon = cc.decode(3, 'SC', z)
     assert recon.shape == triu.shape
-    conn = cc.decode_conn('SC', z)
+    conn = cc.decode_conn(3, 'SC', z)
     assert conn.shape == (triu.shape[0], 10, 10)
     np.testing.assert_allclose(np.asarray(conn), np.asarray(conn).transpose(0, 2, 1), atol=1e-5)
 
@@ -155,3 +155,65 @@ def test_sweep_crosscoder():
     assert len(results) == 2
     assert best is results[0]
     assert cc.wbs == []
+
+
+def test_multi_view_cross_reconstruction():
+    triu_a, _ = _fake_triu(ns=30, nn=10, seed=1)
+    triu_b, _ = _fake_triu(ns=30, nn=10, seed=2)
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu_a, 'A', normalize='center')
+    cc.add_view(triu_b, 'B', normalize='center')
+    cc.tts = 20
+    trace, wbs, cr = cc.train(nlat=3, lr=5e-3, niter=80, mb=8)
+    assert len(trace) > 1
+    assert 0.0 <= cr <= 1.0
+
+    # Encode one view and decode the other (cross-reconstruction)
+    z_a = cc.encode(3, 'A')
+    rec_b = cc.decode(3, 'B', z_a)
+    assert rec_b.shape == triu_b.shape
+
+    # Overall loss should be finite with two views
+    loss_fn, _ = cc.make_loss()
+    l = float(loss_fn(cc.wbs[0], cc.conns))
+    assert np.isfinite(l)
+
+
+@pytest.mark.parametrize('variational', [False, True])
+def test_train_not_chunked(variational):
+    triu, _ = _fake_triu(ns=20, nn=8)
+    cc = vb.CrossCoder(variational=variational, chunked_training=False)
+    cc.add_view(triu, 'SC', normalize='center')
+    cc.tts = 14
+    trace, wbs, cr = cc.train(
+        nlat=2, lr=5e-3, niter=20, mb=8,
+        beta_end=1e-4 if variational else 0.0,
+        anneal_steps=10 if variational else 0)
+    assert len(trace) == 21
+    assert 0.0 <= cr <= 1.0
+
+
+def test_encode_sample_stochastic():
+    triu, _ = _fake_triu(ns=20, nn=8)
+    cc = vb.CrossCoder(variational=True, chunked_training=True)
+    cc.add_view(triu, 'SC', normalize='center')
+    cc.tts = 14
+    cc.train(nlat=2, lr=5e-3, niter=20, mb=8,
+             beta_end=1e-4, anneal_steps=10)
+    mu = cc.encode(2, 'SC', sample=False)
+    z1 = cc.encode(2, 'SC', sample=True, key=jax.random.PRNGKey(1))
+    z2 = cc.encode(2, 'SC', sample=True, key=jax.random.PRNGKey(2))
+    assert z1.shape == mu.shape == (triu.shape[0], 2)
+    assert not np.allclose(np.asarray(z1), np.asarray(mu))
+    assert not np.allclose(np.asarray(z1), np.asarray(z2))
+
+
+def test_add_view_zero_std():
+    triu = np.ones((20, 36), dtype='f4')
+    cc = vb.CrossCoder(variational=False)
+    cc.add_view(triu, 'Flat', normalize='zscore')
+    # Constant data -> centered is 0 -> norm is 0
+    np.testing.assert_allclose(np.asarray(cc.conns[0]), 0.0, atol=1e-6)
+    cc.tts = 14
+    cc.train(nlat=2, lr=5e-3, niter=10, mb=8)
+    assert cc.arch == [2]

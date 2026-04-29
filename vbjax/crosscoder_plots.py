@@ -151,16 +151,17 @@ def plot_fidelity(model, arch, parc, cmap='inferno', gridsize=50,
     emp = _empirical_flat(model, parc, tts=tts)
     rec = _flat_recon(model, arch, parc, Z)
 
+    iparc = model.parcs.index(parc)
     x, y = emp.ravel(), rec.ravel()
-    keep = (x > 0) if (mask_zeros and 'SC' in parc) else numpy.ones_like(x, dtype=bool)
+    keep = (x > 0) if (mask_zeros and model.nonneg[iparc]) else numpy.ones_like(x, dtype=bool)
     xf, yf = x[keep], y[keep]
     r_val = stats.spearmanr(xf, yf)[0]
     m, b = numpy.polyfit(xf, yf, 1)
 
-    xp, yp = (xf, yf) if (mask_zeros and hide_masked and 'SC' in parc) else (x, y)
+    xp, yp = (xf, yf) if (mask_zeros and hide_masked and model.nonneg[iparc]) else (x, y)
     hb = ax.hexbin(xp, yp, gridsize=gridsize, cmap=cmap, mincnt=1, bins='log')
     dmax = max(xp.max(), yp.max())
-    dmin = 0 if 'SC' in parc else min(xp.min(), yp.min()) * 1.05
+    dmin = 0 if model.nonneg[iparc] else min(xp.min(), yp.min()) * 1.05
     ax.set_xlim(dmin, dmax * 1.05); ax.set_ylim(dmin, dmax * 1.05)
 
     xr = numpy.linspace(xf.min(), xf.max(), 100)
@@ -181,6 +182,7 @@ def plot_obs_vs_pred(model, arch, parc=None, n_subs=3, cmap='inferno',
     import matplotlib.pyplot as plt
 
     parc = parc or model.parcs[0]
+    iparc = model.parcs.index(parc)
     enc_start = start_idx if start_idx is not None else getattr(model, 'tts', 0)
     Z = _latents(model, arch, parc, tts=enc_start)
     n_draw = min(n_subs, Z.shape[0])
@@ -197,7 +199,7 @@ def plot_obs_vs_pred(model, arch, parc=None, n_subs=3, cmap='inferno',
         r_val = numpy.corrcoef(emp, rec)[0, 1]
         rmse = numpy.sqrt(numpy.mean((emp - rec) ** 2))
         vmax = numpy.percentile(emp_m, 99)
-        vmin = 0 if 'SC' in parc else -vmax
+        vmin = 0 if model.nonneg[iparc] else -vmax
         dmax = max(numpy.percentile(numpy.abs(diff), 99), 1e-9)
         panels = [(emp_m, vmin, vmax, cmap),
                   (rec_m, vmin, vmax, cmap),
@@ -225,6 +227,7 @@ def plot_obs_vs_pred(model, arch, parc=None, n_subs=3, cmap='inferno',
 def plot_latent(model, arch, parc, color_vals=None, cohorts=None,
                 method='pca', n_components=2, tts=None, dims=(0, 1),
                 per_cohort_color=True, pca_params=None, umap_params=None,
+                cohort_markers=None, fallback_markers=None,
                 ax=None, **scatter_kw):
     "2-D latent scatter via PCA or UMAP, optionally colored by a covariate."
     import matplotlib.pyplot as plt
@@ -281,7 +284,9 @@ def plot_latent(model, arch, parc, color_vals=None, cohorts=None,
     if cohorts is not None:
         for ci, coh in enumerate(numpy.unique(cohorts)):
             m = cohorts == coh
-            mk = _COHORT_MARKERS.get(coh, _FALLBACK_MARKERS[ci % len(_FALLBACK_MARKERS)])
+            _markers = cohort_markers if cohort_markers is not None else _COHORT_MARKERS
+            _fallback = fallback_markers if fallback_markers is not None else _FALLBACK_MARKERS
+            mk = _markers.get(coh, _fallback[ci % len(_fallback)])
             c = color_vals[m] if color_vals is not None else None
             sc_ = ax.scatter(emb[m, dims[0]], emb[m, dims[1]], c=c, marker=mk,
                              label=coh, cmap='inferno', edgecolor='k', lw=0.3,

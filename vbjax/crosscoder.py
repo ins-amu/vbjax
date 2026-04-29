@@ -262,7 +262,7 @@ class CrossCoder:
         opt_init, opt_update, get_params = optimizers.adam(lr)
         opt_state = opt_init(wbs)
         loss_fn, grad_fn = self.make_loss()
-        mbkey = jax.random.PRNGKey(mb)
+        mbkey = jax.random.PRNGKey(SEED)
         trace = []
 
         if self.variational:
@@ -393,7 +393,10 @@ class CrossCoder:
             for i in (pbar := tqdm.trange(niter + 1)):
                 opt_state, mbkey = step(i, opt_state, mbkey)
                 wbs = get_params(opt_state)
-                ll_tr = float(np.log(loss_fn(wbs, [c[:mb] for c in train_c])))
+                mbkey, _key = jax.random.split(mbkey)
+                idx = jax.random.randint(_key, (mb,), 0, tts)
+                log_mb = [c[idx] for c in train_c]
+                ll_tr = float(np.log(loss_fn(wbs, log_mb)))
                 ll_te = float(np.log(loss_fn(wbs, test_c)))
                 trace.append((ll_tr, ll_te))
                 ll0 = trace[0][1]
@@ -417,7 +420,7 @@ class CrossCoder:
             u = conns[i] @ ew + eb
             for j, (_, (dw, db)) in enumerate(wbs):
                 rec = u @ dw + db
-                ok = dist(conns[j], rec).argmin(axis=1) == np.r_[:conns[j].shape[0]]
+                ok = dist(conns[j], rec).argmin(axis=1) == np.arange(conns[j].shape[0])
                 crs[i, j] = 1 - ok.mean()
         return crs
 
@@ -456,7 +459,7 @@ class CrossCoder:
             mu = c @ w_mu + b_mu
             if not sample:
                 return mu
-            logvar = c @ w_lv + b_lv
+            logvar = np.clip(c @ w_lv + b_lv, *_LOGVAR_CLIP)
             key = key if key is not None else jax.random.PRNGKey(SEED)
             return mu + np.exp(0.5 * logvar) * jax.random.normal(key, mu.shape)
         (ew, eb), _ = self.wbs[iarch][iparc]
@@ -472,9 +475,9 @@ class CrossCoder:
         return _denorm(rec, self.norm_types[iparc], self.means[iparc],
                        self.stds[iparc], self.scales[iparc], self.nonneg[iparc])
 
-    def decode_conn(self, parc, z, clip_positive=None):
+    def decode_conn(self, arch, parc, z, clip_positive=None):
         "Decode latents into full symmetric connectomes ``(ns, nn, nn)``."
-        flat = self.decode(z.shape[1], parc, z, raw=False)
+        flat = self.decode(arch, parc, z, raw=False)
         if clip_positive is True:
             flat = np.maximum(flat, 0.0)
         return triu_to_mat(flat)
@@ -539,7 +542,10 @@ class CrossCoder:
         cc.means, cc.stds, cc.scales = cc1.means, cc1.stds, cc1.scales
         cc.norm_types, cc.nonneg = cc1.norm_types, cc1.nonneg
         cc.parcs = cc1.parcs
-        cc.tts = cc.conns[0].shape[0] // 2
+        if cc1.tts is not None and cc2.tts is not None:
+            cc.tts = cc1.tts + cc2.tts
+        else:
+            cc.tts = cc.conns[0].shape[0] // 2
         return cc
 
 
@@ -570,23 +576,30 @@ def sweep_crosscoder(model, dims, n_trials=20, seed=42,
             else:
                 beta_end, anneal = 0.0, 0
 
-            trace, wbs, cr = model.train(
-                nlat=dim, lr=lr, niter=niter, mb=mb,
-                beta_start=0.0, beta_end=beta_end, anneal_steps=anneal)
-            mu = numpy.asarray(model.encode(dim, model.parcs[0], sample=False))
-            std_z = mu.std(axis=0)
-            if model.variational:
-                final_mse = float(numpy.asarray(trace)[-1, 2])
-            else:
-                final_mse = float(numpy.exp(trace[-1][1]))
-            results.append({
-                'dim': dim, 'lr': lr, 'niter': niter, 'mb': mb,
-                'beta_end': beta_end, 'anneal_steps': anneal,
-                'cr': cr, 'mse': final_mse,
-                'latent_std_min': float(std_z.min()),
-                'latent_std_max': float(std_z.max()),
-                'score': score_fn(cr, final_mse, float(std_z.min())),
-            })
+            n_wbs_before = len(model.wbs)
+            try:
+                trace, wbs, cr = model.train(
+                    nlat=dim, lr=lr, niter=niter, mb=mb,
+                    beta_start=0.0, beta_end=beta_end, anneal_steps=anneal)
+                mu = numpy.asarray(model.encode(dim, model.parcs[0], sample=False))
+                std_z = mu.std(axis=0)
+                if model.variational:
+                    final_mse = float(numpy.asarray(trace)[-1, 2])
+                else:
+                    final_mse = float(numpy.exp(trace[-1][1]))
+                results.append({
+                    'dim': dim, 'lr': lr, 'niter': niter, 'mb': mb,
+                    'beta_end': beta_end, 'anneal_steps': anneal,
+                    'cr': cr, 'mse': final_mse,
+                    'latent_std_min': float(std_z.min()),
+                    'latent_std_max': float(std_z.max()),
+                    'score': score_fn(cr, final_mse, float(std_z.min())),
+                })
+            except Exception:
+                while len(model.wbs) > n_wbs_before:
+                    model.wbs.pop()
+                    model.history.pop()
+                continue
             model.wbs.pop()
             model.history.pop()
 
