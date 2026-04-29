@@ -290,7 +290,8 @@ class CrossCoder:
         into ``self.wbs`` / ``self.history`` and returns
         ``(trace, wbs, confusion_rate)``.
         """
-        tts = tts or self.tts
+        if tts is None:
+            tts = self.tts
         if tts is None:
             raise ValueError('set self.tts or pass tts= before training')
 
