@@ -472,7 +472,39 @@ class CrossCoder:
                 crs[i, j] = 1 - ok.mean()
         return crs
 
-    def calc_confusion_rate(self, arch, tts=None, self_recon_only=True):
+    def _conf_rates_var(self, wbs, conns, n_samples=0):
+        """Compute (n_views, n_views) confusion rate matrix for variational mode."""
+        @jax.jit
+        def dist(a, b):
+            return np.sum((a[:, None] - b) ** 2, axis=-1)
+
+        nv = len(conns)
+        crs = numpy.zeros((nv, nv))
+
+        for i, (((w_mu, b_mu), (w_lv, b_lv)), _) in enumerate(wbs):
+            mu = conns[i] @ w_mu + b_mu
+
+            if n_samples > 0:
+                logvar = np.clip(conns[i] @ w_lv + b_lv, *_LOGVAR_CLIP)
+                key = jax.random.PRNGKey(42)
+                recs = [None] * nv
+                for j, (_, (w_dec, b_dec)) in enumerate(wbs):
+                    stacked = []
+                    for _ in range(n_samples):
+                        key, sub = jax.random.split(key)
+                        z_s = mu + np.exp(0.5 * logvar) * jax.random.normal(sub, mu.shape)
+                        stacked.append(z_s @ w_dec + b_dec)
+                    recs[j] = np.mean(np.stack(stacked), axis=0)
+            else:
+                recs = [mu @ w_dec + b_dec for (_, (w_dec, b_dec)) in wbs]
+
+            for j in range(nv):
+                ok = np.argmin(dist(conns[j], recs[j]), axis=1) == np.arange(conns[j].shape[0])
+                crs[i, j] = float(1.0 - numpy.mean(numpy.asarray(ok)))
+
+        return crs
+
+    def calc_confusion_rate(self, arch, tts=None, self_recon_only=True, n_samples=0):
         "Fraction of test subjects not fingerprinted correctly."
         tts = tts or self.tts
         wbs = self._get_arch(arch).wbs
@@ -481,20 +513,36 @@ class CrossCoder:
             cr = self._conf_rates_det(wbs, test_c)
             return float(numpy.diag(cr).mean() if self_recon_only else cr.mean())
 
-        @jax.jit
-        def dist(a, b):
-            return np.sum((a[:, None] - b) ** 2, axis=-1)
-        total, count = 0.0, 0
-        for i, (((w_mu, b_mu), _), _) in enumerate(wbs):
-            mu = test_c[i] @ w_mu + b_mu
-            for j, (_, (w_dec, b_dec)) in enumerate(wbs):
-                if self_recon_only and i != j:
-                    continue
-                rec = mu @ w_dec + b_dec
-                ok = np.argmin(dist(test_c[j], rec), axis=1) == np.arange(test_c[j].shape[0])
-                total += 1.0 - np.mean(ok)
-                count += 1
-        return float(total / max(count, 1))
+        crs = self._conf_rates_var(wbs, test_c, n_samples=n_samples)
+        if self_recon_only:
+            return float(numpy.diag(crs).mean())
+        return float(crs.mean())
+
+    def confusion_matrix(self, arch, tts=None, n_samples=0):
+        """Return (n_views, n_views) confusion rate matrix.
+
+        Entry (i, j) is the fraction of test subjects from view i whose
+        reconstruction in view j is closest to the wrong subject.
+
+        Parameters
+        ----------
+        arch : int
+            Latent dimension (nlat value)
+        tts : int, optional
+            Train/test split index
+        n_samples : int
+            Number of posterior samples for variational mode. 0 = point estimate.
+
+        Returns
+        -------
+        numpy.ndarray of shape (n_views, n_views)
+        """
+        tts = tts or self.tts
+        wbs = self._get_arch(arch).wbs
+        test_c = [c[tts:] for c in self.conns]
+        if not self.variational:
+            return self._conf_rates_det(wbs, test_c)
+        return self._conf_rates_var(wbs, test_c, n_samples=n_samples)
 
 
     def encode(self, arch, parc, tts=None, sample=False, key=None):

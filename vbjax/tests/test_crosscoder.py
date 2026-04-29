@@ -377,3 +377,57 @@ def test_pickle_roundtrip_variational(tmp_path):
     assert z_stoch.shape == z2.shape
     assert not np.allclose(np.asarray(z_stoch), np.asarray(z2))
 
+
+def test_variational_confusion_sampling():
+    """Variational confusion rate with posterior sampling vs point estimate."""
+    triu, _ = _fake_triu(ns=30, nn=10)
+    cc = vb.CrossCoder(variational=True, chunked_training=True)
+    cc.add_view(triu, 'SC', normalize='center')
+    cc.tts = 20
+    cc.train(nlat=3, lr=5e-3, niter=50, mb=8,
+             beta_end=1e-4, anneal_steps=25)
+    nlat = 3
+
+    cr_mean = cc.calc_confusion_rate(nlat, n_samples=0)
+    cr_sampled = cc.calc_confusion_rate(nlat, n_samples=50)
+
+    assert 0.0 <= cr_mean <= 1.0
+    assert 0.0 <= cr_sampled <= 1.0
+
+
+def test_confusion_matrix_api():
+    """confusion_matrix returns full (n_views, n_views) matrix, deterministic."""
+    triu_a, _ = _fake_triu(ns=30, nn=10, seed=1)
+    triu_b, _ = _fake_triu(ns=30, nn=10, seed=2)
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu_a, 'A', normalize='center')
+    cc.add_view(triu_b, 'B', normalize='center')
+    cc.tts = 20
+    cc.train(nlat=3, lr=5e-3, niter=80, mb=8)
+    nlat = 3
+
+    mat = cc.confusion_matrix(nlat)
+    assert mat.shape == (2, 2)
+    assert np.all(mat >= 0) and np.all(mat <= 1)
+
+    # Diagonal mean should match self-recon confusion rate
+    cr = cc.calc_confusion_rate(nlat)
+    np.testing.assert_allclose(float(np.diag(mat).mean()), cr, atol=1e-6)
+
+
+def test_confusion_matrix_variational():
+    """confusion_matrix returns full matrix with posterior sampling."""
+    triu_a, _ = _fake_triu(ns=30, nn=10, seed=1)
+    triu_b, _ = _fake_triu(ns=30, nn=10, seed=2)
+    cc = vb.CrossCoder(variational=True, chunked_training=True)
+    cc.add_view(triu_a, 'A', normalize='center')
+    cc.add_view(triu_b, 'B', normalize='center')
+    cc.tts = 20
+    cc.train(nlat=3, lr=5e-3, niter=50, mb=8,
+             beta_end=1e-4, anneal_steps=25)
+    nlat = 3
+
+    mat = cc.confusion_matrix(nlat, n_samples=10)
+    assert mat.shape == (2, 2)
+    assert np.all(mat >= 0) and np.all(mat <= 1)
+
