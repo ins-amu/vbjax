@@ -1,4 +1,4 @@
-# Virtual Cohort Coordinator (VCC) - CrossCoder Pipeline Summary
+# Variational Cross Coder (VCC) - CrossCoder Pipeline Summary
 
 This document summarizes the core components and design choices of the `CrossCoder` pipeline for amortized inference of whole-brain connectomes, based on the `vcc_modules.py` codebase.
 
