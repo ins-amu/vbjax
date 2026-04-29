@@ -431,3 +431,38 @@ def test_confusion_matrix_variational():
     assert mat.shape == (2, 2)
     assert np.all(mat >= 0) and np.all(mat <= 1)
 
+
+def test_encode_all():
+    """encode_all returns dict of latent vectors for every view."""
+    triu_a, _ = _fake_triu(ns=20, nn=8, seed=1)
+    triu_b, _ = _fake_triu(ns=20, nn=10, seed=2)
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu_a, 'A', normalize='center')
+    cc.add_view(triu_b, 'B', normalize='center')
+    cc.tts = 14
+    cc.train(nlat=3, lr=5e-3, niter=30, mb=8)
+
+    all_z = cc.encode_all(3)
+    assert set(all_z.keys()) == {'A', 'B'}
+    assert all_z['A'].shape == (20, 3)
+    assert all_z['B'].shape == (20, 3)
+
+    # Should match individual encode calls
+    np.testing.assert_allclose(np.asarray(all_z['A']),
+                               np.asarray(cc.encode(3, 'A')), atol=1e-5)
+
+
+def test_add_view_preserves_dtype():
+    """add_view should not force-cast to float32."""
+    import jax
+    jax.config.update('jax_enable_x64', True)
+
+    triu = np.random.randn(20, 28).astype(np.float64)
+    cc = vb.CrossCoder(variational=False)
+    cc.add_view(triu, 'SC', normalize='center')
+    assert cc.conns[0].dtype == np.float64
+
+    triu32 = np.random.randn(20, 28).astype(np.float32)
+    cc2 = vb.CrossCoder(variational=False)
+    cc2.add_view(triu32, 'SC', normalize='center')
+    assert cc2.conns[0].dtype == np.float32

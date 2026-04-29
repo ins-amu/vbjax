@@ -181,7 +181,7 @@ class CrossCoder:
 
     def add_view(self, data, parc_name, normalize='zscore', nonneg=False):
         "Register a view, normalizing its flat upper-tri connectomes."
-        data = np.asarray(data, dtype=np.float32)
+        data = np.asarray(data)
         scale = 1.0
         std = 1.0
 
@@ -560,6 +560,17 @@ class CrossCoder:
             return mu + np.exp(0.5 * logvar) * jax.random.normal(key, mu.shape)
         (ew, eb), _ = ta.wbs[iparc]
         return c @ ew + eb
+
+    def encode_all(self, arch, tts=None, sample=False, key=None):
+        """Encode all views into latent space.
+
+        Returns
+        -------
+        dict[str, Array]
+            Mapping of parcellation name to latent vectors of shape (n_subjects, nlat).
+        """
+        return {parc: self.encode(arch, parc, tts=tts, sample=sample, key=key)
+                for parc in self.parcs}
 
     def decode(self, arch, parc, z, raw=False):
         "Decode latent vectors into flat upper-tri connectomes."
