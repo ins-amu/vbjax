@@ -217,3 +217,95 @@ def test_add_view_zero_std():
     cc.tts = 14
     cc.train(nlat=2, lr=5e-3, niter=10, mb=8)
     assert cc.arch == [2]
+
+
+def test_multi_view_different_sizes():
+    """Deterministic cross-reconstruction with different nn across views."""
+    triu_a, _ = _fake_triu(ns=30, nn=10, seed=1)   # triu dim 45
+    triu_b, _ = _fake_triu(ns=30, nn=16, seed=2)   # triu dim 120
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu_a, 'SC-079', normalize='center')
+    cc.add_view(triu_b, 'SC-200', normalize='center')
+    cc.tts = 20
+    trace, wbs, cr = cc.train(nlat=4, lr=5e-3, niter=100, mb=8)
+    assert len(trace) > 1
+    assert 0.0 <= cr <= 1.0
+
+    # Encode coarse -> decode to fine
+    z = cc.encode(4, 'SC-079')
+    assert z.shape == (30, 4)
+    rec_fine = cc.decode(4, 'SC-200', z)
+    assert rec_fine.shape == triu_b.shape
+
+    # Encode fine -> decode to coarse
+    z2 = cc.encode(4, 'SC-200')
+    assert z2.shape == (30, 4)
+    rec_coarse = cc.decode(4, 'SC-079', z2)
+    assert rec_coarse.shape == triu_a.shape
+
+    # Full connectome shapes
+    conn_a = cc.decode_conn(4, 'SC-079', z2)
+    assert conn_a.shape == (30, 10, 10)
+    conn_b = cc.decode_conn(4, 'SC-200', z)
+    assert conn_b.shape == (30, 16, 16)
+    # Symmetry
+    np.testing.assert_allclose(
+        np.asarray(conn_a), np.asarray(conn_a).transpose(0, 2, 1), atol=1e-5)
+    np.testing.assert_allclose(
+        np.asarray(conn_b), np.asarray(conn_b).transpose(0, 2, 1), atol=1e-5)
+
+    # Confusion rate in [0, 1]
+    cr2 = cc.calc_confusion_rate(4)
+    assert 0.0 <= cr2 <= 1.0
+
+
+def test_multi_view_different_sizes_variational():
+    """Variational mode with heterogeneous parcellations."""
+    triu_a, _ = _fake_triu(ns=30, nn=10, seed=1)
+    triu_b, _ = _fake_triu(ns=30, nn=16, seed=2)
+    cc = vb.CrossCoder(variational=True, chunked_training=True)
+    cc.add_view(triu_a, 'SC-079', normalize='center')
+    cc.add_view(triu_b, 'SC-200', normalize='center')
+    cc.tts = 20
+    cc.train(nlat=4, lr=5e-3, niter=100, mb=8,
+             beta_end=1e-4, anneal_steps=50)
+
+    # Encode with sampling returns different results each call
+    z1 = cc.encode(4, 'SC-079', sample=True, key=jax.random.PRNGKey(1))
+    z2 = cc.encode(4, 'SC-079', sample=True, key=jax.random.PRNGKey(2))
+    assert z1.shape == (30, 4)
+    assert not np.allclose(np.asarray(z1), np.asarray(z2))
+
+    # Cross-decode shapes
+    rec_fine = cc.decode(4, 'SC-200', z1)
+    assert rec_fine.shape == triu_b.shape
+    rec_coarse = cc.decode(4, 'SC-079', z2)
+    assert rec_coarse.shape == triu_a.shape
+
+    # MVN over heterogeneous views
+    mvn = cc.calc_mvn(4)
+    assert isinstance(mvn, vb.MvNorm)
+    assert mvn.mean.shape == (4,)
+    assert mvn.cov.shape == (4, 4)
+
+
+def test_confusion_rate_different_sizes():
+    """Confusion-rate matrix has correct shape with mixed nn."""
+    triu_a, _ = _fake_triu(ns=30, nn=10, seed=5)
+    triu_b, _ = _fake_triu(ns=30, nn=14, seed=6)
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu_a, 'A', normalize='center')
+    cc.add_view(triu_b, 'B', normalize='center')
+    cc.tts = 20
+    cc.train(nlat=3, lr=5e-3, niter=80, mb=8)
+
+    # Scalar confusion rate
+    cr = cc.calc_confusion_rate(3)
+    assert 0.0 <= cr <= 1.0
+
+    # Raw confusion matrix from _conf_rates_det
+    wbs = cc.wbs[cc.arch.index(3)]
+    test_c = [c[20:] for c in cc.conns]
+    crs = cc._conf_rates_det(wbs, test_c)
+    assert crs.shape == (2, 2)
+    assert np.all(crs >= 0) and np.all(crs <= 1)
