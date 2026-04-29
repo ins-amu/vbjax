@@ -217,3 +217,71 @@ def test_add_view_zero_std():
     cc.tts = 14
     cc.train(nlat=2, lr=5e-3, niter=10, mb=8)
     assert cc.arch == [2]
+
+
+def test_shuffle_roundtrip():
+    triu_a, _ = _fake_triu(ns=30, nn=10, seed=10)
+    triu_b, _ = _fake_triu(ns=30, nn=10, seed=11)
+    cc = vb.CrossCoder(variational=False, chunked_training=True)
+    cc.add_view(triu_a, 'SC', normalize='center')
+    cc.add_view(triu_b, 'FC', normalize='center')
+    cc.tts = 20
+    cc.train(nlat=2, lr=5e-3, niter=30, mb=8)
+    cr1 = cc.calc_confusion_rate(2)
+    assert 0.0 <= cr1 <= 1.0
+
+    perm = cc.shuffle(seed=99)
+    assert isinstance(perm, np.ndarray)
+    assert cc.conns[0].shape == (30, 45)
+    assert cc.conns[1].shape == (30, 45)
+
+    cc.train(nlat=2, lr=5e-3, niter=30, mb=8)
+    cr2 = cc.calc_confusion_rate(2)
+    assert 0.0 <= cr2 <= 1.0
+
+
+def test_combine_variational():
+    triu_a, _ = _fake_triu(ns=20, nn=8, seed=5)
+    triu_b, _ = _fake_triu(ns=20, nn=8, seed=6)
+    cc1 = vb.CrossCoder(variational=True, chunked_training=True)
+    cc1.add_view(triu_a, 'SC', normalize='center')
+    cc1.tts = 10
+    cc2 = vb.CrossCoder(variational=True, chunked_training=True)
+    cc2.add_view(triu_b, 'SC', normalize='center')
+    cc2.tts = 10
+
+    cc = vb.CrossCoder.combine(cc1, cc2, shuffle=False)
+    assert cc.variational is True
+    assert cc.conns[0].shape == (40, 28)
+    assert cc.tts == 20
+
+    cc.train(nlat=2, lr=5e-3, niter=30, mb=8,
+             beta_end=1e-4, anneal_steps=15)
+    assert cc.arch == [2]
+    cr = cc.calc_confusion_rate(2)
+    assert 0.0 <= cr <= 1.0
+
+
+def test_pickle_roundtrip_variational(tmp_path):
+    triu, _ = _fake_triu(ns=20, nn=8, seed=7)
+    cc = vb.CrossCoder(variational=True, chunked_training=True)
+    cc.add_view(triu, 'SC', normalize='zscore')
+    cc.tts = 14
+    cc.train(nlat=3, lr=5e-3, niter=50, mb=8,
+             beta_end=1e-4, anneal_steps=25)
+
+    fn = tmp_path / 'cc_var.pkl'
+    cc.to_pkl(str(fn))
+    cc2 = vb.CrossCoder.from_pkl(str(fn))
+    assert cc2.variational is True
+    assert cc2.parcs == cc.parcs
+    assert cc2.arch == cc.arch
+
+    z1 = cc.encode(3, 'SC', sample=False)
+    z2 = cc2.encode(3, 'SC', sample=False)
+    np.testing.assert_allclose(np.asarray(z1), np.asarray(z2), atol=1e-5)
+
+    # Stochastic encode on loaded model should work and differ from mu
+    z_stoch = cc2.encode(3, 'SC', sample=True, key=jax.random.PRNGKey(42))
+    assert z_stoch.shape == z2.shape
+    assert not np.allclose(np.asarray(z_stoch), np.asarray(z2))
