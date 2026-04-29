@@ -1,7 +1,7 @@
 import itertools
 import jax
 import jax.numpy as np
-from jax.example_libraries.optimizers import adam
+from vbjax._optimizers import adam
 
 from .layers import make_dense_layers
 from .loops import make_ode

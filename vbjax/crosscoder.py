@@ -14,7 +14,7 @@ import numpy
 import tqdm
 import jax
 import jax.numpy as np
-from jax.example_libraries import optimizers
+from vbjax import _optimizers as optimizers
 
 
 SEED = 42
