@@ -432,6 +432,8 @@ def test_confusion_matrix_variational():
     assert np.all(mat >= 0) and np.all(mat <= 1)
 
 
+
+
 def test_encode_all():
     """encode_all returns dict of latent vectors for every view."""
     triu_a, _ = _fake_triu(ns=20, nn=8, seed=1)
@@ -466,3 +468,43 @@ def test_add_view_preserves_dtype():
     cc2 = vb.CrossCoder(variational=False)
     cc2.add_view(triu32, 'SC', normalize='center')
     assert cc2.conns[0].dtype == np.float32
+
+
+def test_from_pkl_legacy_apvbt(tmp_path):
+    """Load old apvbt-format pickle (no stds, scales, norm_types, nonneg)."""
+    import pickle as _pickle
+    rng = np.random.default_rng(42)
+    ns, nn = 20, 8
+    conn = rng.normal(size=(ns, nn * (nn - 1) // 2)).astype('f4')
+    mean = conn.mean(axis=0)
+    old_data = {
+        'conns': [conn - mean],
+        'means': [mean],
+        'parcs': ['08-Schaefer'],
+        'tts': 14,
+        'wbs': [[
+            ((rng.normal(size=(nn * (nn - 1) // 2, 2)).astype('f4'),
+              rng.normal(size=2).astype('f4')),
+             (rng.normal(size=(2, nn * (nn - 1) // 2)).astype('f4'),
+              rng.normal(size=nn * (nn - 1) // 2).astype('f4')))
+        ]],
+    }
+    fn = tmp_path / 'old.pkl'
+    with open(str(fn), 'wb') as f:
+        _pickle.dump(old_data, f)
+
+    cc = vb.CrossCoder.from_pkl(str(fn))
+    assert cc.parcs == ['08-Schaefer']
+    assert cc.tts == 14
+    assert cc.variational is False
+    assert len(cc.stds) == 1
+    assert cc.stds[0] == 1.0
+    assert cc.norm_types == ['center']
+    assert cc.nonneg == [False]
+    # Should be able to encode with loaded weights
+    z = cc.encode(2, '08-Schaefer')
+    assert z.shape == (20, 2)  # all subjects when tts not passed
+    z_test = cc.encode(2, '08-Schaefer', tts=14)
+    assert z_test.shape == (6, 2)  # 20 - 14 test subjects
+
+
