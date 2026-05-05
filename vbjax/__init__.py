@@ -7,6 +7,9 @@ _say('███▒▒▒▒▒▒▒ loading')
 def _use_many_cores():
     import os, sys
     import multiprocessing as mp
+    # suppress XLA/Triton C++ fusion compiler logs (absl ERROR-level but purely
+    # informational; must be set before the XLA C++ runtime initialises)
+    os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
     if 'XLA_FLAGS' not in os.environ:
         n = mp.cpu_count()
         value = '--xla_force_host_platform_device_count=%d' % n
@@ -36,6 +39,7 @@ from .coupling import (
         make_diff_cfun, make_linear_cfun, make_delay_helper, delay_apply,
         )
 from .connectome import make_conn_latent_mvnorm
+from .crosscoder import CrossCoder, MvNorm, triu_to_mat, triu_to_mat_np, sweep_crosscoder
 from .sparse import make_spmv, csr_to_jax_bcoo, make_sg_spmv
 from .monitor import (
     make_timeavg, make_bold, make_gain, make_offline, make_cov, make_fc)
