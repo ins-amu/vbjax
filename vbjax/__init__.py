@@ -36,7 +36,7 @@ from .neural_mass import (
         )
 from .regmap import make_region_mapping
 from .coupling import (
-        make_diff_cfun, make_linear_cfun, make_delay_helper, delay_apply,
+        make_delay_helper, delay_apply,
         )
 from .connectome import make_conn_latent_mvnorm
 from .crosscoder import CrossCoder, MvNorm, triu_to_mat, triu_to_mat_np, sweep_crosscoder
