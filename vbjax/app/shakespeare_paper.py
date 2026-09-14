@@ -160,7 +160,7 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
 
     schedule = optax.warmup_cosine_decay_schedule(
         init_value=1e-4, peak_value=hp.lr, warmup_steps=hp.warmup_steps,
-        decay_steps=hp.train_steps, end_value=1e-5,
+        decay_steps=max(1, hp.train_steps - hp.warmup_steps), end_value=1e-5,
     )
     optimizer = optax.chain(
         optax.clip_by_global_norm(1.0),
