@@ -73,9 +73,9 @@ class ShakespeareHP(NamedTuple):
     d_v: int = 32
     seq_len: int = 32
     batch_size: int = 32
-    lr: float = 3e-4
-    warmup_steps: int = 200
-    train_steps: int = 3000
+    lr: float = 1e-4
+    warmup_steps: int = 500
+    train_steps: int = 5000
     early_stop_patience: int = 300
     seed: int = 42
 
@@ -87,11 +87,15 @@ class ShakespeareParams(NamedTuple):
 
 
 def init_shakespeare(hp: ShakespeareHP, mhsa_hp: Hyperparameters, key):
+    # Embedding/readout init: unit-ish input scale (1/sqrt(d_model)) so the residual
+    # readout x_t + y_t has meaningful magnitude and gradients don't vanish.
+    # (Core W_* use Xavier in init_ct_mhsa; 0.02 here was ~3.5x too small.)
     k_e, k_m, k_h = jax.random.split(key, 3)
-    embed = jax.random.normal(k_e, (hp.vocab_size, hp.d_model)) * 0.02
+    scale = 1.0 / (hp.d_model ** 0.5)
+    embed = jax.random.normal(k_e, (hp.vocab_size, hp.d_model)) * scale
     mhsa, state, lags = init_ct_mhsa(mhsa_hp, k_m, batch_size=hp.batch_size,
                                      initial_c=np.ones((1, 1)))
-    head = jax.random.normal(k_h, (hp.d_model, hp.vocab_size)) * 0.02
+    head = jax.random.normal(k_h, (hp.d_model, hp.vocab_size)) * scale
     return ShakespeareParams(embed, mhsa, head), state
 
 
