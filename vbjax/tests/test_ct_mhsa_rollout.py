@@ -6,7 +6,7 @@ def test_stability():
     T = 100
     hp = Hyperparameters(n_regions=2, n_heads=2, d_k=4, d_v=4, d_model=4, lam=0.1) # Fast decay
     key = jax.random.PRNGKey(42)
-    params, state = init_ct_mhsa(hp, key, batch_size=1)
+    params, state, lags = init_ct_mhsa(hp, key, batch_size=1)
     
     # Make C Identity to avoid mixing for this check
     params = params._replace(C=np.eye(hp.n_regions))
@@ -34,7 +34,7 @@ def test_python_loop_comparison():
     T = 5
     hp = Hyperparameters(n_regions=2, n_heads=2, d_k=4, d_v=4, d_model=4, lam=0.5)
     key = jax.random.PRNGKey(43)
-    params, state = init_ct_mhsa(hp, key, batch_size=1)
+    params, state, lags = init_ct_mhsa(hp, key, batch_size=1)
     
     inputs = jax.random.normal(key, (T, 1, hp.n_regions, hp.d_model))
     

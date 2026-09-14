@@ -27,7 +27,7 @@ def test_delayed_propagation():
     # We want 0 -> 1. So C_10 = 1.0.
     C = np.array([[0.0, 0.0], [1.0, 0.0]])
     
-    params, state = init_ct_mhsa(hp, key, batch_size=1, initial_c=C, lengths=lengths)
+    params, state, lags = init_ct_mhsa(hp, key, batch_size=1, initial_c=C, lengths=lengths)
     
     # Force W parameters to be positive to ensure signal propagation through ReLU
     # Use larger weights to avoid attenuation

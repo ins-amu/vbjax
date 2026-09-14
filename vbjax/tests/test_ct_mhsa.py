@@ -6,7 +6,7 @@ import numpy as onp
 def test_init_and_structure():
     hp = Hyperparameters(n_regions=10, n_heads=4, d_k=8, d_v=8, d_model=8, lam=0.5)
     key = jax.random.PRNGKey(0)
-    params, state = init_ct_mhsa(hp, key, batch_size=2)
+    params, state, lags = init_ct_mhsa(hp, key, batch_size=2)
     
     # Check structure
     print("Params structure:", jax.tree_util.tree_structure(params))
@@ -30,7 +30,7 @@ def test_needle_in_haystack():
     # Setup single head, single region for simplicity or just standard dims
     hp = Hyperparameters(n_regions=1, n_heads=1, d_k=4, d_v=4, d_model=4, lam=0.5)
     key = jax.random.PRNGKey(1)
-    params, state = init_ct_mhsa(hp, key, batch_size=1)
+    params, state, lags = init_ct_mhsa(hp, key, batch_size=1)
     
     # Manually set weights to identity to make reasoning easier
     # W_Q, W_K, W_V, W_Y = Identity-like
@@ -114,9 +114,9 @@ def test_needle_in_haystack():
     # I will use the internal functions for this specific test to verify the memory mechanism.
     
     from vbjax.ct_mhsa import retrieve_query_l5, compute_projections
-    
-    q, k, v = compute_projections(params, x0)
-    o = retrieve_query_l5(state_before, q)
+
+    q, k, v = compute_projections(params, x0, act=hp.act)
+    o = retrieve_query_l5(params, state_before, q)
     
     # o should be M_before * q.
     # M_before is approx 0.5^11 * (v0 * k0^T).
@@ -132,7 +132,7 @@ def test_needle_in_haystack():
 def test_gradients():
     hp = Hyperparameters()
     key = jax.random.PRNGKey(2)
-    params, state = init_ct_mhsa(hp, key)
+    params, state, lags = init_ct_mhsa(hp, key)
     x = jax.random.normal(key, (1, hp.n_regions, hp.d_model))
     
     def loss_fn(params, state, x):

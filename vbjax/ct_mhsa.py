@@ -12,10 +12,37 @@ class Hyperparameters(NamedTuple):
     d_k: int = 16
     d_v: int = 16
     d_model: int = 16
-    lam: float = 0.9  # forgetting factor lambda
+    # Memory update-rate factor u = dt/tau (paper Alg. 1: M += (dt/tau)(v*phi(k)^T - M)).
+    # Paper retention is lambda = 1 - dt/tau = 1 - lam; with leakage g_ell the recurrence is
+    #   M_t = (1 - g_ell*lam) M_{t-1} + lam * v_t phi(k_t)^T   (paper eq. 1, g_ell=1)
+    # Default lam=0.05 <=> retention lambda=0.95 (paper Shakespeare/translation settings: dt=50ms, tau~1s).
+    lam: float = 0.05
+    leak: float = 1.0  # leakage factor g_ell (paper Alg. 1/eq. 1); 1 = full leak
+    tau: float = 0.0  # integration time constant in units of dt; 0 => update rate falls back to lam
+    act: str = "relu"  # phi: "relu" (threshold-linear, paper default) or "elup1"
+    use_block_residual: bool = False  # paper core has no in-block residual (residual is token-level)
+    use_ln: bool = False  # paper core has no layer-norm inside the block
+    sigma_a: float = 0.0  # apical-afferent width; 0 => identity (no A), >0 => Gaussian A
     dt: float = 0.1
     v_c: float = 10.0
     steps_per_token: int = 1
+
+    @property
+    def memory_update_rate(self) -> float:
+        """Update-rate factor u = dt/tau (what the recurrence actually multiplies the delta by).
+
+        If tau > 0, u = dt/tau (paper convention). If tau == 0 (default), the legacy `lam`
+        field is used directly as the update rate u (backward compatible with the pre-paper core).
+        Retention lambda (paper) = 1 - g_ell * u.
+        """
+        if self.tau > 0:
+            return self.dt / self.tau
+        return self.lam
+
+    @property
+    def retention(self) -> float:
+        """Paper retention lambda = 1 - g_ell * u."""
+        return 1.0 - self.leak * self.memory_update_rate
 
 
 class NetworkState(NamedTuple):
@@ -30,8 +57,23 @@ class CTMHSAParams(NamedTuple):
     W_V: jax.Array  # (H, d_model, d_v)
     W_Y: jax.Array  # (H, d_v, d_model)
     C: jax.Array  # (N, N)
+    A: jax.Array  # (H, d_k, d_k) apical afferent matrix (Gaussian on diagonal); identity if off
     ln_gamma: Optional[jax.Array] = None  # (d_model,)
     ln_beta: Optional[jax.Array] = None  # (d_model,)
+
+
+def make_apical_matrix(sigma: float, d_k: int, n_heads: int = 1) -> jax.Array:
+    """Gaussian apical-afferent matrix A per head (paper eq. after eq. 5, fig. 2d).
+
+    A_ij = exp(-(i-j)^2 / (2 sigma^2)). With sigma=0 this degenerates to identity
+    (the plain linear-attention / 'transformer id' case). Returns (H, d_k, d_k).
+    """
+    if sigma <= 0:
+        return np.broadcast_to(np.eye(d_k), (n_heads, d_k, d_k))
+    idx = np.arange(d_k)
+    diff = idx[:, None] - idx[None, :]
+    A = np.exp(-(diff**2) / (2.0 * sigma**2))
+    return np.broadcast_to(A, (n_heads, d_k, d_k))
 
 
 def layer_norm(
@@ -86,8 +128,10 @@ def init_ct_mhsa(
     ln_gamma = np.ones((hp.d_model,))
     ln_beta = np.zeros((hp.d_model,))
 
+    A = make_apical_matrix(hp.sigma_a, hp.d_k, hp.n_heads)
+
     params = CTMHSAParams(
-        W_Q=W_Q, W_K=W_K, W_V=W_V, W_Y=W_Y, C=C, ln_gamma=ln_gamma, ln_beta=ln_beta
+        W_Q=W_Q, W_K=W_K, W_V=W_V, W_Y=W_Y, C=C, A=A, ln_gamma=ln_gamma, ln_beta=ln_beta
     )
 
     # Initialize State M
@@ -104,7 +148,7 @@ def init_ct_mhsa(
 
 
 def compute_projections(
-    params: CTMHSAParams, x: jax.Array
+    params: CTMHSAParams, x: jax.Array, act: str = "relu"
 ) -> Tuple[jax.Array, jax.Array, jax.Array]:
     """
     Compute q, k, v projections.
@@ -118,56 +162,56 @@ def compute_projections(
     k = np.einsum("bnd,hdk->bnhk", x, params.W_K)
     v = np.einsum("bnd,hdv->bnhv", x, params.W_V)
 
-    # Activation phi (identity or ReLU). Plan mentions "Apply activation phi ... to k and q".
-    # We'll use identity for now as simple linear attention often does, or elu+1.
-    # "Apply activation phi (e.g., identity or ReLU)"
-    # Let's use identity as default or maybe a simple relu.
-    # For "Fast Weights" / Linear Transformers, often use elu()+1 or relu.
-    # I'll stick to identity for now to match "linear projections" strict sense,
-    # but usually strictly positive keys/queries help stability.
-    # Let's use ReLU to be safe and follow common linear attention practices if not specified strictly.
-    # Plan: "Apply activation phi (e.g., identity or ReLU) to k and q"
-    # I will use ReLU.
-    k = jax.nn.relu(k)
-    q = jax.nn.relu(q)
+    # Activation phi on keys and queries (paper: monotone increasing, e.g. threshold-linear).
+    # Default "relu" is the threshold-linear choice; "elup1" is a smooth, strictly-positive variant
+    # often used for stability in linear attention.
+    if act == "elup1":
+        k = jax.nn.elu(k) + 1.0
+        q = jax.nn.elu(q) + 1.0
+    else:  # relu (threshold-linear)
+        k = jax.nn.relu(k)
+        q = jax.nn.relu(q)
 
     return q, k, v
 
 
 def update_memory_l23(state: NetworkState, k: jax.Array, v: jax.Array, hp: Hyperparameters) -> Tuple[NetworkState, jax.Array]:
     """
-    Update memory M using Delta Rule.
-    M_t = M_{t-1} + lambda * (v_t * k_t^T - M_{t-1})
-    Returns state and surprise (Frobenius norm of delta M).
+    Update memory M using the paper's recurrent key-value update (eq. 1, Alg. 1).
+      M_t = M_{t-1} + (dt/tau) * ( v_t phi(k_t)^T - g_ell * M_{t-1} )
+    Returns state and surprise (Frobenius norm of the delta).
     """
     # k: (B, N, H, Dk)
     # v: (B, N, H, Dv)
     # M: (B, N, H, Dv, Dk)
-    
-    # Outer product v * k^T -> (B, N, H, Dv, Dk)
-    # Einsum: bnhv, bnhk -> bnhvk
+
+    u = hp.memory_update_rate  # dt/tau
+    g = hp.leak  # g_ell
+
+    # Outer product v * phi(k)^T -> (B, N, H, Dv, Dk)
     target = np.einsum('bnhv,bnhk->bnhvk', v, k)
-    
-    # Delta M = lambda * (target - M_prev)
-    delta_M = hp.lam * (target - state.M)
+
+    # Delta M = (dt/tau) * (target - g_ell * M_prev)
+    delta_M = u * (target - g * state.M)
     M_new = state.M + delta_M
-    
-    # Surprise: Frobenius norm over last two dims (Dv, Dk)
-    # shape: (B, N, H)
+
+    # Surprise: Frobenius norm over last two dims (Dv, Dk); shape (B, N, H)
     surprise = np.linalg.norm(delta_M, axis=(-2, -1))
-    
+
     return state._replace(M=M_new), surprise
 
-def retrieve_query_l5(state: NetworkState, q: jax.Array) -> jax.Array:
+
+def retrieve_query_l5(params: CTMHSAParams, state: NetworkState, q: jax.Array) -> jax.Array:
     """
-    Retrieve output from memory.
-    o_t = M_t * q_t
+    Retrieve output from memory:  o = M * (A * phi(q))
+    (paper eq. 5 with the apical afferent matrix A; A=identity recovers the plain case).
     """
     # M: (B, N, H, Dv, Dk)
-    # q: (B, N, H, Dk)
+    # q: (B, N, H, Dk) (already phi-activated)
+    # A: (H, Dk, Dk) with indices (h, i, k)
     # Out: (B, N, H, Dv)
-    # Einsum: bnhvk, bnhk -> bnhv
-    o = np.einsum('bnhvk,bnhk->bnhv', state.M, q)
+    Aq = np.einsum('hik,bnhk->bnhi', params.A, q)  # (B, N, H, Dk); per-head A applied to q
+    o = np.einsum('bnhvk,bnhk->bnhv', state.M, Aq)
     return o
 
 def aggregate_heads(o: jax.Array, params: CTMHSAParams) -> jax.Array:
@@ -184,27 +228,27 @@ def aggregate_heads(o: jax.Array, params: CTMHSAParams) -> jax.Array:
 
 def mhsa_step(params: CTMHSAParams, state: NetworkState, x: jax.Array, hp: Hyperparameters) -> Tuple[NetworkState, jax.Array, jax.Array]:
     """
-    Single time step of MHSA block.
+    Single time step of MHSA block (paper eqs. 1-3).
     Returns: state, y, surprise
     """
-    q, k, v = compute_projections(params, x)
-    
+    q, k, v = compute_projections(params, x, act=hp.act)
+
     # Update Memory (L2/3)
     state_new, surprise = update_memory_l23(state, k, v, hp)
-    
-    # Retrieve (L5)
-    o = retrieve_query_l5(state_new, q)
-    
+
+    # Retrieve (L5) via apical afferent matrix A
+    o = retrieve_query_l5(params, state_new, q)
+
     # Aggregate
     y = aggregate_heads(o, params)
-    
-    # Residual Connection
-    y = y + x
-    
-    # Layer Norm
-    if params.ln_gamma is not None and params.ln_beta is not None:
+
+    # Optional in-block residual + layer norm (OFF by default: paper core has neither;
+    # residual is token-level x_t + y_t and normalisation happens at the embedding/decoding stage).
+    if hp.use_block_residual:
+        y = y + x
+    if hp.use_ln and params.ln_gamma is not None and params.ln_beta is not None:
         y = layer_norm(y, params.ln_gamma, params.ln_beta)
-    
+
     return state_new, y, surprise
 
 
