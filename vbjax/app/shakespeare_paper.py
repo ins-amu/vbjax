@@ -110,6 +110,7 @@ def forward(prm: ShakespeareParams, state: NetworkState, x_idx: jax.Array,
 
     def step_fn(carry, x_t):
         st = carry
+        x_t = x_t[:, None, :]  # (B, 1, D) single region (paper: heads sum, no C coupling)
         st_new, y, _ = mhsa_step(prm.mhsa, st, x_t, mhsa_hp)  # y (B,1,D)
         return st_new, y[:, 0, :]                   # squeeze region dim
 
