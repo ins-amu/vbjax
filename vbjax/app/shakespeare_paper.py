@@ -76,6 +76,7 @@ class ShakespeareHP(NamedTuple):
     lr: float = 1e-4
     warmup_steps: int = 500
     train_steps: int = 5000
+    decay_steps: int = 0        # 0 => decay over full train_steps
     early_stop_patience: int = 300
     seed: int = 42
 
@@ -166,9 +167,11 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
     # warmup_cosine_decay_schedule internally needs decay_steps > warmup_steps; bound both
     # so short/smoke runs (train_steps small) don't produce a negative internal decay window.
     warmup = min(hp.warmup_steps, max(1, hp.train_steps // 4))
+    decay_steps = int(getattr(hp, "decay_steps", hp.train_steps) or hp.train_steps)
+    decay_steps = max(decay_steps, warmup + 1)
     schedule = optax.warmup_cosine_decay_schedule(
         init_value=1e-4, peak_value=hp.lr, warmup_steps=warmup,
-        decay_steps=hp.train_steps, end_value=1e-5,
+        decay_steps=decay_steps, end_value=1e-5,
     )
     optimizer = optax.chain(
         optax.clip_by_global_norm(1.0),
@@ -245,6 +248,7 @@ if __name__ == "__main__":
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--seq-len", type=int, default=32)
     p.add_argument("--lr", type=float, default=None, help="peak learning rate (default hp.lr)")
+    p.add_argument("--decay-steps", type=int, default=None, help="lr decay horizon in steps (default: train_steps)")
     p.add_argument("--patience", type=int, default=None, help="early-stop patience in steps")
     p.add_argument("--seed", type=int, default=42)
     a = p.parse_args()
@@ -255,6 +259,8 @@ if __name__ == "__main__":
         hp = hp._replace(lr=a.lr)
     if a.patience is not None:
         hp = hp._replace(early_stop_patience=a.patience)
+    if a.decay_steps is not None:
+        hp = hp._replace(decay_steps=a.decay_steps)
     mhsa_hp = Hyperparameters(n_regions=1, n_heads=hp.n_heads, d_k=hp.d_k,
                               d_v=hp.d_v, d_model=hp.d_model,
                               lam=0.05, dt=1.0, tau=20.0, leak=1.0,
