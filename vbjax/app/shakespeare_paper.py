@@ -244,11 +244,17 @@ if __name__ == "__main__":
     p.add_argument("--train-steps", type=int, default=3000)
     p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--seq-len", type=int, default=32)
+    p.add_argument("--lr", type=float, default=None, help="peak learning rate (default hp.lr)")
+    p.add_argument("--patience", type=int, default=None, help="early-stop patience in steps")
     p.add_argument("--seed", type=int, default=42)
     a = p.parse_args()
 
     hp = ShakespeareHP(train_steps=a.train_steps, batch_size=a.batch_size,
                        seq_len=a.seq_len, seed=a.seed)
+    if a.lr is not None:
+        hp = hp._replace(lr=a.lr)
+    if a.patience is not None:
+        hp = hp._replace(early_stop_patience=a.patience)
     mhsa_hp = Hyperparameters(n_regions=1, n_heads=hp.n_heads, d_k=hp.d_k,
                               d_v=hp.d_v, d_model=hp.d_model,
                               lam=0.05, dt=1.0, tau=20.0, leak=1.0,
