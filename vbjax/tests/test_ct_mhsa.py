@@ -50,7 +50,7 @@ def test_needle_in_haystack():
     x0 = np.array([[[1.0, 0.0, 0.0, 0.0]]]) # (B=1, N=1, D=4)
     
     # Step 0
-    state, y0 = mhsa_step(params, state, x0, hp)
+    state, y0, _ = mhsa_step(params, state, x0, hp)
     
     # Check M state
     # M_0 = (1-lam)*0 + lam * (v*k^T)
@@ -60,7 +60,7 @@ def test_needle_in_haystack():
     # Steps 1..10: Input zero
     x_zero = np.zeros_like(x0)
     for _ in range(10):
-        state, _ = mhsa_step(params, state, x_zero, hp)
+        state, _, _ = mhsa_step(params, state, x_zero, hp)
         
     # M should decay by (1-lam)=0.5 each time.
     # After 10 steps: 0.5 * (0.5)^10
@@ -99,7 +99,7 @@ def test_needle_in_haystack():
     # If we want to verify "memory retention", we check if result > new_only.
     
     state_before = state
-    state, y_out = mhsa_step(params, state, x0, hp)
+    state, y_out, _ = mhsa_step(params, state, x0, hp)
     
     # Expected output y:
     # M_new = 0.5*M_old + 0.5*(v*k^T)
@@ -136,7 +136,7 @@ def test_gradients():
     x = jax.random.normal(key, (1, hp.n_regions, hp.d_model))
     
     def loss_fn(params, state, x):
-        state_new, y = mhsa_step(params, state, x, hp)
+        state_new, y, _ = mhsa_step(params, state, x, hp)
         return np.sum(y**2)
     
     grads = jax.grad(loss_fn)(params, state, x)

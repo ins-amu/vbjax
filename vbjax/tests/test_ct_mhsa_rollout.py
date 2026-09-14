@@ -48,7 +48,7 @@ def test_python_loop_comparison():
     
     for t in range(T):
         x_t = network_coupling(y_curr, params, inputs[t])
-        state_curr, y_curr = mhsa_step(params, state_curr, x_t, hp)
+        state_curr, y_curr, _ = mhsa_step(params, state_curr, x_t, hp)
         loop_outputs.append(y_curr)
         
     loop_outputs = np.stack(loop_outputs)
