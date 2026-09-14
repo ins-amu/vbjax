@@ -179,8 +179,10 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
         prm = optax.apply_updates(prm, updates)
         return prm, opt_state, loss
 
-    val_step = jax.jit(lambda prm, x, y: (loss_fn(prm, new_state(mhsa_hp, hp.batch_size, k_val), x, y, mhsa_hp),
-                                          sample_accuracy(prm, new_state(mhsa_hp, hp.batch_size, k_val), x, y, mhsa_hp)))
+    val_bs = hp.batch_size * 4
+    val_state = new_state(mhsa_hp, val_bs, k_val)
+    val_step = jax.jit(lambda prm, x, y, st: (loss_fn(prm, st, x, y, mhsa_hp),
+                                              sample_accuracy(prm, st, x, y, mhsa_hp)))
 
     # validation slice
     n_val = min(4096, len(val_data) - hp.seq_len - 1)
@@ -197,7 +199,7 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
         train_losses.append(float(onp.asarray(loss)))
 
         if i % 50 == 0:
-            vl, va = val_step(prm, val_x, val_y)
+            vl, va = val_step(prm, val_x, val_y, val_state)
             vl, va = float(onp.asarray(vl)), float(onp.asarray(va))
             val_losses.append(vl)
             val_accs.append(va)
