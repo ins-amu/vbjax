@@ -1,0 +1,13 @@
+{
+ "best_x": {
+  "G_rel": 2.0922508801037725,
+  "tau_s": 35.98211726209418,
+  "sigma": 0.18036855875648378,
+  "noise_tc_s": 2.0,
+  "kv_scale": 0.15
+ },
+ "fc1_final": 0.14844812479350858,
+ "fc2_holdout": 0.13103653686400618,
+ "n_evals": 60,
+ "res_message": "Maximum number of function evaluations has been exceeded."
+}
