@@ -88,14 +88,23 @@ def simulate(mhsa_params, C, lags, L, hp, G, sigma, T, key):
     return e_seq, y_seq
 
 
-def bold_forward(signal: onp.ndarray, dt: float, tr: float) -> onp.ndarray:
-    """Balloon model: input (T, N) neural signal at step dt -> BOLD sampled every TR."""
+def bold_forward(signal: onp.ndarray, dt_ms: float, tr_s: float) -> onp.ndarray:
+    """Balloon model: input (T, N) neural signal at step dt_ms -> BOLD sampled at TR.
+
+    One offline_sample per TR window yields the BOLD at each window end
+    (aaicd.py make_bold_hopf pattern). Balloon ODE time constants are in
+    seconds, so the Heun step uses dt_s = dt_ms/1000.
+    NOTE: installed jax's scan signature is scan(f, init, xs).
+    """
     T, N = signal.shape
-    bold_buf, bold_step, bold_sample = make_bold(shape=(N,), dt=dt, p=bold_default_theta)
-    bold_sample = make_offline(step_fn=bold_step, sample_fn=bold_sample)
-    bold_buf, bold = jax.lax.scan(bold_sample, np.asarray(signal), bold_buf)
-    every = int(round(tr / dt))
-    return onp.asarray(bold[::every])
+    every = int(round(tr_s * 1000.0 / dt_ms))
+    W = T // every
+    windowed = signal[:W * every].reshape(W, every, N)
+    bold_buf, bold_step, bold_sample = make_bold(
+        shape=(N,), dt=dt_ms / 1000.0, p=bold_default_theta)
+    bold_offline = make_offline(step_fn=bold_step, sample_fn=bold_sample)
+    _, bold = jax.lax.scan(bold_offline, bold_buf, np.asarray(windowed))
+    return onp.asarray(bold)  # (W, N), one sample per TR
 
 
 def fc_from_ts(ts: onp.ndarray) -> onp.ndarray:
