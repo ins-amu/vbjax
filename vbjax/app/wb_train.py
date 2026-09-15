@@ -144,7 +144,9 @@ def main():
     ap.add_argument("--ts1", required=True)
     ap.add_argument("--ts2", required=True)
     ap.add_argument("--out", default="runs/wb_train")
-    ap.add_argument("--dt", type=float, default=20.0)
+    ap.add_argument("--dt", type=float, default=2.0, help="eval integration step (ms)")
+    ap.add_argument("--dt-train", type=float, default=100.0,
+                    help="training integration step (ms); coarse dt keeps the BPTT window shallow" )
     ap.add_argument("--tr", type=float, default=2.0)
     ap.add_argument("--v-c", type=float, default=5.0)
     ap.add_argument("--d-model", type=int, default=16)
@@ -194,7 +196,7 @@ def main():
         for w in range(emp_z_wins.shape[0]):
             k_w = jax.random.fold_in(kw, w)
             c, loss, _ = window_loss(params, c, emp_z_wins[w], k_w,
-                                     C, lags, L_win, hp0, args.dt)
+                                     C, lags, L_win, hp0, args.dt_train)
             losses.append(loss)
         return c, np.mean(np.stack(losses))
 
