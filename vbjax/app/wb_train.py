@@ -87,10 +87,16 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
         y_out = y / (y_ema + 1e-8)
         return (state.M, noise, y_ema, y), e
 
-    # Chunked remat: checkpoint at the 100-step chunk level (inner scan runs
+    # Chunked remat: checkpoint at the chunk level (inner scan runs
     # uncheckpointed). Per-step checkpoint over thousands of steps OOMs on the
-    # gradient reduction; per-chunk keeps backward memory ~100x smaller.
+    # gradient reduction; per-chunk keeps backward memory far smaller.
+    # The chunk must tile T_int exactly (it is only a checkpoint grouping, so
+    # the scan arithmetic is identical for any chunk). Default 25 does not
+    # divide T_int=1280 (64 vols x 20 steps), so fall back to the largest
+    # divisor of T_int <= 25, which is strictly cheaper in backward memory.
     chunk = 25
+    if T_int % chunk != 0:
+        chunk = max(c for c in range(1, chunk + 1) if T_int % c == 0)
     n_chunks = T_int // chunk
     keys_w = jax.random.split(keys, T_int)
     keys_c = keys_w.reshape(n_chunks, chunk, 2)
@@ -262,11 +268,14 @@ def main():
             bool(onp.isfinite(onp.asarray(g)).all()) for g in grads.values())
         if not finite:
             bad_streak += 1
+            # Roll back to the last params whose step produced finite grads:
+            # the bad gradient was measured *at* the current (post-step) params.
+            params = {k: v2 for k, v2 in last_good.items()}
             lr_now = cur_opt.lr
             cur_opt.reset()          # drop any poisoned m/v moment state
             print(f"iter {it:4d}/{args.iters} SKIP non-finite loss/grad "
-                  f"loss={v} bad_streak={bad_streak} lr={lr_now:.2e} "
-                  f"({time.time()-t0:.1f}s)", flush=True)
+                  f"loss={v} -> restore params, bad_streak={bad_streak} "
+                  f"lr={lr_now:.2e} ({time.time()-t0:.1f}s)", flush=True)
             if bad_streak >= BAD_TO_HALVE:
                 cur_opt.lr = max(lr_now * 0.5, MIN_LR)
                 bad_streak = 0
