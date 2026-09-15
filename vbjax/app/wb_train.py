@@ -169,7 +169,7 @@ def main():
     L_win = max(int(lags.max()), 1) + 1
 
     def full_carry(params):
-        st, _, _ = init_ct_mhsa(hp0, key, batch_size=1)
+        _, st, _ = init_ct_mhsa(hp0, key, batch_size=1)
         hist = np.zeros((L_win, N, d))
         n_prev = np.zeros((N, d))
         y_ema = np.ones((N, 1))
