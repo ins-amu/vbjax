@@ -31,16 +31,22 @@ from vbjax.ct_mhsa import (
 )
 
 
-def load_connectome(sc_path: str, lengths_path: str, dt: float, v_c: float):
-    """Structural weights + tract lengths -> normalized C (sqrt, 99th-pct, aaicd.py style)
-    and integer per-pair delays in integration steps."""
+def load_connectome(sc_path: str, lengths_path: str, dt: float, v_c: float,
+                    c_norm: str = "sqrt99"):
+    """Structural weights + tract lengths -> normalized C and integer per-pair delays.
+    c_norm: 'sqrt99' (aaicd.py style: sqrt, clip at 99th pct) or 'row' (row-stochastic,
+    each area's afferents sum to 1 — TVB-style; shape-preserving coupling)."""
     W = onp.load(sc_path) if sc_path.endswith(".npy") else onp.loadtxt(sc_path)
     L = onp.load(lengths_path) if lengths_path.endswith(".npy") else onp.loadtxt(lengths_path)
     nreg = W.shape[0]
     assert W.shape == L.shape == (nreg, nreg)
     W = W - W.min()
-    W = W / onp.percentile(W, 99)
-    W = onp.clip(onp.sqrt(W), 0, 1)
+    if c_norm == "row":
+        rs = W.sum(axis=1, keepdims=True)
+        W = W / (rs + (rs == 0) * 1.0)      # each target area's afferents sum to 1
+    else:
+        W = W / onp.percentile(W, 99)
+        W = onp.clip(onp.sqrt(W), 0, 1)
     onp.fill_diagonal(W, 0.0)
     lags = onp.floor(L / v_c / dt).astype("i")
     Lmax = int(lags.max())
@@ -151,6 +157,8 @@ def main():
     p.add_argument("--spectral-norm", action="store_true", default=True,
                    help="normalize C to unit spectral radius (G then = loop gain)")
     p.add_argument("--no-spectral-norm", dest="spectral_norm", action="store_false")
+    p.add_argument("--c-norm", default="sqrt99", choices=["sqrt99", "row"],
+                   help="SC normalization: sqrt99 (aaicd style) or row (row-stochastic)")
     p.add_argument("--g-sweep", default="0.5,1.0,2.0")
     p.add_argument("--tau-sweep", default="20,40")
     p.add_argument("--sigma-sweep", default="0.3")
@@ -160,7 +168,7 @@ def main():
     p.add_argument("--seed", type=int, default=42)
     a = p.parse_args()
 
-    C, lags, L = load_connectome(a.sc, a.lengths, a.dt, a.v_c)
+    C, lags, L = load_connectome(a.sc, a.lengths, a.dt, a.v_c, a.c_norm)
     N = C.shape[0]
     if a.emp_fc is not None:
         fc_emp = onp.load(a.emp_fc) if a.emp_fc.endswith(".npy") else onp.loadtxt(a.emp_fc)
