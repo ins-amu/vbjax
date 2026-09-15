@@ -101,6 +101,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     (fM, fn, fe, fyp), e_chunks = jax.lax.scan(
         jax.checkpoint(chunk_step), (M0, n0, fe0, y0), keys_c)
     e_seq = e_chunks.reshape(n_chunks * chunk, N)            # (T_int, N)
+    e_win = zscore(e_seq)                                    # (T_int, N)
 
     bold_buf = carry[4]
     _, bold_step, bold_sample = make_bold(shape=(N,), dt=dt_ms, p=bold_default_theta)
