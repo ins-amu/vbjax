@@ -1,0 +1,42 @@
+{
+  "results": [
+    {
+      "G": 2.5,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.12707385943691274
+    },
+    {
+      "G": 3.5,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.11495468122235757
+    },
+    {
+      "G": 5.0,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.11226860474739171
+    }
+  ],
+  "best": {
+    "G": 2.5,
+    "tau": 10.0,
+    "sigma": 0.1,
+    "bold_input": "e",
+    "fc_match": 0.12707385943691274
+  },
+  "N": 100,
+  "T": 300000,
+  "Gmax": 1.0,
+  "dt": 2.0,
+  "tr": 2.0,
+  "kv_scale": 0.15,
+  "seed": 42,
+  "bold_input": "e",
+  "noise_tc": 2.0,
+  "emp_source": "/home/marmaduke@lnn.timone.univ-mrs.fr/mhsa_e0/data/kb_100sch/emp_ts.npy"
+}
