@@ -231,6 +231,7 @@ def main():
     opt_s = Adam(params, lr=1e-2)
     iters1, iters2 = args.iters // 2, args.iters - args.iters // 2
     log = []
+    last_good = {k: v for k, v in params.items()}
     for it in range(iters1 + iters2):
         stage_all = it >= iters1
         t0 = time.time()
@@ -241,10 +242,16 @@ def main():
             _, l = losses_all_windows(p, carry, kw)
             return l
 
-        t1 = time.time()
         val, grads = jax.value_and_grad(loss_fn)(params)
-        val.block_until_ready() if hasattr(val, "block_until_ready") else None
-        print(f"  [iter {it}] fwd+bwd took {time.time()-t1:.1f}s", flush=True)
+        v = float(val)
+        if not onp.isfinite(v):
+            # instability: restore last good params, halve lr, skip update
+            print(f"iter {it:4d} LOSS={v} -> restore + halve lr", flush=True)
+            params = {k: v2 for k, v2 in last_good.items()}
+            (opt_s if not stage_all else opt).lr *= 0.5
+            log.append({"iter": it, "loss": v, "restored": True})
+            continue
+        last_good = {k: v2 for k, v2 in params.items()}
         if not stage_all:
             grads = {k: (np.zeros_like(g) if k in ("W_q", "W_y") else g)
                      for k, g in grads.items()}
@@ -252,19 +259,17 @@ def main():
         if gnorm > 1.0:
             grads = {k: g / gnorm for k, g in grads.items()}
         params = (opt_s if not stage_all else opt).step(params, grads)
-        if it % 10 == 0 or it == args.iters - 1:
-            msg = (f"iter {it:4d}/{args.iters} loss={float(val):.5f} "
-                   f"G={float(params['G_rel']):.2f} "
-                   f"tau={float(np.exp(params['log_tau'])):.1f}s "
-                   f"sigma={float(np.exp(params['log_sigma'])):.3f} "
-                   f"gnorm={gnorm:.2e} ({time.time()-t0:.1f}s)")
-            print(msg, flush=True)
-            log.append({"iter": it, "loss": float(val), "gnorm": gnorm})
-            with open(os.path.join(args.out, "log.json"), "w") as f:
-                json.dump(log, f, indent=1)
-            with open(os.path.join(args.out, "params_ckpt.pkl"), "wb") as f:
-                pickle.dump(params, f)
-
+        msg = (f"iter {it:4d}/{args.iters} loss={v:.5f} "
+               f"G={float(params['G_rel']):.2f} "
+               f"tau={float(np.exp(params['log_tau'])):.1f}s "
+               f"sigma={float(np.exp(params['log_sigma'])):.3f} "
+               f"gnorm={gnorm:.2e} ({time.time()-t0:.1f}s)")
+        print(msg, flush=True)
+        log.append({"iter": it, "loss": v, "gnorm": gnorm})
+        with open(os.path.join(args.out, "log.json"), "w") as f:
+            json.dump(log, f, indent=1)
+        with open(os.path.join(args.out, "params_ckpt.pkl"), "wb") as f:
+            pickle.dump(params, f)
     s1 = eval_fc(params, args.final_sim_s, fc1, args.seed)
     s2 = eval_fc(params, args.final_sim_s, fc2, args.seed + 1)
     with open(os.path.join(args.out, "params.pkl"), "wb") as f:
