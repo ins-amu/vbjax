@@ -78,6 +78,8 @@ class ShakespeareHP(NamedTuple):
     train_steps: int = 5000
     decay_steps: int = 0        # 0 => decay over full train_steps
     early_stop_patience: int = 300
+    readout_ln: int = 0         # 1 => standardize residual x_t + y_t before readout P
+    kv_scale: float = 1.0       # extra scale on FROZEN W_K/W_V init (memory magnitude control)
     seed: int = 42
 
 
@@ -97,6 +99,9 @@ def init_shakespeare(hp: ShakespeareHP, mhsa_hp: Hyperparameters, key):
     mhsa, state, lags = init_ct_mhsa(mhsa_hp, k_m, batch_size=hp.batch_size,
                                      initial_c=np.ones((1, 1)))
     head = jax.random.normal(k_h, (hp.d_model, hp.vocab_size)) * scale
+    if hp.kv_scale != 1.0:
+        # scale down frozen memory synapses -> smaller v, phi(k) -> bounded memory M
+        mhsa = mhsa._replace(W_K=mhsa.W_K * hp.kv_scale, W_V=mhsa.W_V * hp.kv_scale)
     return ShakespeareParams(embed, mhsa, head), state
 
 
@@ -104,6 +109,9 @@ def new_state(mhsa_hp: Hyperparameters, batch_size: int, key) -> NetworkState:
     _, state, _ = init_ct_mhsa(mhsa_hp, key, batch_size=batch_size,
                                initial_c=np.ones((1, 1)))
     return state
+
+
+_READOUT_LN = False  # set from hp in train(); static for jit
 
 
 def forward(prm: ShakespeareParams, state: NetworkState, x_idx: jax.Array,
@@ -122,8 +130,11 @@ def forward(prm: ShakespeareParams, state: NetworkState, x_idx: jax.Array,
     final_state, y_seq = jax.lax.scan(step_fn, state, x_emb_T)  # y_seq (T,B,D)
     y_seq = np.transpose(y_seq, (1, 0, 2))          # (B, T, D)
 
-    # paper uses residual x_t + y_t for the readout
+    # paper uses residual x_t + y_t for the readout; optionally standardize it so the
+    # unnormalized linear-attention scale (maxM ~ O(40) at eq.) can't saturate the softmax
     resid = x_emb + y_seq                           # (B, T, D)
+    if _READOUT_LN:
+        resid = resid / np.sqrt(np.mean(resid ** 2, axis=-1, keepdims=True) + 1e-5)
     logits = resid @ prm.head                       # (B, T, V)
     return final_state, logits
 
@@ -147,6 +158,8 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
           train_data: onp.ndarray, val_data: onp.ndarray,
           out_dir: str):
     key = jax.random.PRNGKey(hp.seed)
+    global _READOUT_LN
+    _READOUT_LN = bool(hp.readout_ln)
     k_init, k_train, k_val = jax.random.split(key, 3)
 
     prm, _ = init_shakespeare(hp, mhsa_hp, k_init)
@@ -261,6 +274,8 @@ if __name__ == "__main__":
     p.add_argument("--lr", type=float, default=None, help="peak learning rate (default hp.lr)")
     p.add_argument("--decay-steps", type=int, default=None, help="lr decay horizon in steps (default: train_steps)")
     p.add_argument("--patience", type=int, default=None, help="early-stop patience in steps")
+    p.add_argument("--readout-ln", action="store_true", help="standardize residual before readout")
+    p.add_argument("--kv-scale", type=float, default=1.0, help="scale on frozen W_K/W_V init")
     p.add_argument("--seed", type=int, default=42)
     a = p.parse_args()
 
@@ -272,6 +287,10 @@ if __name__ == "__main__":
         hp = hp._replace(early_stop_patience=a.patience)
     if a.decay_steps is not None:
         hp = hp._replace(decay_steps=a.decay_steps)
+    if a.readout_ln:
+        hp = hp._replace(readout_ln=1)
+    if a.kv_scale != 1.0:
+        hp = hp._replace(kv_scale=a.kv_scale)
     mhsa_hp = Hyperparameters(n_regions=1, n_heads=hp.n_heads, d_k=hp.d_k,
                               d_v=hp.d_v, d_model=hp.d_model,
                               lam=0.05, dt=1.0, tau=20.0, leak=1.0,
