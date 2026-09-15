@@ -80,7 +80,7 @@ def make_sim_fn(C: jax.Array, lags: jax.Array, L: int, hp: Hyperparameters,
 def simulate(mhsa_params, C, lags, L, hp, G, sigma, T, key):
     """Run T integration steps; returns e (T, N) local prediction errors, y (T, N, D)."""
     N = C.shape[0]
-    state, _, _ = init_ct_mhsa(hp, key, batch_size=1)   # zero memory, no lags (we manage history)
+    _, state, _ = init_ct_mhsa(hp, key, batch_size=1)   # zero memory, no lags (we manage history)
     history = np.zeros((L, N, hp.d_model))
     keys = jax.random.split(jax.random.fold_in(key, 1), T)
     sim = make_sim_fn(C, lags, L, hp, G, sigma)(mhsa_params)
