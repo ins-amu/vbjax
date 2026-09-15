@@ -60,8 +60,9 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     mhsa = build_mhsa(hp0, jax.random.PRNGKey(0), params["W_q"], params["W_y"],
                       params["kv_scale"])
     hp_eff = hp0._replace(lam=u, tau=tau_s * 1000.0)
+    win_vols = emp_z_win.shape[0]
     steps_per_vol = int(round(2000.0 / dt_ms))
-    T_int = emp_z_win.shape[0] * steps_per_vol
+    T_int = win_vols * steps_per_vol
     ar = np.arange(N)
     M0, n0, fe0, y0 = carry[0], carry[1], carry[2], carry[3]  # carry[0] = M array
 
