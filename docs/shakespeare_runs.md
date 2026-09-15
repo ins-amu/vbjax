@@ -76,3 +76,10 @@ and reproducible. Remaining gap to paper's ~1.8 (fig 2b) consistent with
 normalization/scale conventions and optimizer details not specified in the
 available paper text; per-row embedding guard tests whether the late crash
 was hiding further descent.
+
+**Stage 3b result (`runs/shakespeare_stage3b`):** embed-clip 5.0 fully
+prevents the late crash (maxM ≤ 0.02 through 26k steps vs 9.0 crash before;
+early stop at 26100), but best val CE is **4.5331 @ step 13950 — identical to
+stage 3**. Conclusion: ~4.53 is the genuine val plateau of this configuration;
+the remaining gap to fig 2b's ~1.8 lives in unspecified training/scale
+conventions of the paper, not in undertraining or instability.
