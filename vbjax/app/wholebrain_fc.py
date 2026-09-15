@@ -141,6 +141,9 @@ def main():
     p.add_argument("--bold-input", default="e", choices=["e", "y", "ey"],
                    help="signal fed to the balloon: prediction error (e), mean area output (y), or sum")
     p.add_argument("--g-rel", action="store_true", help="interpret g-sweep as fractions of Gmax=1/rho(C)")
+    p.add_argument("--spectral-norm", action="store_true", default=True,
+                   help="normalize C to unit spectral radius (G then = loop gain)")
+    p.add_argument("--no-spectral-norm", dest="spectral_norm", action="store_false")
     p.add_argument("--g-sweep", default="0.5,1.0,2.0")
     p.add_argument("--tau-sweep", default="20,40")
     p.add_argument("--sigma-sweep", default="0.3")
@@ -172,6 +175,10 @@ def main():
     key = jax.random.PRNGKey(a.seed)
     # stability cap: recurrent loop gain G * rho(C) must stay below 1
     rho = float(onp.max(onp.abs(onp.linalg.eigvals(C))))
+    if a.spectral_norm and rho > 1.0:
+        C = C / rho
+        rho = 1.0
+        print("C spectrally normalized to rho=1")
     Gmax = 1.0 / max(rho, 1e-8)
     print(f"N={N} T={T} rho(C)={rho:.3f} Gmax={Gmax:.3f}")
 
@@ -201,6 +208,10 @@ def main():
                             "fc_match": None, "diverged": True})
             continue
         src = {"e": e, "y": y.mean(-1), "ey": e + y.mean(-1)}[a.bold_input]
+        src = onp.asarray(src, dtype="f4")
+        # z-score per area before the balloon: FC is correlation-based, and raw
+        # surprise can underflow (u~1e-5) to zero variance -> NaN
+        src = (src - src.mean(0, keepdims=True)) / (src.std(0, keepdims=True) + 1e-8)
         bold = bold_forward(src, a.dt, a.tr)
         fc_sim = fc_from_ts(bold)
         score = fc_match(fc_sim, fc_emp)
