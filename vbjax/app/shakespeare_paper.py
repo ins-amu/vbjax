@@ -80,6 +80,7 @@ class ShakespeareHP(NamedTuple):
     early_stop_patience: int = 300
     readout_ln: int = 0         # 1 => standardize residual x_t + y_t before readout P
     kv_scale: float = 1.0       # extra scale on FROZEN W_K/W_V init (memory magnitude control)
+    embed_clip: float = 0.0     # >0: clip embedding row L2 norm to this (rare-token blow-up guard)
     seed: int = 42
 
 
@@ -112,6 +113,7 @@ def new_state(mhsa_hp: Hyperparameters, batch_size: int, key) -> NetworkState:
 
 
 _READOUT_LN = False  # set from hp in train(); static for jit
+_EMBED_CLIP = 0.0     # >0: clip per-row L2 norm of the embedding table after each step
 
 
 def forward(prm: ShakespeareParams, state: NetworkState, x_idx: jax.Array,
@@ -158,8 +160,9 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
           train_data: onp.ndarray, val_data: onp.ndarray,
           out_dir: str):
     key = jax.random.PRNGKey(hp.seed)
-    global _READOUT_LN
+    global _READOUT_LN, _EMBED_CLIP
     _READOUT_LN = bool(hp.readout_ln)
+    _EMBED_CLIP = float(hp.embed_clip)
     k_init, k_train, k_val = jax.random.split(key, 3)
 
     prm, _ = init_shakespeare(hp, mhsa_hp, k_init)
@@ -198,6 +201,10 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
         gn = optax.global_norm(grads)  # pre-clip grad norm (diagnostic)
         updates, opt_state = optimizer.update(grads, opt_state, prm)
         prm = optax.apply_updates(prm, updates)
+        if _EMBED_CLIP > 0:
+            # guard against rare-token embedding-row blow-up (poisons frozen-scale memory M)
+            rn = np.sqrt(np.sum(prm.embed ** 2, axis=1, keepdims=True))
+            prm = prm._replace(embed=prm.embed * (_EMBED_CLIP / np.maximum(rn, _EMBED_CLIP)))
         e_norm = np.sqrt(np.sum(prm.embed ** 2))
         return prm, opt_state, loss, gn, e_norm
 
@@ -276,6 +283,7 @@ if __name__ == "__main__":
     p.add_argument("--patience", type=int, default=None, help="early-stop patience in steps")
     p.add_argument("--readout-ln", action="store_true", help="standardize residual before readout")
     p.add_argument("--kv-scale", type=float, default=1.0, help="scale on frozen W_K/W_V init")
+    p.add_argument("--embed-clip", type=float, default=0.0, help="clip embedding row L2 norm (>0 to enable, ~5.0)")
     p.add_argument("--seed", type=int, default=42)
     a = p.parse_args()
 
@@ -291,6 +299,8 @@ if __name__ == "__main__":
         hp = hp._replace(readout_ln=1)
     if a.kv_scale != 1.0:
         hp = hp._replace(kv_scale=a.kv_scale)
+    if a.embed_clip > 0:
+        hp = hp._replace(embed_clip=a.embed_clip)
     mhsa_hp = Hyperparameters(n_regions=1, n_heads=hp.n_heads, d_k=hp.d_k,
                               d_v=hp.d_v, d_model=hp.d_model,
                               lam=0.05, dt=1.0, tau=20.0, leak=1.0,
