@@ -45,7 +45,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     """One window: differentiable neural sim + balloon + MSE.
 
     params: dict(W_q, W_y, kv_scale, G_rel, log_tau, log_sigma, log_noise_tc)
-    carry:  (state, n_prev (N,D), y_ema (N,1), y_prev (N,D), bold_buf)
+    carry:  (M (N,H,Dv,Dk), n_prev (N,D), y_ema (N,1), y_prev (N,D), bold_buf)
     Returns (new_carry (stop-grad), loss, bold_vol)."""
     N = C.shape[0]
     D = params["W_q"].shape[-1]
@@ -63,7 +63,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     steps_per_vol = int(round(2000.0 / dt_ms))
     T_int = emp_z_win.shape[0] * steps_per_vol
     ar = np.arange(N)
-    state0, n0, fe0, y0 = carry[0], carry[1], carry[2], carry[3]
+    M0, n0, fe0, y0 = carry[0], carry[1], carry[2], carry[3]  # carry[0] = M array
 
     # NOTE: coupling inside the differentiable window uses the previous-step
     # output (causal, instantaneous) instead of the tract-delay history buffer:
@@ -88,7 +88,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
 
     keys_w = jax.random.split(keys, T_int)
     (fM, fn, fe, fyp), e_seq = jax.lax.scan(
-        jax.checkpoint(neural_step), (state0.M, n0, fe0, y0), keys_w)
+        jax.checkpoint(neural_step), (M0, n0, fe0, y0), keys_w)
     e_win = zscore(e_seq)                                    # (T_int, N)
 
     bold_buf = carry[4]
@@ -176,7 +176,7 @@ def main():
         y_ema = np.ones((N, 1))
         y_prev = np.zeros((N, d))
         buf, _, _ = make_bold(shape=(N,), dt=args.dt, p=bold_default_theta)
-        return (st, n_prev, y_ema, y_prev, buf)
+        return (st.M, n_prev, y_ema, y_prev, buf)
 
     def losses_all_windows(params, carry, kw):
         losses = []
