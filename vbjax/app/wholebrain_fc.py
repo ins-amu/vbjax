@@ -113,7 +113,10 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--sc", required=True, help="structural connectome (txt/npy), (N,N)")
     p.add_argument("--lengths", required=True, help="tract lengths (N,N)")
-    p.add_argument("--emp-ts", required=True, help="empirical BOLD time series (T_vol, N)")
+    p.add_argument("--emp-ts", default=None, help="empirical BOLD time series (T_vol, N)")
+    p.add_argument("--emp-fc", default=None,
+                   help="empirical FC matrix (N,N) directly; skips the BOLD forward model "
+                        "on the empirical side (use when only FC matrices exist)")
     p.add_argument("--out", default="runs/wb_fc")
     p.add_argument("--dt", type=float, default=2.0, help="integration step ms")
     p.add_argument("--tr", type=float, default=2.0, help="fMRI repetition time s")
@@ -129,9 +132,24 @@ def main():
 
     C, lags, L = load_connectome(a.sc, a.lengths, a.dt, a.v_c)
     N = C.shape[0]
-    emp_ts = onp.load(a.emp_ts) if a.emp_ts.endswith(".npy") else onp.loadtxt(a.emp_ts)
-    assert emp_ts.shape[1] == N, f"emp ts {emp_ts.shape} vs N={N}"
-    fc_emp = fc_from_ts(emp_ts)
+    if a.emp_fc is not None:
+        fc_emp = onp.load(a.emp_fc) if a.emp_fc.endswith(".npy") else onp.loadtxt(a.emp_fc)
+        assert fc_emp.shape == (N, N), f"emp fc {fc_emp.shape} vs N={N}"
+        emp_source = a.emp_fc
+    elif a.emp_ts is not None:
+        emp_ts = onp.load(a.emp_ts) if a.emp_ts.endswith(".npy") else onp.loadtxt(a.emp_ts)
+        assert emp_ts.shape[1] == N, f"emp ts {emp_ts.shape} vs N={N}"
+        fc_emp = fc_from_ts(emp_ts)
+        emp_source = a.emp_ts
+    else:
+        # no empirical side: fixed-seed random FC -> results are PIPELINE VALIDATION, not a fit
+        dkey = onp.random.RandomState(a.seed)
+        fc_emp = dkey.randn(N, N)
+        iu = onp.triu_indices(N, 1)
+        fc_emp = (fc_emp + fc_emp.T) / 2
+        onp.fill_diagonal(fc_emp, 1.0)
+        fc_emp[iu] /= (onp.abs(fc_emp[iu]).max() + 1e-8)
+        emp_source = "SYNTHETIC-DUMMY (no empirical TS/FC available; pipeline validation only)"
     T = int(a.sim_s * 1000 / a.dt)
     key = jax.random.PRNGKey(a.seed)
 
@@ -163,10 +181,11 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "results.json"), "w") as f:
         json.dump({"results": results, "best": best, "N": N, "T": T,
-                   "dt": a.dt, "tr": a.tr, "kv_scale": a.kv_scale, "seed": a.seed}, f, indent=2)
+                   "dt": a.dt, "tr": a.tr, "kv_scale": a.kv_scale, "seed": a.seed,
+                   "emp_source": emp_source}, f, indent=2)
     # heatmap comparison
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    axes[0].imshow(fc_emp); axes[0].set_title("empirical FC (BOLD)")
+    axes[0].imshow(fc_emp); axes[0].set_title(f"empirical FC ({emp_source.split()[-1] if emp_source.startswith('SYN') else 'BOLD'})")
     axes[1].imshow(onp.load(os.path.join(a.out, "fc_sim_best.npy"))); axes[1].set_title(f"sim FC (best, r={best['fc_match']:.3f})")
     plt.tight_layout(); plt.savefig(os.path.join(a.out, "fc_comparison.png"), dpi=120)
     print("best:", best)
