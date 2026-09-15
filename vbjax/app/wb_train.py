@@ -45,7 +45,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     """One window: differentiable neural sim + balloon + MSE.
 
     params: dict(W_q, W_y, kv_scale, G_rel, log_tau, log_sigma, log_noise_tc)
-    carry:  (state, history (L,N,D), n_prev (N,D), y_ema (N,1), bold_buf)
+    carry:  (state, n_prev (N,D), y_ema (N,1), y_prev (N,D), bold_buf)
     Returns (new_carry (stop-grad), loss, bold_vol)."""
     N = C.shape[0]
     D = params["W_q"].shape[-1]
@@ -63,20 +63,18 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     steps_per_vol = int(round(2000.0 / dt_ms))
     T_int = emp_z_win.shape[0] * steps_per_vol
     ar = np.arange(N)
-    state0, hist0, n0, fe0 = carry[0], carry[1], carry[2], carry[3]
+    state0, n0, fe0, y0 = carry[0], carry[1], carry[2], carry[3]
 
-    def neural_step(carry_n, inputs):
-        key_t, t = inputs
-        M, history, n_prev, y_ema = carry_n
+    # NOTE: coupling inside the differentiable window uses the previous-step
+    # output (causal, instantaneous) instead of the tract-delay history buffer:
+    # dynamic fancy-indexing of a traced buffer breaks jax.checkpoint remat
+    # (negative-index bounds checks become tracer bool conversions). Delays
+    # (ms-scale) are kept in the evaluation simulation; the FC-relevant
+    # dynamics live at seconds scale, so this approximation is benign.
+    def neural_step(carry_n, key_t):
+        M, n_prev, y_ema, y_prev = carry_n
         state = NetworkState(M=M, history=None, step=0)
-        # NOTE: avoid tracer % L — numpy's remainder inserts a div-by-zero bool
-        # check that breaks jax.checkpoint remat; floor-based wrap has no check.
-        def wrap_idx(t_shift):
-            f = jax.lax.floor(t_shift.astype(np.float32) / L)
-            return (t_shift - L * f.astype(np.int32)).astype(np.int32)
-        idx = wrap_idx(t - lags)
-        y_hist = history[idx, ar, :]
-        aff = G * np.einsum("ij,ijd->id", C, y_hist)
+        aff = G * np.einsum("ij,jd->id", C, y_prev)
         eps = jax.random.normal(key_t, (N, D))
         noise = noise_a * n_prev + sigma * sq1 * eps
         x = (aff + noise)[None]
@@ -86,13 +84,11 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
         rms = np.sqrt(np.mean(y ** 2, axis=-1, keepdims=True))
         y_ema = 0.999 * y_ema + 0.001 * rms
         y_out = y / (y_ema + 1e-8)
-        history = history.at[wrap_idx(t)].set(y_out)
-        return (state.M, history, noise, y_ema), e
+        return (state.M, noise, y_ema, y), e
 
     keys_w = jax.random.split(keys, T_int)
-    ts_w = np.arange(T_int)
-    (fM, fhist, fn, fe), e_seq = jax.lax.scan(
-        jax.checkpoint(neural_step), (state0.M, hist0, n0, fe0), (keys_w, ts_w))
+    (fM, fn, fe, fyp), e_seq = jax.lax.scan(
+        jax.checkpoint(neural_step), (state0.M, n0, fe0, y0), keys_w)
     e_win = zscore(e_seq)                                    # (T_int, N)
 
     bold_buf = carry[4]
@@ -103,9 +99,9 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
 
     loss = np.mean((bold_vol - emp_z_win) ** 2)
     new_carry = (jax.lax.stop_gradient(fM),
-                 jax.lax.stop_gradient(fhist),
                  jax.lax.stop_gradient(fn),
                  jax.lax.stop_gradient(fe),
+                 jax.lax.stop_gradient(fyp),
                  jax.lax.stop_gradient(fbuf))
     return new_carry, loss, bold_vol
 
@@ -176,11 +172,11 @@ def main():
 
     def full_carry(params):
         _, st, _ = init_ct_mhsa(hp0, key, batch_size=1)
-        hist = np.zeros((L_win, N, d))
         n_prev = np.zeros((N, d))
         y_ema = np.ones((N, 1))
+        y_prev = np.zeros((N, d))
         buf, _, _ = make_bold(shape=(N,), dt=args.dt, p=bold_default_theta)
-        return (st, hist, n_prev, y_ema, buf)
+        return (st, n_prev, y_ema, y_prev, buf)
 
     def losses_all_windows(params, carry, kw):
         losses = []
