@@ -69,7 +69,12 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
         key_t, t = inputs
         M, history, n_prev, y_ema = carry_n
         state = NetworkState(M=M, history=None, step=0)
-        idx = (t - lags) % L
+        # NOTE: avoid tracer % L — numpy's remainder inserts a div-by-zero bool
+        # check that breaks jax.checkpoint remat; floor-based wrap has no check.
+        def wrap_idx(t_shift):
+            f = jax.lax.floor(t_shift.astype(np.float32) / L)
+            return (t_shift - L * f.astype(np.int32)).astype(np.int32)
+        idx = wrap_idx(t - lags)
         y_hist = history[idx, ar, :]
         aff = G * np.einsum("ij,ijd->id", C, y_hist)
         eps = jax.random.normal(key_t, (N, D))
@@ -81,7 +86,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
         rms = np.sqrt(np.mean(y ** 2, axis=-1, keepdims=True))
         y_ema = 0.999 * y_ema + 0.001 * rms
         y_out = y / (y_ema + 1e-8)
-        history = history.at[t % L].set(y_out)
+        history = history.at[wrap_idx(t)].set(y_out)
         return (state.M, history, noise, y_ema), e
 
     keys_w = jax.random.split(keys, T_int)
