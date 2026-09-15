@@ -1,0 +1,77 @@
+{
+  "results": [
+    {
+      "G": 1.5,
+      "tau": 10.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.030886835784794217
+    },
+    {
+      "G": 1.5,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.0401437555355642
+    },
+    {
+      "G": 1.5,
+      "tau": 30.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.0075059732458508666
+    },
+    {
+      "G": 1.5,
+      "tau": 30.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.05326176830176863
+    },
+    {
+      "G": 2.5,
+      "tau": 10.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.03916369075574365
+    },
+    {
+      "G": 2.5,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.04008068160039295
+    },
+    {
+      "G": 2.5,
+      "tau": 30.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": -0.042419923823760725
+    },
+    {
+      "G": 2.5,
+      "tau": 30.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.023669746409711187
+    }
+  ],
+  "best": {
+    "G": 1.5,
+    "tau": 30.0,
+    "sigma": 0.1,
+    "bold_input": "e",
+    "fc_match": 0.05326176830176863
+  },
+  "N": 100,
+  "T": 300000,
+  "Gmax": 1.0,
+  "dt": 2.0,
+  "tr": 2.0,
+  "kv_scale": 0.15,
+  "seed": 42,
+  "bold_input": "e",
+  "noise_tc": 2.0,
+  "emp_source": "/home/marmaduke@lnn.timone.univ-mrs.fr/mhsa_e0/data/kb_100sch/emp_ts.npy"
+}

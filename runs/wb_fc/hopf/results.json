@@ -1,0 +1,26 @@
+{
+  "results": [
+    {
+      "G_rel": 0.3,
+      "fc_match": NaN
+    },
+    {
+      "G_rel": 0.7,
+      "fc_match": NaN
+    },
+    {
+      "G_rel": 1.0,
+      "fc_match": NaN
+    },
+    {
+      "G_rel": 1.2,
+      "fc_match": NaN
+    }
+  ],
+  "best": {
+    "G_rel": 0.3,
+    "fc_match": NaN
+  },
+  "N": 100,
+  "T": 300000
+}
