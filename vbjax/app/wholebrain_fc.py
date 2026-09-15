@@ -155,6 +155,8 @@ def main():
     p.add_argument("--tau-sweep", default="20,40")
     p.add_argument("--sigma-sweep", default="0.3")
     p.add_argument("--kv-scale", type=float, default=0.15)
+    p.add_argument("--delta-rule", action="store_true",
+                   help="error-gated memory write M += u(v - M phi(k)) phi(k)^T")
     p.add_argument("--seed", type=int, default=42)
     a = p.parse_args()
 
@@ -200,7 +202,8 @@ def main():
         hp = Hyperparameters(n_regions=N, n_heads=N, d_model=a.d_model,
                              d_k=a.d_model, d_v=a.d_model,
                              lam=a.dt / (tau * 1000.0), dt=a.dt, tau=tau * 1000.0,
-                             leak=1.0, act="relu", steps_per_token=1, sigma_a=0.0)
+                             leak=1.0, act="relu", steps_per_token=1, sigma_a=0.0,
+                             delta_rule=1 if a.delta_rule else 0)
         k_m, k_sim = jax.random.split(key)
         mhsa, _, _ = init_ct_mhsa(hp, k_m, batch_size=1)
         if a.kv_scale != 1.0:

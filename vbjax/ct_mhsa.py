@@ -22,7 +22,8 @@ class Hyperparameters(NamedTuple):
     act: str = "relu"  # phi: "relu" (threshold-linear, paper default) or "elup1"
     use_block_residual: bool = False  # paper core has no in-block residual (residual is token-level)
     use_ln: bool = False  # paper core has no layer-norm inside the block
-    sigma_a: float = 0.0  # apical-afferent width; 0 => identity (no A), >0 => Gaussian A
+    sigma_a: float = 0.0
+    delta_rule: int = 0   # 1 => error-gated memory write M += u(v - M phi(k)) phi(k)^T  # apical-afferent width; 0 => identity (no A), >0 => Gaussian A
     dt: float = 0.1
     v_c: float = 10.0
     steps_per_token: int = 1
@@ -188,8 +189,17 @@ def update_memory_l23(state: NetworkState, k: jax.Array, v: jax.Array, hp: Hyper
     u = hp.memory_update_rate  # dt/tau
     g = hp.leak  # g_ell
 
-    # Outer product v * phi(k)^T -> (B, N, H, Dv, Dk)
-    target = np.einsum('bnhv,bnhk->bnhvk', v, k)
+    if getattr(hp, "delta_rule", 0):
+        # Delta-rule / error-gated write: store only the retrieval RESIDUAL
+        # (what memory fails to predict about the new key-value pair):
+        #   M += u * (v - M phi(k)) phi(k)^T
+        # This is the local prediction-error plasticity form; the plain
+        # outer-product accumulation is recovered when M=0 each step.
+        o_pred = np.einsum('bnhvk,bnhk->bnhv', state.M, k)   # memory's prediction of v
+        target = np.einsum('bnhv,bnhk->bnhvk', v - o_pred, k)
+    else:
+        # Outer product v * phi(k)^T -> (B, N, H, Dv, Dk)
+        target = np.einsum('bnhv,bnhk->bnhvk', v, k)
 
     # Delta M = (dt/tau) * (target - g_ell * M_prev)
     delta_M = u * (target - g * state.M)
