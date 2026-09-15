@@ -45,7 +45,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     """One window: differentiable neural sim + balloon + MSE.
 
     params: dict(W_q, W_y, kv_scale, G_rel, log_tau, log_sigma, log_noise_tc)
-    carry:  (M (N,H,Dv,Dk), n_prev (N,D), y_ema (N,1), y_prev (N,D), bold_buf)
+    carry:  (M (N,H,Dv,Dk), n_prev (N,D), y_ema (N,1), y_prev (N,D))
     Returns (new_carry (stop-grad), loss, bold_vol)."""
     N = C.shape[0]
     D = params["W_q"].shape[-1]
@@ -91,8 +91,6 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     # gradient reduction; per-chunk keeps backward memory ~100x smaller.
     chunk = 100
     n_chunks = T_int // chunk
-    keys_c = keys_w.reshape(n_chunks, chunk, 2) if False else None
-    keys_w = jax.random.split(keys, T_int)
     keys_c = keys_w.reshape(n_chunks, chunk, 2)
 
     def chunk_step(carry_c, keys_chunk):
@@ -101,20 +99,19 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     (fM, fn, fe, fyp), e_chunks = jax.lax.scan(
         jax.checkpoint(chunk_step), (M0, n0, fe0, y0), keys_c)
     e_seq = e_chunks.reshape(n_chunks * chunk, N)            # (T_int, N)
-    e_win = zscore(e_seq)                                    # (T_int, N)
 
-    bold_buf = carry[4]
-    _, bold_step, bold_sample = make_bold(shape=(N,), dt=dt_ms, p=bold_default_theta)
-    bold_sample = make_offline(step_fn=bold_step, sample_fn=bold_sample)
-    fbuf, bold_seq = jax.lax.scan(bold_sample, bold_buf, e_win)
-    bold_vol = zscore(bold_seq[::steps_per_vol])             # (win_vols, N)
+    # Balloon at dt_train (20 ms) destabilizes (V**alpha NaN) — the training
+    # loss fits the NEURAL prediction-error trace: average e within each TR
+    # volume, z-score, match to empirical BOLD. The balloon stays in the
+    # fc_match evaluation (bold_forward at fine dt).
+    e_vol = e_seq.reshape(win_vols, steps_per_vol, N).mean(axis=1)   # (win_vols, N)
+    bold_vol = zscore(e_vol)
 
     loss = np.mean((bold_vol - emp_z_win) ** 2)
     new_carry = (jax.lax.stop_gradient(fM),
                  jax.lax.stop_gradient(fn),
                  jax.lax.stop_gradient(fe),
-                 jax.lax.stop_gradient(fyp),
-                 jax.lax.stop_gradient(fbuf))
+                 jax.lax.stop_gradient(fyp))
     return new_carry, loss, bold_vol
 
 
@@ -187,8 +184,7 @@ def main():
         n_prev = np.zeros((N, d))
         y_ema = np.ones((N, 1))
         y_prev = np.zeros((N, d))
-        buf, _, _ = make_bold(shape=(N,), dt=args.dt, p=bold_default_theta)
-        return (st.M, n_prev, y_ema, y_prev, buf)
+        return (st.M, n_prev, y_ema, y_prev)
 
     def losses_all_windows(params, carry, kw):
         losses = []
