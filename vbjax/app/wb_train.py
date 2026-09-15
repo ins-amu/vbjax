@@ -260,6 +260,8 @@ def main():
             log.append({"iter": it, "loss": float(val), "gnorm": gnorm})
             with open(os.path.join(args.out, "log.json"), "w") as f:
                 json.dump(log, f, indent=1)
+            with open(os.path.join(args.out, "params_ckpt.pkl"), "wb") as f:
+                pickle.dump(params, f)
 
     s1 = eval_fc(params, args.final_sim_s, fc1, args.seed)
     s2 = eval_fc(params, args.final_sim_s, fc2, args.seed + 1)
