@@ -90,7 +90,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     # Chunked remat: checkpoint at the 100-step chunk level (inner scan runs
     # uncheckpointed). Per-step checkpoint over thousands of steps OOMs on the
     # gradient reduction; per-chunk keeps backward memory ~100x smaller.
-    chunk = 5
+    chunk = 25
     n_chunks = T_int // chunk
     keys_w = jax.random.split(keys, T_int)
     keys_c = keys_w.reshape(n_chunks, chunk, 2)
