@@ -86,10 +86,21 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
         y_out = y / (y_ema + 1e-8)
         return (state.M, noise, y_ema, y), e
 
+    # Chunked remat: checkpoint at the 100-step chunk level (inner scan runs
+    # uncheckpointed). Per-step checkpoint over thousands of steps OOMs on the
+    # gradient reduction; per-chunk keeps backward memory ~100x smaller.
+    chunk = 100
+    n_chunks = T_int // chunk
+    keys_c = keys_w.reshape(n_chunks, chunk, 2) if False else None
     keys_w = jax.random.split(keys, T_int)
-    (fM, fn, fe, fyp), e_seq = jax.lax.scan(
-        jax.checkpoint(neural_step), (M0, n0, fe0, y0), keys_w)
-    e_win = zscore(e_seq)                                    # (T_int, N)
+    keys_c = keys_w.reshape(n_chunks, chunk, 2)
+
+    def chunk_step(carry_c, keys_chunk):
+        return jax.lax.scan(neural_step, carry_c, keys_chunk)
+
+    (fM, fn, fe, fyp), e_chunks = jax.lax.scan(
+        jax.checkpoint(chunk_step), (M0, n0, fe0, y0), keys_c)
+    e_seq = e_chunks.reshape(n_chunks * chunk, N)            # (T_int, N)
 
     bold_buf = carry[4]
     _, bold_step, bold_sample = make_bold(shape=(N,), dt=dt_ms, p=bold_default_theta)
