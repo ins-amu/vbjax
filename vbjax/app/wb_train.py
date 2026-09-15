@@ -124,6 +124,13 @@ class Adam:
         self.v = {k: np.zeros_like(v) for k, v in params.items()}
         self.b1, self.b2, self.eps, self.t = 0.9, 0.999, 1e-8, 0
 
+    def reset(self):
+        """Zero the moment state. Called when a step is discarded so a
+        poisoned m/v (from a non-finite gradient) cannot re-inject NaN."""
+        self.m = {k: np.zeros_like(v) for k, v in self.m.items()}
+        self.v = {k: np.zeros_like(v) for k, v in self.v.items()}
+        self.t = 0
+
     def step(self, params, grads):
         self.t += 1
         out = {}
@@ -229,11 +236,15 @@ def main():
 
     opt = Adam(params, lr=1e-3)
     opt_s = Adam(params, lr=1e-2)
+    MIN_LR = 1e-5
+    BAD_TO_HALVE = 3
     iters1, iters2 = args.iters // 2, args.iters - args.iters // 2
     log = []
     last_good = {k: v for k, v in params.items()}
+    bad_streak = 0
     for it in range(iters1 + iters2):
         stage_all = it >= iters1
+        cur_opt = opt if stage_all else opt_s
         t0 = time.time()
         key, kw = jax.random.split(key)
         carry = full_carry(params)
@@ -244,13 +255,29 @@ def main():
 
         val, grads = jax.value_and_grad(loss_fn)(params)
         v = float(val)
-        if not onp.isfinite(v):
-            # instability: restore last good params, halve lr, skip update
-            print(f"iter {it:4d} LOSS={v} -> restore + halve lr", flush=True)
-            params = {k: v2 for k, v2 in last_good.items()}
-            (opt_s if not stage_all else opt).lr *= 0.5
-            log.append({"iter": it, "loss": v, "restored": True})
+        # Guard the STEP, not just the loss: a finite loss can still carry a
+        # non-finite gradient. If either is non-finite, discard this step
+        # entirely so neither params nor the Adam moments get poisoned.
+        finite = bool(onp.isfinite(v)) and all(
+            bool(onp.isfinite(onp.asarray(g)).all()) for g in grads.values())
+        if not finite:
+            bad_streak += 1
+            lr_now = cur_opt.lr
+            cur_opt.reset()          # drop any poisoned m/v moment state
+            print(f"iter {it:4d}/{args.iters} SKIP non-finite loss/grad "
+                  f"loss={v} bad_streak={bad_streak} lr={lr_now:.2e} "
+                  f"({time.time()-t0:.1f}s)", flush=True)
+            if bad_streak >= BAD_TO_HALVE:
+                cur_opt.lr = max(lr_now * 0.5, MIN_LR)
+                bad_streak = 0
+                print(f"iter {it:4d} {BAD_TO_HALVE} consecutive bad steps -> "
+                      f"lr={cur_opt.lr:.2e} (floor {MIN_LR:.0e})", flush=True)
+            log.append({"iter": it, "skipped": True, "loss": None,
+                        "bad_streak": bad_streak, "lr": cur_opt.lr})
+            with open(os.path.join(args.out, "log.json"), "w") as f:
+                json.dump(log, f, indent=1)
             continue
+        bad_streak = 0
         last_good = {k: v2 for k, v2 in params.items()}
         if not stage_all:
             grads = {k: (np.zeros_like(g) if k in ("W_q", "W_y") else g)
@@ -258,14 +285,15 @@ def main():
         gnorm = float(np.sqrt(sum(float(np.sum(g ** 2)) for g in grads.values())))
         if gnorm > 1.0:
             grads = {k: g / gnorm for k, g in grads.items()}
-        params = (opt_s if not stage_all else opt).step(params, grads)
+        params = cur_opt.step(params, grads)
         msg = (f"iter {it:4d}/{args.iters} loss={v:.5f} "
                f"G={float(params['G_rel']):.2f} "
                f"tau={float(np.exp(params['log_tau'])):.1f}s "
                f"sigma={float(np.exp(params['log_sigma'])):.3f} "
-               f"gnorm={gnorm:.2e} ({time.time()-t0:.1f}s)")
+               f"gnorm={gnorm:.2e} lr={cur_opt.lr:.2e} ({time.time()-t0:.1f}s)")
         print(msg, flush=True)
-        log.append({"iter": it, "loss": v, "gnorm": gnorm})
+        log.append({"iter": it, "loss": v, "gnorm": gnorm,
+                    "lr": cur_opt.lr})
         with open(os.path.join(args.out, "log.json"), "w") as f:
             json.dump(log, f, indent=1)
         with open(os.path.join(args.out, "params_ckpt.pkl"), "wb") as f:
