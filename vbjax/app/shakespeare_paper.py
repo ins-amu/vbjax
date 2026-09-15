@@ -285,6 +285,7 @@ if __name__ == "__main__":
     p.add_argument("--readout-ln", action="store_true", help="standardize residual before readout")
     p.add_argument("--kv-scale", type=float, default=1.0, help="scale on frozen W_K/W_V init")
     p.add_argument("--embed-clip", type=float, default=0.0, help="clip embedding row L2 norm (>0 to enable, ~5.0)")
+    p.add_argument("--tau", type=float, default=20.0)
     p.add_argument("--seed", type=int, default=42)
     a = p.parse_args()
 
@@ -304,7 +305,7 @@ if __name__ == "__main__":
         hp = hp._replace(embed_clip=a.embed_clip)
     mhsa_hp = Hyperparameters(n_regions=1, n_heads=hp.n_heads, d_k=hp.d_k,
                               d_v=hp.d_v, d_model=hp.d_model,
-                              lam=0.05, dt=1.0, tau=20.0, leak=1.0,
+                              lam=0.05, dt=1.0, tau=a.tau, leak=1.0,
                               act="relu", steps_per_token=1)
 
     text = load_text(a.input)
