@@ -182,9 +182,16 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
     @jax.jit
     def train_step(prm, opt_state, state, x, y):
         loss, grads = jax.value_and_grad(loss_fn)(prm, state, x, y, mhsa_hp)
+        gn = optax.global_norm(grads)  # pre-clip grad norm (diagnostic)
         updates, opt_state = optimizer.update(grads, opt_state, prm)
         prm = optax.apply_updates(prm, updates)
-        return prm, opt_state, loss
+        e_norm = np.sqrt(np.sum(prm.embed ** 2))
+        return prm, opt_state, loss, gn, e_norm
+
+    @jax.jit
+    def diag_fn(prm, st, x):
+        fin_state, logits = forward(prm, st, x, mhsa_hp)
+        return np.max(np.abs(logits)), np.max(np.abs(fin_state.M))
 
     val_bs = hp.batch_size * 4
     val_state = new_state(mhsa_hp, val_bs, k_val)
@@ -202,15 +209,19 @@ def train(hp: ShakespeareHP, mhsa_hp: Hyperparameters,
         k_train, k_b = jax.random.split(k_train)
         x, y = get_batch(train_data, hp.batch_size, hp.seq_len, k_b)
         state = new_state(mhsa_hp, hp.batch_size, k_train)
-        prm, opt_state, loss = train_step(prm, opt_state, state, x, y)
+        prm, opt_state, loss, gn, en = train_step(prm, opt_state, state, x, y)
         train_losses.append(float(onp.asarray(loss)))
 
         if i % 50 == 0:
             vl, va = val_step(prm, val_x, val_y, val_state)
+            ml, mm = diag_fn(prm, val_state, val_x)
             vl, va = float(onp.asarray(vl)), float(onp.asarray(va))
+            gn_f, en_f = float(onp.asarray(gn)), float(onp.asarray(en))
+            ml_f, mm_f = float(onp.asarray(ml)), float(onp.asarray(mm))
             val_losses.append(vl)
             val_accs.append(va)
-            print(f"step {i:5d} train_loss={loss:.4f} val_loss={vl:.4f} val_acc={va:.4f}")
+            print(f"step {i:5d} train_loss={loss:.4f} val_loss={vl:.4f} val_acc={va:.4f} "
+                  f"gn={gn_f:.3f} e_norm={en_f:.2f} maxlogit={ml_f:.2f} maxM={mm_f:.4f}")
             if vl < best_val - 1e-4:
                 best_val, best_prm, patience = vl, prm, 0
             else:
