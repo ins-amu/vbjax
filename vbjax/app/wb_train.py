@@ -27,7 +27,7 @@ import jax
 import jax.numpy as np
 
 from vbjax import make_bold, bold_default_theta, make_offline
-from vbjax.ct_mhsa import Hyperparameters, init_ct_mhsa, mhsa_step
+from vbjax.ct_mhsa import Hyperparameters, NetworkState, init_ct_mhsa, mhsa_step
 from vbjax.app.wholebrain_fc import load_connectome, fc_from_ts, fc_match
 
 
@@ -65,9 +65,10 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     ar = np.arange(N)
     state0, hist0, n0, fe0 = carry[0], carry[1], carry[2], carry[3]
 
-    def neural_step(carry_n, key_t):
-        state, history, n_prev, y_ema = carry_n
-        t = state.step
+    def neural_step(carry_n, inputs):
+        key_t, t = inputs
+        M, history, n_prev, y_ema = carry_n
+        state = NetworkState(M=M, history=None, step=0)
         idx = (t - lags) % L
         y_hist = history[idx, ar, :]
         aff = G * np.einsum("ij,ijd->id", C, y_hist)
@@ -81,12 +82,12 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
         y_ema = 0.999 * y_ema + 0.001 * rms
         y_out = y / (y_ema + 1e-8)
         history = history.at[t % L].set(y_out)
-        state = state._replace(step=t + 1)
-        return (state, history, noise, y_ema), e
+        return (state.M, history, noise, y_ema), e
 
     keys_w = jax.random.split(keys, T_int)
-    (fstate, fhist, fn, fe), e_seq = jax.lax.scan(
-        jax.checkpoint(neural_step), (state0, hist0, n0, fe0), keys_w)
+    ts_w = np.arange(T_int)
+    (fM, fhist, fn, fe), e_seq = jax.lax.scan(
+        jax.checkpoint(neural_step), (state0.M, hist0, n0, fe0), (keys_w, ts_w))
     e_win = zscore(e_seq)                                    # (T_int, N)
 
     bold_buf = carry[4]
@@ -96,7 +97,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     bold_vol = zscore(bold_seq[::steps_per_vol])             # (win_vols, N)
 
     loss = np.mean((bold_vol - emp_z_win) ** 2)
-    new_carry = (jax.lax.stop_gradient(fstate),
+    new_carry = (jax.lax.stop_gradient(fM),
                  jax.lax.stop_gradient(fhist),
                  jax.lax.stop_gradient(fn),
                  jax.lax.stop_gradient(fe),
