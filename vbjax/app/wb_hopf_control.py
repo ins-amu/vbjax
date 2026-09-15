@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from vbjax import make_bold, bold_default_theta, make_offline
+from vbjax.app.wholebrain_fc import bold_forward
 
 
 def hopf_sim(C, lags, L, G, sigma, T, dt_ms, key, noise_tc_s=2.0, a_param=1.0):
@@ -96,14 +96,21 @@ def main():
         # the raw x oscillates around 0 and net-negative neural input drives
         # the balloon volume V negative -> V**alpha NaN (round-3 lesson).
         r = onp.sqrt(xs * xs + ys * ys)
-        bold_buf, bstep, bsamp = make_bold(shape=(N,), dt=a.dt / 1000.0, p=bold_default_theta)
-        bsamp = make_offline(step_fn=bstep, sample_fn=bsamp)
-        _, bold = jax.lax.scan(bsamp, bold_buf, r)
-        bold = onp.asarray(bold[::int(round(a.tr * 1000.0 / a.dt))])
+        # Window the input per TR and sample the balloon once per window, exactly
+        # like wholebrain_fc.bold_forward. make_offline's inner scan consumes a
+        # WINDOW of per-step inputs; feeding it single (N,) steps made that scan
+        # iterate over the N regions and broadcast each scalar region value to
+        # ALL regions -> identical BOLD traces -> all-ones FC -> corrcoef NaN.
+        bold = bold_forward(r, a.dt, a.tr)
         if not onp.isfinite(bold).all():
             print(f"G_rel={G_rel} BOLD_NAN"); results.append({"G_rel": G_rel, "fc_match": None, "bold_nan": True}); continue
         zs = (bold - bold.mean(0)) / (bold.std(0) + 1e-8)
         fc_sim = (zs.T @ zs) / bold.shape[0]
+        fc_vec = fc_sim[iu]
+        if not onp.isfinite(fc_vec).all() or float(fc_vec.std()) == 0.0:
+            print(f"G_rel={G_rel} FC_DEGENERATE (constant/non-finite fc_sim)")
+            results.append({"G_rel": G_rel, "fc_match": None, "fc_degenerate": True})
+            continue
         score = float(onp.corrcoef(fc_sim[iu], fc_emp[iu])[0, 1])
         results.append({"G_rel": G_rel, "fc_match": score})
         print(f"G_rel={G_rel} fc_match={score:.4f}")
