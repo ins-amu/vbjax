@@ -162,6 +162,7 @@ def main():
     T = int(a.sim_s * 1000 / a.dt)
     key = jax.random.PRNGKey(a.seed)
 
+    os.makedirs(a.out, exist_ok=True)
     results = []
     best = None
     for G, tau, sigma in itertools.product(
