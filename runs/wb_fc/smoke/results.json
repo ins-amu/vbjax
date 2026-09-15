@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "G": 0.5,
+      "tau": 20.0,
+      "sigma": 0.3,
+      "fc_match": 0.022851915944377247
+    },
+    {
+      "G": 1.0,
+      "tau": 20.0,
+      "sigma": 0.3,
+      "fc_match": 0.02311698764362187
+    }
+  ],
+  "best": {
+    "G": 1.0,
+    "tau": 20.0,
+    "sigma": 0.3,
+    "fc_match": 0.02311698764362187
+  },
+  "N": 100,
+  "T": 60000,
+  "dt": 2.0,
+  "tr": 2.0,
+  "kv_scale": 0.15,
+  "seed": 42,
+  "emp_source": "SYNTHETIC-DUMMY (no empirical TS/FC available; pipeline validation only)"
+}
