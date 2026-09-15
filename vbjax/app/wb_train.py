@@ -239,7 +239,10 @@ def main():
             _, l = losses_all_windows(p, carry, kw)
             return l
 
+        t1 = time.time()
         val, grads = jax.value_and_grad(loss_fn)(params)
+        val.block_until_ready() if hasattr(val, "block_until_ready") else None
+        print(f"  [iter {it}] fwd+bwd took {time.time()-t1:.1f}s", flush=True)
         if not stage_all:
             grads = {k: (np.zeros_like(g) if k in ("W_q", "W_y") else g)
                      for k, g in grads.items()}
