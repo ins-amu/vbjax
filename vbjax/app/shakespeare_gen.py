@@ -53,6 +53,12 @@ if __name__ == "__main__":
     p.add_argument("--seed", type=int, default=0)
     a = p.parse_args()
 
+    import __main__
+    # training ran via `python -m vbjax.app.shakespeare_paper`, so pickled classes carry
+    # __module__ == "__main__"; alias them into OUR __main__ so pickle can resolve them.
+    __main__.ShakespeareParams = sp.ShakespeareParams
+    __main__.ShakespeareHP = sp.ShakespeareHP
+
     with open(a.ckpt, "rb") as f:
         ck = pickle.load(f)
     hp = ShakespeareHP(**ck["hp"])
