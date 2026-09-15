@@ -1,0 +1,147 @@
+{
+  "results": [
+    {
+      "G": 0.5,
+      "tau": 10.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.10115462968554034
+    },
+    {
+      "G": 0.5,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.1058222955396113
+    },
+    {
+      "G": 0.5,
+      "tau": 30.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.09931413057034165
+    },
+    {
+      "G": 0.5,
+      "tau": 30.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.11138242911066285
+    },
+    {
+      "G": 0.5,
+      "tau": 100.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.09791329237900608
+    },
+    {
+      "G": 0.5,
+      "tau": 100.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.10254579032286507
+    },
+    {
+      "G": 1.0,
+      "tau": 10.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.10198079915763651
+    },
+    {
+      "G": 1.0,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.10955079221700217
+    },
+    {
+      "G": 1.0,
+      "tau": 30.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.09900163669254362
+    },
+    {
+      "G": 1.0,
+      "tau": 30.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.09542288922819855
+    },
+    {
+      "G": 1.0,
+      "tau": 100.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.09397043749419591
+    },
+    {
+      "G": 1.0,
+      "tau": 100.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.10334828661009246
+    },
+    {
+      "G": 1.5,
+      "tau": 10.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.08900478473983232
+    },
+    {
+      "G": 1.5,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.12173843063038696
+    },
+    {
+      "G": 1.5,
+      "tau": 30.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.1022030319023174
+    },
+    {
+      "G": 1.5,
+      "tau": 30.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.11530833626134813
+    },
+    {
+      "G": 1.5,
+      "tau": 100.0,
+      "sigma": 0.05,
+      "bold_input": "e",
+      "fc_match": 0.07441296531021997
+    },
+    {
+      "G": 1.5,
+      "tau": 100.0,
+      "sigma": 0.1,
+      "bold_input": "e",
+      "fc_match": 0.10733007530232408
+    }
+  ],
+  "best": {
+    "G": 1.5,
+    "tau": 10.0,
+    "sigma": 0.1,
+    "bold_input": "e",
+    "fc_match": 0.12173843063038696
+  },
+  "N": 100,
+  "T": 300000,
+  "Gmax": 1.0,
+  "dt": 2.0,
+  "tr": 2.0,
+  "kv_scale": 0.15,
+  "seed": 42,
+  "bold_input": "e",
+  "noise_tc": 2.0,
+  "emp_source": "/home/marmaduke@lnn.timone.univ-mrs.fr/mhsa_e0/data/kb_100sch/emp_ts.npy"
+}

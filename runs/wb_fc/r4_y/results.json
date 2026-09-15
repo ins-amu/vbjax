@@ -1,0 +1,147 @@
+{
+  "results": [
+    {
+      "G": 0.5,
+      "tau": 10.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.05880768706745021
+    },
+    {
+      "G": 0.5,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": -0.01803750614080028
+    },
+    {
+      "G": 0.5,
+      "tau": 30.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.0764450331723334
+    },
+    {
+      "G": 0.5,
+      "tau": 30.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": 0.008116873107324412
+    },
+    {
+      "G": 0.5,
+      "tau": 100.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.05415794683198193
+    },
+    {
+      "G": 0.5,
+      "tau": 100.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": 0.03208396616853186
+    },
+    {
+      "G": 1.0,
+      "tau": 10.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.0381092026853835
+    },
+    {
+      "G": 1.0,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": -0.0403650219973929
+    },
+    {
+      "G": 1.0,
+      "tau": 30.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.08222216824640209
+    },
+    {
+      "G": 1.0,
+      "tau": 30.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": 0.02435938650441306
+    },
+    {
+      "G": 1.0,
+      "tau": 100.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.053171060320152785
+    },
+    {
+      "G": 1.0,
+      "tau": 100.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": 0.05136227530753991
+    },
+    {
+      "G": 1.5,
+      "tau": 10.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.009723922516615248
+    },
+    {
+      "G": 1.5,
+      "tau": 10.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": -0.05145618847291735
+    },
+    {
+      "G": 1.5,
+      "tau": 30.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.01980211899155142
+    },
+    {
+      "G": 1.5,
+      "tau": 30.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": -0.037477661088266126
+    },
+    {
+      "G": 1.5,
+      "tau": 100.0,
+      "sigma": 0.05,
+      "bold_input": "y",
+      "fc_match": 0.057034694965202
+    },
+    {
+      "G": 1.5,
+      "tau": 100.0,
+      "sigma": 0.1,
+      "bold_input": "y",
+      "fc_match": -0.009184550843022226
+    }
+  ],
+  "best": {
+    "G": 1.0,
+    "tau": 30.0,
+    "sigma": 0.05,
+    "bold_input": "y",
+    "fc_match": 0.08222216824640209
+  },
+  "N": 100,
+  "T": 300000,
+  "Gmax": 1.0,
+  "dt": 2.0,
+  "tr": 2.0,
+  "kv_scale": 0.15,
+  "seed": 42,
+  "bold_input": "y",
+  "noise_tc": 2.0,
+  "emp_source": "/home/marmaduke@lnn.timone.univ-mrs.fr/mhsa_e0/data/kb_100sch/emp_ts.npy"
+}

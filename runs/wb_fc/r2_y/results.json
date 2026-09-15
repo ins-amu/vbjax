@@ -1,0 +1,84 @@
+{
+  "results": [
+    {
+      "G": 0.031,
+      "tau": 10.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.006442786099803267
+    },
+    {
+      "G": 0.031,
+      "tau": 30.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.004312378469581455
+    },
+    {
+      "G": 0.031,
+      "tau": 100.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.013001327820682054
+    },
+    {
+      "G": 0.0621,
+      "tau": 10.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.00620593554296979
+    },
+    {
+      "G": 0.0621,
+      "tau": 30.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.0040823789304994
+    },
+    {
+      "G": 0.0621,
+      "tau": 100.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.012996274268499005
+    },
+    {
+      "G": 0.0931,
+      "tau": 10.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.005973544143919593
+    },
+    {
+      "G": 0.0931,
+      "tau": 30.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.003874654988937068
+    },
+    {
+      "G": 0.0931,
+      "tau": 100.0,
+      "sigma": 0.3,
+      "bold_input": "y",
+      "fc_match": 0.01295541629418473
+    }
+  ],
+  "best": {
+    "G": 0.031,
+    "tau": 100.0,
+    "sigma": 0.3,
+    "bold_input": "y",
+    "fc_match": 0.013001327820682054
+  },
+  "N": 100,
+  "T": 300000,
+  "Gmax": 0.1034567847882881,
+  "dt": 2.0,
+  "tr": 2.0,
+  "kv_scale": 0.15,
+  "seed": 42,
+  "bold_input": "y",
+  "noise_tc": 2.0,
+  "emp_source": "/home/marmaduke@lnn.timone.univ-mrs.fr/mhsa_e0/data/kb_100sch/emp_ts.npy"
+}
