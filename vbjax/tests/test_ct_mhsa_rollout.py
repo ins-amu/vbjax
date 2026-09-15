@@ -53,9 +53,11 @@ def test_python_loop_comparison():
         
     loop_outputs = np.stack(loop_outputs)
     
-    # Compare
+    # Compare. GPU matmuls default to TF32 (~1e-3 precision); this test checks
+    # algorithmic equivalence (scan == python loop), not fp32 bit-precision.
+    atol = 1e-2 if jax.default_backend().startswith("gpu") else 1e-5
     print("Max diff:", np.max(np.abs(scan_outputs - loop_outputs)))
-    assert np.allclose(scan_outputs, loop_outputs, atol=1e-5)
+    assert np.allclose(scan_outputs, loop_outputs, atol=atol)
     print("Python loop comparison passed.")
 
 if __name__ == "__main__":
