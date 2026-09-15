@@ -48,28 +48,31 @@ def load_connectome(sc_path: str, lengths_path: str, dt: float, v_c: float):
 
 
 def make_sim_fn(C: jax.Array, lags: jax.Array, L: int, hp: Hyperparameters,
-                G: float, sigma: float):
-    """Jitted whole-brain scan. Carry = (state, history (L, N, D) of past outputs)."""
+                G: float, sigma: float, noise_a: float, bold_src: str):
+    """Jitted whole-brain scan. Carry = (state, history (L, N, D) of past outputs,
+    AR(1) noise state). noise_a: OU-like coefficient; bold_src in {'e','y','ey'}"""
     N = C.shape[0]
     D = hp.d_model
     ar = np.arange(N)
 
     def step(carry, key_t):
-        state, history = carry
+        state, history, n_prev = carry
         t = state.step
         idx = (t - lags) % L                       # (N, N)
         y_hist = history[idx, ar, :]               # (N, N, D) y_j(t - lags[i,j])
         aff = G * np.einsum("ij,ijd->id", C, y_hist)          # delayed afferent prediction
-        noise = sigma * jax.random.normal(key_t, (N, D))
+        # AR(1) (OU-like) noise, stationary variance sigma^2
+        eps = jax.random.normal(key_t, (N, D))
+        noise = noise_a * n_prev + sigma * np.sqrt(1.0 - noise_a ** 2) * eps
         x = (aff + noise)[None, :, :]              # (B=1, N, D)
         state, y, surprise = mhsa_step(wb_mhsa, state, x, hp)  # y (1,N,D), surprise (1,N,H)
         y = y[0]
         e = surprise[0].mean(-1)                   # local prediction error per area (N,)
         history = history.at[t % L].set(y)
         state = state._replace(step=t + 1)
-        return (state, history), (y, e)
+        return (state, history, noise), (y, e)
 
-    wb_mhsa = None  # closed over via init below (set by caller through partial)
+    wb_mhsa = None  # closed over via build() below
     def build(mhsa_params):
         nonlocal wb_mhsa
         wb_mhsa = mhsa_params
@@ -77,14 +80,16 @@ def make_sim_fn(C: jax.Array, lags: jax.Array, L: int, hp: Hyperparameters,
     return build
 
 
-def simulate(mhsa_params, C, lags, L, hp, G, sigma, T, key):
+def simulate(mhsa_params, C, lags, L, hp, G, sigma, T, key,
+             noise_tc_s: float = 2.0, dt_ms: float = 2.0, bold_src: str = "e"):
     """Run T integration steps; returns e (T, N) local prediction errors, y (T, N, D)."""
     N = C.shape[0]
     _, state, _ = init_ct_mhsa(hp, key, batch_size=1)   # zero memory, no lags (we manage history)
     history = np.zeros((L, N, hp.d_model))
     keys = jax.random.split(jax.random.fold_in(key, 1), T)
-    sim = make_sim_fn(C, lags, L, hp, G, sigma)(mhsa_params)
-    (fs, _), (y_seq, e_seq) = sim((state, history), keys)
+    noise_a = float(onp.exp(-(dt_ms / 1000.0) / max(noise_tc_s, 1e-6)))
+    sim = make_sim_fn(C, lags, L, hp, G, sigma, noise_a, bold_src)(mhsa_params)
+    (fs, _, _), (y_seq, e_seq) = sim((state, history, np.zeros((N, hp.d_model))), keys)
     return e_seq, y_seq
 
 
@@ -132,6 +137,10 @@ def main():
     p.add_argument("--v-c", type=float, default=5.0, help="conduction velocity mm/ms")
     p.add_argument("--d-model", type=int, default=16)
     p.add_argument("--sim-s", type=float, default=600.0, help="simulated seconds")
+    p.add_argument("--noise-tc", type=float, default=2.0, help="AR(1) noise time constant (s)")
+    p.add_argument("--bold-input", default="e", choices=["e", "y", "ey"],
+                   help="signal fed to the balloon: prediction error (e), mean area output (y), or sum")
+    p.add_argument("--g-rel", action="store_true", help="interpret g-sweep as fractions of Gmax=1/rho(C)")
     p.add_argument("--g-sweep", default="0.5,1.0,2.0")
     p.add_argument("--tau-sweep", default="20,40")
     p.add_argument("--sigma-sweep", default="0.3")
@@ -161,6 +170,10 @@ def main():
         emp_source = "SYNTHETIC-DUMMY (no empirical TS/FC available; pipeline validation only)"
     T = int(a.sim_s * 1000 / a.dt)
     key = jax.random.PRNGKey(a.seed)
+    # stability cap: recurrent loop gain G * rho(C) must stay below 1
+    rho = float(onp.max(onp.abs(onp.linalg.eigvals(C))))
+    Gmax = 1.0 / max(rho, 1e-8)
+    print(f"N={N} T={T} rho(C)={rho:.3f} Gmax={Gmax:.3f}")
 
     os.makedirs(a.out, exist_ok=True)
     results = []
@@ -169,29 +182,40 @@ def main():
             [float(x) for x in a.g_sweep.split(",")],
             [float(x) for x in a.tau_sweep.split(",")],
             [float(x) for x in a.sigma_sweep.split(",")]):
+        # tau in SECONDS on the CLI; memory_update_rate = dt/tau with dt in ms
         hp = Hyperparameters(n_regions=N, n_heads=N, d_model=a.d_model,
                              d_k=a.d_model, d_v=a.d_model,
-                             lam=1.0 / tau, dt=1.0, tau=tau, leak=1.0,
-                             act="relu", steps_per_token=1, sigma_a=0.0)
+                             lam=a.dt / (tau * 1000.0), dt=a.dt, tau=tau * 1000.0,
+                             leak=1.0, act="relu", steps_per_token=1, sigma_a=0.0)
         k_m, k_sim = jax.random.split(key)
         mhsa, _, _ = init_ct_mhsa(hp, k_m, batch_size=1)
         if a.kv_scale != 1.0:
             mhsa = mhsa._replace(W_K=mhsa.W_K * a.kv_scale, W_V=mhsa.W_V * a.kv_scale)
+        G_abs = G * Gmax if a.g_rel else G
         e, y = simulate(mhsa, np.asarray(C), jax.numpy.asarray(lags), L, hp,
-                        G, sigma, T, k_sim)
-        bold = bold_forward(onp.asarray(e), a.dt, a.tr)
+                        G_abs, sigma, T, k_sim, a.noise_tc, a.dt, a.bold_input)
+        e = onp.asarray(e); y = onp.asarray(y)
+        if not onp.isfinite(e).all() or not onp.isfinite(y).all():
+            print(f"G={G_abs:.3f} tau={tau} sigma={sigma} DIVERGED (NaN/inf) -- skipped")
+            results.append({"G": round(G_abs, 4), "tau": tau, "sigma": sigma,
+                            "fc_match": None, "diverged": True})
+            continue
+        src = {"e": e, "y": y.mean(-1), "ey": e + y.mean(-1)}[a.bold_input]
+        bold = bold_forward(src, a.dt, a.tr)
         fc_sim = fc_from_ts(bold)
         score = fc_match(fc_sim, fc_emp)
-        results.append({"G": G, "tau": tau, "sigma": sigma, "fc_match": score})
-        print(f"G={G} tau={tau} sigma={sigma} fc_match={score:.4f}")
+        results.append({"G": round(G_abs, 4), "tau": tau, "sigma": sigma,
+                        "bold_input": a.bold_input, "fc_match": score})
+        print(f"G={G_abs:.3f} tau={tau} sigma={sigma} in={a.bold_input} fc_match={score:.4f}")
         if best is None or score > best["fc_match"]:
             best = dict(results[-1])
             onp.save(os.path.join(a.out, "fc_sim_best.npy"), fc_sim)
 
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "results.json"), "w") as f:
-        json.dump({"results": results, "best": best, "N": N, "T": T,
+        json.dump({"results": results, "best": best, "N": N, "T": T, "Gmax": Gmax,
                    "dt": a.dt, "tr": a.tr, "kv_scale": a.kv_scale, "seed": a.seed,
+                   "bold_input": a.bold_input, "noise_tc": a.noise_tc,
                    "emp_source": emp_source}, f, indent=2)
     emp_label = "synthetic dummy" if emp_source.startswith("SYN") else ("FC matrix" if a.emp_fc else "BOLD")
     # heatmap comparison
