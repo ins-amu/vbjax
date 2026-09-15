@@ -15,7 +15,7 @@ def test_stability():
     inputs = np.zeros((T, 1, hp.n_regions, hp.d_model))
     inputs = inputs.at[0, :, :, :].set(1.0)
     
-    (final_state, final_y), outputs = scan_ct_mhsa(params, state, inputs, hp)
+    (final_state, final_y), (outputs, _surprise) = scan_ct_mhsa(params, state, inputs, hp)
     
     # Check for NaNs
     assert not np.isnan(outputs).any()
@@ -39,7 +39,7 @@ def test_python_loop_comparison():
     inputs = jax.random.normal(key, (T, 1, hp.n_regions, hp.d_model))
     
     # JAX Scan
-    (scan_final_state, scan_final_y), scan_outputs = scan_ct_mhsa(params, state, inputs, hp)
+    (scan_final_state, scan_final_y), (scan_outputs, _surprise) = scan_ct_mhsa(params, state, inputs, hp)
     
     # Python Loop
     state_curr = state

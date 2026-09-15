@@ -41,9 +41,9 @@ def test_delayed_propagation():
         ln_beta=None
     )
 
-    # params.lags check
-    print("Lags:", params.lags)
-    assert params.lags[1, 0] == 5
+    # lags check (returned by init_ct_mhsa, not stored in params)
+    print("Lags:", lags)
+    assert lags[1, 0] == 5
     
     # Run simulation
     T = 20
@@ -51,7 +51,7 @@ def test_delayed_propagation():
     # Inject pulse at t=0 into node 0
     inputs = inputs.at[0, 0, 0, 0].set(10.0)
     
-    (final_state, _), outputs = scan_ct_mhsa(params, state, inputs, hp)
+    (final_state, _), (outputs, _surprise) = scan_ct_mhsa(params, state, inputs, hp, lags=lags)
     # outputs: (T, B, N, D)
     
     y0 = outputs[:, 0, 0, 0]
