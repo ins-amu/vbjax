@@ -1,0 +1,65 @@
+{
+  "results": [
+    {
+      "G": 0.5,
+      "tau": 20.0,
+      "sigma": 0.3,
+      "fc_match": 0.024439485087270837
+    },
+    {
+      "G": 0.5,
+      "tau": 40.0,
+      "sigma": 0.3,
+      "fc_match": -0.005943263714575486
+    },
+    {
+      "G": 1.0,
+      "tau": 20.0,
+      "sigma": 0.3,
+      "fc_match": 0.026346421727943686
+    },
+    {
+      "G": 1.0,
+      "tau": 40.0,
+      "sigma": 0.3,
+      "fc_match": -0.010491716423763535
+    },
+    {
+      "G": 2.0,
+      "tau": 20.0,
+      "sigma": 0.3,
+      "fc_match": NaN
+    },
+    {
+      "G": 2.0,
+      "tau": 40.0,
+      "sigma": 0.3,
+      "fc_match": NaN
+    },
+    {
+      "G": 4.0,
+      "tau": 20.0,
+      "sigma": 0.3,
+      "fc_match": NaN
+    },
+    {
+      "G": 4.0,
+      "tau": 40.0,
+      "sigma": 0.3,
+      "fc_match": NaN
+    }
+  ],
+  "best": {
+    "G": 1.0,
+    "tau": 20.0,
+    "sigma": 0.3,
+    "fc_match": 0.026346421727943686
+  },
+  "N": 100,
+  "T": 300000,
+  "dt": 2.0,
+  "tr": 2.0,
+  "kv_scale": 0.15,
+  "seed": 42,
+  "emp_source": "SYNTHETIC-DUMMY (no empirical TS/FC available; pipeline validation only)"
+}
