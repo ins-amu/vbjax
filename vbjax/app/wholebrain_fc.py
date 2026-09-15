@@ -193,9 +193,10 @@ def main():
         json.dump({"results": results, "best": best, "N": N, "T": T,
                    "dt": a.dt, "tr": a.tr, "kv_scale": a.kv_scale, "seed": a.seed,
                    "emp_source": emp_source}, f, indent=2)
+    emp_label = "synthetic dummy" if emp_source.startswith("SYN") else ("FC matrix" if a.emp_fc else "BOLD")
     # heatmap comparison
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    axes[0].imshow(fc_emp); axes[0].set_title(f"empirical FC ({emp_source.split()[-1] if emp_source.startswith('SYN') else 'BOLD'})")
+    axes[0].imshow(fc_emp); axes[0].set_title(f"empirical FC ({emp_label})")
     axes[1].imshow(onp.load(os.path.join(a.out, "fc_sim_best.npy"))); axes[1].set_title(f"sim FC (best, r={best['fc_match']:.3f})")
     plt.tight_layout(); plt.savefig(os.path.join(a.out, "fc_comparison.png"), dpi=120)
     print("best:", best)
