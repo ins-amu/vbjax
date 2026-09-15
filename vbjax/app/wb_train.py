@@ -91,6 +91,7 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     # gradient reduction; per-chunk keeps backward memory ~100x smaller.
     chunk = 100
     n_chunks = T_int // chunk
+    keys_w = jax.random.split(keys, T_int)
     keys_c = keys_w.reshape(n_chunks, chunk, 2)
 
     def chunk_step(carry_c, keys_chunk):
