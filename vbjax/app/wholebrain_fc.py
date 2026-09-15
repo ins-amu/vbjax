@@ -56,7 +56,7 @@ def make_sim_fn(C: jax.Array, lags: jax.Array, L: int, hp: Hyperparameters,
     ar = np.arange(N)
 
     def step(carry, key_t):
-        state, history, n_prev = carry
+        state, history, n_prev, y_ema = carry
         t = state.step
         idx = (t - lags) % L                       # (N, N)
         y_hist = history[idx, ar, :]               # (N, N, D) y_j(t - lags[i,j])
@@ -68,9 +68,15 @@ def make_sim_fn(C: jax.Array, lags: jax.Array, L: int, hp: Hyperparameters,
         state, y, surprise = mhsa_step(wb_mhsa, state, x, hp)  # y (1,N,D), surprise (1,N,H)
         y = y[0]
         e = surprise[0].mean(-1)                   # local prediction error per area (N,)
-        history = history.at[t % L].set(y)
+        # per-area EMA normalization: local output -> O(1) so the coupling gain is
+        # meaningful (neural-mass-model convention; the raw block output scale
+        # depends on u, kv_scale etc. and is otherwise ~1e-6 -> uncoupled areas)
+        rms = np.sqrt(np.mean(y ** 2, axis=-1, keepdims=True))   # (N, 1)
+        y_ema = 0.999 * y_ema + 0.001 * rms
+        y_out = y / (y_ema + 1e-8)
+        history = history.at[t % L].set(y_out)
         state = state._replace(step=t + 1)
-        return (state, history, noise), (y, e)
+        return (state, history, noise, y_ema), (y_out, e)
 
     wb_mhsa = None  # closed over via build() below
     def build(mhsa_params):
@@ -89,7 +95,8 @@ def simulate(mhsa_params, C, lags, L, hp, G, sigma, T, key,
     keys = jax.random.split(jax.random.fold_in(key, 1), T)
     noise_a = float(onp.exp(-(dt_ms / 1000.0) / max(noise_tc_s, 1e-6)))
     sim = make_sim_fn(C, lags, L, hp, G, sigma, noise_a, bold_src)(mhsa_params)
-    (fs, _, _), (y_seq, e_seq) = sim((state, history, np.zeros((N, hp.d_model))), keys)
+    (fs, _, _, _), (y_seq, e_seq) = sim((state, history, np.zeros((N, hp.d_model)),
+                                         np.ones((N, 1))), keys)
     return e_seq, y_seq
 
 
