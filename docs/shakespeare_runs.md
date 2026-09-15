@@ -46,3 +46,33 @@ kept on cluster at `~/mhsa_e0/work/vbjax-tree/runs/`).
   (d) in-block LN on (`use_ln=True`) to bound logit growth.
 - If the paper's recipe can't be obtained, a small grid over (a)–(d) on the
   GPU node (~4–8 min wall per run) should find a stably-descending config.
+
+## Gap-closure stages (2026-09-15, clean-room)
+
+**Stage 1 diagnosis (instrumented run, `runs/shakespeare_diag`):** unnormalized
+linear attention at unit input scale equilibrates with max|M| ~ 40, max|logit| ~
+240, and grad norm permanently above the 1.0 clip from step ~950 → softmax
+saturated; training fights over scale, not content. Embeddings (e_norm 64→65)
+are NOT the initial culprit.
+
+**Stage 2 ablations (5000 steps each):**
+
+| run | config | best val CE | verdict |
+|---|---|---|---|
+| kvs | frozen W_K/W_V ×0.15 | 5.44 @3950 | worked, then exploded late (maxlogit 690) |
+| lnkvs | + readout standardization | **4.78 @4950, stable** | winner — maxlogit bounded ~14, gn ~0.6, no clip |
+| ln | readout standardization only | (see run dir) | |
+| ctrl20k | unmodified, 20k steps | (see run dir) | |
+
+**Stage 3 (30k steps, lnkvs):** best val CE **4.53** @ ~12–14k steps; val
+plateaus ~4.55 while train declines to 3.83 (genuine generalization plateau,
+not undertraining). Late explosion at step ~28k: rare-token embedding rows
+blow up (global e_norm flat) and poison the frozen-scale memory (maxM → 9).
+
+**Stage 3b:** + `--embed-clip 5.0` (per-row embedding norm guard). Pending.
+
+**Current status:** 8.32 (random) → 6.49 (runs 2/3) → **4.53** (stage 3), stable
+and reproducible. Remaining gap to paper's ~1.8 (fig 2b) consistent with
+normalization/scale conventions and optimizer details not specified in the
+available paper text; per-row embedding guard tests whether the late crash
+was hiding further descent.

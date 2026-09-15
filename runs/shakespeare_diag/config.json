@@ -1,0 +1,35 @@
+{
+  "hp": {
+    "vocab_size": 4096,
+    "d_model": 192,
+    "n_heads": 6,
+    "d_k": 32,
+    "d_v": 32,
+    "seq_len": 32,
+    "batch_size": 32,
+    "lr": 0.0001,
+    "warmup_steps": 500,
+    "train_steps": 5000,
+    "decay_steps": 0,
+    "early_stop_patience": 300,
+    "seed": 42
+  },
+  "mhsa_hp": {
+    "n_regions": 1,
+    "n_heads": 6,
+    "d_k": 32,
+    "d_v": 32,
+    "d_model": 192,
+    "lam": 0.05,
+    "leak": 1.0,
+    "tau": 20.0,
+    "act": "relu",
+    "use_block_residual": false,
+    "use_ln": false,
+    "sigma_a": 0.0,
+    "dt": 1.0,
+    "v_c": 10.0,
+    "steps_per_token": 1
+  },
+  "seed": 42
+}
