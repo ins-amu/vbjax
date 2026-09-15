@@ -209,10 +209,20 @@ def main():
             continue
         src = {"e": e, "y": y.mean(-1), "ey": e + y.mean(-1)}[a.bold_input]
         src = onp.asarray(src, dtype="f4")
-        # z-score per area before the balloon: FC is correlation-based, and raw
-        # surprise can underflow (u~1e-5) to zero variance -> NaN
-        src = (src - src.mean(0, keepdims=True)) / (src.std(0, keepdims=True) + 1e-8)
+        # Rescale each area to [0.2, 1.0] before the balloon. Net-negative input
+        # drives the balloon volume V negative and V**alpha (alpha=3.2) of a
+        # negative base -> NaN (this NaNed the entire round-3 sweep, where the
+        # input was z-scored to zero mean). Positive affine rescale preserves
+        # the signal's correlation structure.
+        lo = src.min(0, keepdims=True)
+        hi = src.max(0, keepdims=True)
+        src = 0.2 + 0.8 * (src - lo) / (hi - lo + 1e-8)
         bold = bold_forward(src, a.dt, a.tr)
+        if not onp.isfinite(bold).all():
+            print(f"G={G_abs:.3f} tau={tau} sigma={sigma} BOLD_NAN (non-finite BOLD output)")
+            results.append({"G": round(G_abs, 4), "tau": tau, "sigma": sigma,
+                            "bold_input": a.bold_input, "fc_match": None, "bold_nan": True})
+            continue
         fc_sim = fc_from_ts(bold)
         score = fc_match(fc_sim, fc_emp)
         results.append({"G": round(G_abs, 4), "tau": tau, "sigma": sigma,
