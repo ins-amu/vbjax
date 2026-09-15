@@ -26,7 +26,7 @@ import numpy as onp
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from tokenizers import Tokenizer, models, pre_tokenizers, trainers
+from tokenizers import Tokenizer, models, pre_tokenizers, trainers, decoders
 
 from vbjax.ct_mhsa import (
     Hyperparameters, CTMHSAParams, NetworkState, init_ct_mhsa, mhsa_step,
@@ -43,6 +43,7 @@ def load_text(path: str) -> str:
 def make_bpe_tokenizer(text: str, vocab_size: int = 4096) -> Tokenizer:
     tok = Tokenizer(models.BPE(unk_token="<unk>"))
     tok.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=False)
+    tok.decoder = decoders.ByteLevel()  # render Ġ/Ċ back to spaces/newlines
     trainer = trainers.BpeTrainer(vocab_size=vocab_size, special_tokens=["<unk>"])
     tok.train_from_iterator([text], trainer)
     return tok
