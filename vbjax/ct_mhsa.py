@@ -36,9 +36,9 @@ class Hyperparameters(NamedTuple):
         field is used directly as the update rate u (backward compatible with the pre-paper core).
         Retention lambda (paper) = 1 - g_ell * u.
         """
-        if self.tau > 0:
-            return self.dt / self.tau
-        return self.lam
+        # branch-free (jnp.where) so tau can be a traced scalar under jax.checkpoint
+        tau_safe = np.where(self.tau > 0, self.tau, 1.0)
+        return np.where(self.tau > 0, self.dt / tau_safe, self.lam)
 
     @property
     def retention(self) -> float:
