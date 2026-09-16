@@ -21,14 +21,14 @@ Run inside the GPU container from the tree root:
   python -m vbjax.app.wb_probe --sc SC.npy --lengths LEN.npy --ts1 TS.npy \
       --params runs_persist/wb_train/params.pkl --out runs/wb_probe
 """
-import argparse, json, os, pickle
+import argparse, json, os, pickle, time
 import numpy as onp
 import jax
 import jax.numpy as np
 
 from vbjax import make_bold, bold_default_theta, make_offline
 from vbjax.ct_mhsa import Hyperparameters, NetworkState, init_ct_mhsa, mhsa_step
-from vbjax.app.wholebrain_fc import load_connectome
+from vbjax.app.wholebrain_fc import load_connectome, fc_from_ts
 from vbjax.app.wb_train import zscore, build_mhsa
 
 
@@ -199,6 +199,83 @@ def null_fraction(de, e_vol):
     return (resid_sq ** 0.5) / (tot_sq ** 0.5 + 1e-30), tot_sq ** 0.5
 
 
+# ------------------------------------------------- eval-side G perturbation
+# Certified rule (wb_eval_std, strict): 2400 s at dt=2 ms, 10-TR rolling std,
+# ref = median of the rolling std over the final 50% of the trace, W = first TR
+# index starting 50 consecutive TRs within 10% of ref, no cap; FC on bold[W:].
+
+
+def cert_eval(params, C, lags, L, hp0, ts1, ts2, T_s, dt, tr, seed,
+              win=10, tol=0.1, run=50, cap=0.0):
+    """Certified fc_match for both subjects at the given params."""
+    from vbjax.app.wb_eval_std import score, settled_entry
+    fc1, fc2 = fc_from_ts(ts1), fc_from_ts(ts2)
+    res = {}
+    for name, ts_fc, sd in (("subj1", fc1, seed), ("subj2", fc2, seed + 1)):
+        r = score(params, C, lags, L, hp0, ts_fc, T_s, dt, tr, sd)
+        if r is None:
+            res[name] = {"fc_match": None, "W": None, "W_uncapped": None,
+                         "found": False, "non_finite": True}
+            continue
+        e = settled_entry(r["bold"], ts_fc, T_s, tr, "strict",
+                          win=win, tol=tol, run=run, cap=cap)
+        res[name] = {"fc_match": e["fc_match"], "W": e["W"],
+                     "W_uncapped": e["W_uncapped"], "found": e["found"],
+                     "cap_binds": e["cap_binds"],
+                     "settled_frac": e["settled_frac"],
+                     "non_finite": False}
+        del r
+    return res
+
+
+def run_eval_g_perturb(args, C, lags, L, hp0):
+    """Perturb only G at fixed trained params; re-score with the certified rule."""
+    mults = [float(x) for x in args.g_mults.split(",")]
+    runs_root = os.path.expanduser(args.runs_root)
+    tags = [t.strip() for t in args.eval_tags.split(",") if t.strip()]
+    ts1 = onp.load(args.ts1)
+    ts2 = onp.load(args.ts2)
+    os.makedirs(args.out, exist_ok=True)
+    allres = {"T_s": args.eval_s, "dt": args.dt, "tr": args.tr,
+              "strict": {"win": 10, "tol": 0.1, "run": 50, "cap": 0.0},
+              "mults": mults, "tags": {}}
+    for tag in tags:
+        pkl = os.path.join(runs_root, tag, "params.pkl")
+        if not os.path.exists(pkl):
+            print(f"[{tag}] MISSING {pkl}", flush=True)
+            allres["tags"][tag] = {"status": "missing", "path": pkl}
+            continue
+        with open(pkl, "rb") as f:
+            params = pickle.load(f)
+        params = {k: np.asarray(v) for k, v in params.items()}
+        key_g = "log_G" if "log_G" in params else "G_rel"
+        G0 = float(np.exp(params["log_G"]) if key_g == "log_G"
+                   else params["G_rel"])
+        entry = {"status": "ok", "G0": G0, "G_param": key_g, "rows": {}}
+        print(f"[{tag}] G0={G0:.6f} ({key_g})", flush=True)
+        for m in mults:
+            q = dict(params)
+            g = G0 * m
+            if key_g == "log_G":
+                q["log_G"] = np.asarray(onp.log(g))
+            else:
+                q["G_rel"] = np.asarray(g)
+            t0 = time.time()
+            r = cert_eval(q, C, lags, L, hp0, ts1, ts2, args.eval_s,
+                          args.dt, args.tr, args.seed)
+            entry["rows"][f"{m:.2f}"] = {"mult": m, "G": g, **r}
+            f1, f2 = (r["subj1"]["fc_match"], r["subj2"]["fc_match"])
+            print(f"[{tag}] mult={m:.2f} G={g:.4f} "
+                  f"fc1={f1} fc2={f2} W1={r['subj1']['W']} "
+                  f"W2={r['subj2']['W']} ({time.time()-t0:.0f}s)", flush=True)
+            with open(os.path.join(args.out, f"gpert_{tag}.json"), "w") as f:
+                json.dump(entry, f, indent=1)
+        allres["tags"][tag] = entry
+    with open(os.path.join(args.out, "gpert_all.json"), "w") as f:
+        json.dump(allres, f, indent=1)
+    print("WB_GPERT_DONE", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sc", required=True)
@@ -218,6 +295,20 @@ def main():
     ap.add_argument("--burnin", type=int, default=0,
                     help="stop-gradient warm-up steps before the window")
     ap.add_argument("--g-scan", default="0.5,1.0,1.5,2.09,3.0,4.0")
+    ap.add_argument("--g-grad", action="store_true",
+                    help="report d(loss)/dG at the trained params (analytic + FD)")
+    ap.add_argument("--eval-g-perturb", action="store_true",
+                    help="eval-side mode: perturb only G at trained params and "
+                         "re-score with the certified wb_eval_std rule")
+    ap.add_argument("--eval-tags", default=None,
+                    help="comma-separated run tags for --eval-g-perturb")
+    ap.add_argument("--runs-root", default=os.path.expanduser(
+        "~/mhsa_e0/runs_persist"))
+    ap.add_argument("--g-mults", default="0.6,0.8,0.9,1.0,1.1,1.2,1.4",
+                    help="G multipliers for --eval-g-perturb (+-10/20/40%%)")
+    ap.add_argument("--eval-s", type=float, default=2400.0)
+    ap.add_argument("--ts2", default=None,
+                    help="subj-2 empirical trace (required for --eval-g-perturb)")
     args = ap.parse_args()
 
     C, lags, L = load_connectome(args.sc, args.lengths, args.dt, args.v_c, "sqrt99")
@@ -243,6 +334,14 @@ def main():
                   "log_noise_tc": np.asarray(onp.log(2.0))}
         src = "init"
     params = {k: np.asarray(v) for k, v in params.items()}
+    if "log_G" in params and "G_rel" not in params:
+        params["G_rel"] = np.exp(params["log_G"])
+
+    if args.eval_g_perturb:
+        if not args.ts2 or not args.eval_tags:
+            raise SystemExit("--eval-g-perturb needs --ts2 and --eval-tags")
+        run_eval_g_perturb(args, C, lags, L, hp0)
+        return
 
     ts1 = onp.load(args.ts1)
     n_win = ts1.shape[0] // args.win
@@ -323,6 +422,34 @@ def main():
                   + " ".join(f"G={g}:{v:.5f}" for g, v in row.items()),
                   flush=True)
         save()
+
+        # --- signed d(loss)/dG at the trained params (identifiability test)
+        if args.g_grad:
+            g0 = params["G_rel"]
+            for mode in ("current", "gscale"):
+                lf = make_loss(mode, emp_win, emp_raw, args.dt_train, args.tr)
+
+                def loss_of_g(g, _c=coupling, _lf=lf, _b=args.burnin):
+                    p = dict(params)
+                    p["G_rel"] = g
+                    ev, es = window_forward(p, carry, kw, C, hp0, args.win,
+                                            args.dt_train, coupling=_c,
+                                            burnin=_b)
+                    return _lf(ev, es)
+
+                val = float(loss_of_g(g0))
+                dl = float(jax.grad(loss_of_g)(g0))
+                h = 0.05 * abs(float(g0)) or 0.05
+                fd = float((loss_of_g(g0 + h) - loss_of_g(g0 - h)) / (2 * h))
+                out.setdefault("g_grad", {})[f"{tag}:{mode}"] = {
+                    "G": float(g0), "loss": val, "dL_dG": dl,
+                    "dL_dG_fd": fd, "fd_h": float(h),
+                    "rel_slope": dl * float(g0) / (abs(val) + 1e-30)}
+                print(f"[ggrad:{tag}:{mode}] G={float(g0):.4f} loss={val:.6f} "
+                      f"dL/dG={dl:.6e} (fd={fd:.6e}, h={h:.4f}) "
+                      f"G*dL/dG/loss={dl*float(g0)/(abs(val)+1e-30):.6e}",
+                      flush=True)
+            save()
 
         # --- per-mode loss + gradient norms (isolated)
         for mode in args.modes.split(","):
