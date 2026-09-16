@@ -35,12 +35,15 @@ from vbjax.app.wb_train import zscore, build_mhsa
 # ---------------------------------------------------------------- forward
 
 def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
-                   with_diag=False, coupling="raw"):
+                   with_diag=False, coupling="raw", burnin=0):
     """One window. Returns (e_vol (V,N), e_seq (T,N)) and optional diagnostics.
 
     coupling: 'raw' = couple through the raw block output (historical trainer
     behaviour); 'ema' = couple through the EMA-normalised output, which is what
     wholebrain_fc.simulate stores in its history buffer.
+    burnin: stop-gradient warm-up steps before the differentiable window; lets
+    the EMA normaliser (time constant 1000 steps) converge to the block output
+    scale, as it has in the eval simulator (300k steps).
     """
     N = C.shape[0]
     D = params["W_q"].shape[-1]
@@ -90,6 +93,15 @@ def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
 
     def chunk_step(carry_c, kc):
         return jax.lax.scan(neural_step, carry_c, kc)
+
+    if burnin > 0:
+        # warm-up (no gradient): converge M, noise and y_ema to their stationary
+        # regime so the differentiable window starts from a realistic state
+        bk = jax.random.split(jax.random.fold_in(keys, 99), burnin)
+        burnin_scan = jax.jit(
+            lambda c, k: jax.lax.scan(neural_step, c, k)[0])
+        M0, n0, fe0, y0 = jax.lax.stop_gradient(
+            burnin_scan((M0, n0, fe0, y0), bk))
 
     carry0 = ((M0, n0, fe0, y0, np.zeros(()), np.zeros(()), np.zeros(()),
                np.zeros(())) if with_diag else (M0, n0, fe0, y0))
@@ -195,6 +207,8 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--modes", default="current,balloon_gs")
     ap.add_argument("--couplings", default="raw,ema")
+    ap.add_argument("--burnin", type=int, default=0,
+                    help="stop-gradient warm-up steps before the window")
     ap.add_argument("--g-scan", default="0.5,1.0,1.5,2.09,3.0,4.0")
     args = ap.parse_args()
 
@@ -249,38 +263,39 @@ def main():
     gvals = [float(x) for x in args.g_scan.split(",")]
 
     for coupling in args.couplings.split(","):
-        out["coupling"][coupling] = {}
-        out["g_scan"][coupling] = {}
+        tag = f"{coupling}-b{args.burnin}"
+        out["coupling"][tag] = {}
+        out["g_scan"][tag] = {}
 
         # --- diagnostics: is the coupling drive visible against the noise?
         e_vol, e_seq, diag = window_forward(
             params, carry, kw, C, hp0, args.win, args.dt_train,
-            with_diag=True, coupling=coupling)
+            with_diag=True, coupling=coupling, burnin=args.burnin)
         e_vol_s = jax.lax.stop_gradient(e_vol)
         aff_rms, noise_rms, y_rms = (float(diag[0]), float(diag[1]),
                                      float(diag[2]))
-        out["coupling"][coupling]["diag"] = {
+        out["coupling"][tag]["diag"] = {
             "aff_rms": aff_rms, "noise_rms": noise_rms, "y_coupled_rms": y_rms,
             "snr_aff_over_noise": aff_rms / (noise_rms + 1e-30),
             "e_vol_mean": float(e_vol.mean()), "e_vol_std": float(e_vol.std()),
         }
-        print(f"[{coupling}] aff_rms={aff_rms:.4e} noise_rms={noise_rms:.4e} "
+        print(f"[{tag}] aff_rms={aff_rms:.4e} noise_rms={noise_rms:.4e} "
               f"snr={aff_rms/(noise_rms+1e-30):.4f} y_rms={y_rms:.4e}", flush=True)
 
         # --- G pushforward: magnitude and null-space fraction
-        def fwd_G(g, _c=coupling):
+        def fwd_G(g, _c=coupling, _b=args.burnin):
             p = dict(params)
             p["G_rel"] = g
             return window_forward(p, carry, kw, C, hp0, args.win,
-                                  args.dt_train, coupling=_c)[0]
+                                  args.dt_train, coupling=_c, burnin=_b)[0]
 
         de = jax.jvp(fwd_G, (params["G_rel"],), (np.asarray(1.0),))[1]
         nf, dn = null_fraction(de, onp.asarray(e_vol_s))
-        out["coupling"][coupling]["G_pushforward"] = {
+        out["coupling"][tag]["G_pushforward"] = {
             "norm": dn, "null_frac": nf,
             "rel_to_e_vol_std": dn / (float(e_vol_s.std()) + 1e-30),
         }
-        print(f"[{coupling}] ||d(e_vol)/dG||={dn:.4e} null_frac={nf:.4f}",
+        print(f"[{tag}] ||d(e_vol)/dG||={dn:.4e} null_frac={nf:.4f}",
               flush=True)
         save()
 
@@ -292,10 +307,11 @@ def main():
                 p = dict(params)
                 p["G_rel"] = np.asarray(g)
                 ev, es = window_forward(p, carry, kw, C, hp0, args.win,
-                                        args.dt_train, coupling=coupling)
+                                        args.dt_train, coupling=coupling,
+                                        burnin=args.burnin)
                 row[g] = float(loss_fn(ev, es))
             out["g_scan"][coupling][mode] = row
-            print(f"[gscan:{coupling}:{mode}] "
+            print(f"[gscan:{tag}:{mode}] "
                   + " ".join(f"G={g}:{v:.5f}" for g, v in row.items()),
                   flush=True)
         save()
@@ -306,9 +322,10 @@ def main():
             try:
                 loss_fn = make_loss(mode, emp_win, emp_raw, args.dt_train, args.tr)
 
-                def total(p, _c=coupling, _lf=loss_fn):
+                def total(p, _c=coupling, _lf=loss_fn, _b=args.burnin):
                     ev, es = window_forward(p, carry, kw, C, hp0, args.win,
-                                            args.dt_train, coupling=_c)
+                                            args.dt_train, coupling=_c,
+                                            burnin=_b)
                     return _lf(ev, es)
 
                 val, grads = jax.value_and_grad(total)(params)
