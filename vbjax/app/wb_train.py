@@ -41,12 +41,48 @@ def build_mhsa(hp0, key, W_q, W_y, kv_scale):
                          W_K=mhsa.W_K * kv_scale, W_V=mhsa.W_V * kv_scale)
 
 
-def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
-    """One window: differentiable neural sim + balloon + MSE.
+def bold_forward_jax(signal, dt_ms, tr_s):
+    """Differentiable balloon: (T, N) neural drive at dt_ms -> BOLD sampled at TR.
+
+    Same monitor as wholebrain_fc.bold_forward but returns a traced array, so the
+    hemodynamic forward can live inside the training loss."""
+    T, N = signal.shape
+    every = int(round(tr_s * 1000.0 / dt_ms))
+    W = T // every
+    windowed = signal[:W * every].reshape(W, every, N)
+    bold_buf, bold_step, bold_sample = make_bold(
+        shape=(N,), dt=dt_ms / 1000.0, p=bold_default_theta)
+    offline = make_offline(step_fn=bold_step, sample_fn=bold_sample)
+    _, bold = jax.lax.scan(offline, bold_buf, windowed)
+    return bold
+
+
+def rescale_per_region(x, lo=0.2, hi=1.0):
+    """Per-region affine map into [lo, hi] (balloon needs a non-negative input).
+
+    Matches wholebrain_fc's pre-balloon rescale, which preserves the signal's
+    correlation structure but quotients out per-region amplitude."""
+    mn = x.min(0, keepdims=True)
+    mx = x.max(0, keepdims=True)
+    return lo + (hi - lo) * (x - mn) / (mx - mn + 1e-8)
+
+
+def rescale_shared(x, lo=0.2, hi=1.0):
+    """Single shared affine map into [lo, hi]: keeps per-region amplitude ratios,
+    so the coupling gain stays observable through the balloon."""
+    mn = x.min()
+    mx = x.max()
+    return lo + (hi - lo) * (x - mn) / (mx - mn + 1e-8)
+
+
+def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
+                dt_ms, mode="current", tr_ms=2000.0, lam_amp=0.5):
+    """One window: differentiable neural sim + selectable loss.
 
     params: dict(W_q, W_y, kv_scale, G_rel, log_tau, log_sigma, log_noise_tc)
     carry:  (M (N,H,Dv,Dk), n_prev (N,D), y_ema (N,1), y_prev (N,D))
-    Returns (new_carry (stop-grad), loss, bold_vol)."""
+    mode:   loss formulation (see --loss-mode); the shipped default is 'current'
+    Returns (new_carry (stop-grad), loss)."""
     N = C.shape[0]
     D = params["W_q"].shape[-1]
     G = params["G_rel"]
@@ -113,14 +149,38 @@ def window_loss(params, carry, emp_z_win, keys, C, lags, L, hp0, dt_ms):
     # volume, z-score, match to empirical BOLD. The balloon stays in the
     # fc_match evaluation (bold_forward at fine dt).
     e_vol = e_seq.reshape(win_vols, steps_per_vol, N).mean(axis=1)   # (win_vols, N)
-    bold_vol = zscore(e_vol)
 
-    loss = np.mean((bold_vol - emp_z_win) ** 2)
+    if mode == "current":
+        # as shipped: prediction z-scored per region per window, target globally
+        # z-scored -> any per-region affine change of the prediction is invisible
+        pred, tgt = zscore(e_vol), emp_z_win
+    elif mode == "sym_win":
+        pred, tgt = zscore(e_vol), zscore(emp_raw_win)
+    elif mode == "gscale":
+        # one shared scale: per-region amplitude ratios survive
+        pred, tgt = e_vol / (np.std(e_vol) + 1e-8), emp_z_win
+    elif mode in ("balloon_pr", "balloon_gs"):
+        src = (rescale_per_region(e_seq) if mode == "balloon_pr"
+               else rescale_shared(e_seq))
+        bold = bold_forward_jax(src, dt_ms, tr_ms)
+        pred, tgt = zscore(bold), zscore(emp_raw_win[: bold.shape[0]])
+    elif mode == "amp":
+        pred, tgt = zscore(e_vol), zscore(emp_raw_win)
+    else:
+        raise ValueError(f"unknown loss mode {mode!r}")
+
+    loss = np.mean((pred - tgt) ** 2)
+    if mode == "amp":
+        # explicit scale term: makes the loop gain observable through the
+        # per-region dispersion, which the z-scored term discards
+        ls_p = np.log(pred.std(0) + 1e-8)
+        ls_t = np.log(tgt.std(0) + 1e-8)
+        loss = loss + lam_amp * np.mean((ls_p - ls_t) ** 2)
     new_carry = (jax.lax.stop_gradient(fM),
                  jax.lax.stop_gradient(fn),
                  jax.lax.stop_gradient(fe),
                  jax.lax.stop_gradient(fyp))
-    return new_carry, loss, bold_vol
+    return new_carry, loss
 
 
 class Adam:
@@ -165,6 +225,13 @@ def main():
     ap.add_argument("--d-model", type=int, default=16)
     ap.add_argument("--win", type=int, default=64, help="window size in TR volumes")
     ap.add_argument("--iters", type=int, default=200)
+    ap.add_argument("--loss-mode", default="current",
+                    choices=["current", "sym_win", "gscale", "balloon_pr",
+                             "balloon_gs", "amp"],
+                    help="prediction/target normalisation + forward model. 'current' is "
+                         "the shipped objective; others are the probe's candidates")
+    ap.add_argument("--loss-amp-lambda", type=float, default=0.5,
+                    help="weight of the per-region log-std term in --loss-mode amp")
     ap.add_argument("--final-sim-s", type=float, default=600.0)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--eval-only", action="store_true")
@@ -194,6 +261,7 @@ def main():
 
     n_win = ts1.shape[0] // args.win
     emp_z_wins = zscore(ts1)[:n_win * args.win].reshape(n_win, args.win, N)
+    emp_raw_wins = ts1[:n_win * args.win].reshape(n_win, args.win, N)
     L_win = max(int(lags.max()), 1) + 1
 
     def full_carry(params):
@@ -208,8 +276,10 @@ def main():
         c = carry
         for w in range(emp_z_wins.shape[0]):
             k_w = jax.random.fold_in(kw, w)
-            c, loss, _ = window_loss(params, c, emp_z_wins[w], k_w,
-                                     C, lags, L_win, hp0, args.dt_train)
+            c, loss = window_loss(params, c, emp_z_wins[w], emp_raw_wins[w], k_w,
+                                  C, lags, L_win, hp0, args.dt_train,
+                                  args.loss_mode, args.tr * 1000.0,
+                                  args.loss_amp_lambda)
             losses.append(loss)
         return c, np.mean(np.stack(losses))
 

@@ -1,18 +1,21 @@
 """Localise where d(loss)/d(G_rel) vanishes, and compare candidate loss variants.
 
-Context: in the 150-iter run G_rel moved 2.090 -> 2.096 while log_tau/log_sigma
-moved 0.21-0.37. This probe measures, with jax, the fraction of G_rel's
-pushforward on the window surprise trace `e_vol` that lies in the null space of
-the per-region z-score used by the loss.
+Findings so far (trained params, window 0, dt_train=100ms):
+  mode        loss      |gG_rel|   |gkv_scale|  |glog_tau|
+  current    0.774     6.07e-13    2.51e-02     3.83e-05
+  sym_win    1.000     4.90e-13    2.32e-02     3.49e-05
+  gscale     0.777     2.52e-13    1.52e+00     2.42e-03
+=> G_rel's gradient is ~1e-13 under *every* normalisation tried, so the
+   prediction normalisation is not the cause. This probe adds the upstream
+   diagnostics that decide between two candidates:
+   (a) the coupling drive G*C@y is swamped by the injected noise before it can
+       shape the surprise readout, and/or
+   (b) G's pushforward is a per-region affine change, exactly in the null space
+       of any per-region normalisation.
 
-The z-score `zscore(e)` (per region, over the window) is invariant to
-e -> a_r * 1 + b_r * e  for per-region constants a_r, b_r. Its Jacobian null
-space at e is therefore span{1, e_r} per region. If G_rel's pushforward
-de = d(e_vol)/d(G) lies in that span (i.e. it is a per-region affine change),
-then d(loss)/d(G) = 0 exactly, no matter what the optimiser does.
-
-Reported per loss variant: loss value, per-parameter gradient norms, and
-`null_frac` = ||P_null(de)|| / ||de|| for the shipped forward.
+Reported: aff/noise RMS ratio, ||d(e_vol)/d(G)|| and its null-space fraction,
+the loss-vs-G scan (flat => unidentifiable, sloped => gradient pathology), and
+per-mode loss + gradient norms including the balloon variants.
 
 Run inside the GPU container from the tree root:
   python -m vbjax.app.wb_probe --sc SC.npy --lengths LEN.npy --ts1 TS.npy \
@@ -31,8 +34,9 @@ from vbjax.app.wb_train import zscore, build_mhsa
 
 # ---------------------------------------------------------------- forward
 
-def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25):
-    """One window: returns (e_vol (V,N) TR-averaged surprise, e_seq (T,N))."""
+def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
+                   with_diag=False):
+    """One window. Returns (e_vol (V,N), e_seq (T,N)) and optional diagnostics."""
     N = C.shape[0]
     D = params["W_q"].shape[-1]
     G = params["G_rel"]
@@ -55,7 +59,10 @@ def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25):
     keys_c = jax.random.split(keys, T_int).reshape(n_chunks, chunk, 2)
 
     def neural_step(carry_n, key_t):
-        M, n_prev, y_ema, y_prev = carry_n
+        if with_diag:
+            M, n_prev, y_ema, y_prev, s_aff, s_noi, cnt = carry_n
+        else:
+            M, n_prev, y_ema, y_prev = carry_n
         state = NetworkState(M=M, history=None, step=0)
         aff = G * np.einsum("ij,jd->id", C, y_prev)
         eps = jax.random.normal(key_t, (N, D))
@@ -66,22 +73,33 @@ def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25):
         e = e[0].mean(-1)
         rms = np.sqrt(np.mean(y ** 2, axis=-1, keepdims=True))
         y_ema = 0.999 * y_ema + 0.001 * rms
+        if with_diag:
+            return (state.M, noise, y_ema, y,
+                    s_aff + np.mean(aff ** 2), s_noi + np.mean(noise ** 2),
+                    cnt + 1), e
         return (state.M, noise, y_ema, y), e
 
     def chunk_step(carry_c, kc):
         return jax.lax.scan(neural_step, carry_c, kc)
 
-    (fM, fn, fe, fyp), e_chunks = jax.lax.scan(
-        jax.checkpoint(chunk_step), (M0, n0, fe0, y0), keys_c)
+    carry0 = ((M0, n0, fe0, y0, np.zeros(()), np.zeros(()), np.zeros(()))
+              if with_diag else (M0, n0, fe0, y0))
+    fin, e_chunks = jax.lax.scan(jax.checkpoint(chunk_step), carry0, keys_c)
     e_seq = e_chunks.reshape(T_int, N)
     e_vol = e_seq.reshape(win_vols, steps_per_vol, N).mean(axis=1)
+    if with_diag:
+        aff_rms = np.sqrt(fin[4] / fin[6])
+        noise_rms = np.sqrt(fin[5] / fin[6])
+        return e_vol, e_seq, (aff_rms, noise_rms)
     return e_vol, e_seq
 
 
 def bold_forward_jax(signal, dt_ms, tr_s):
-    """Differentiable balloon: (T,N) neural signal at dt_ms -> BOLD at TR."""
+    """Differentiable balloon: (T,N) neural signal at dt_ms -> BOLD sampled at TR."""
     T, N = signal.shape
     every = int(round(tr_s * 1000.0 / dt_ms))
+    if every < 1:
+        raise ValueError(f"tr_s={tr_s} too small for dt_ms={dt_ms}")
     W = T // every
     windowed = signal[:W * every].reshape(W, every, N)
     bold_buf, bold_step, bold_sample = make_bold(
@@ -105,8 +123,8 @@ def rescale_shared(x, lo=0.2, hi=1.0):
 
 # ---------------------------------------------------------------- losses
 
-def make_loss(mode, emp_win, emp_raw_win, dt_ms, tr_ms, lam_amp=0.5):
-    """Return loss(e_vol, e_seq) -> scalar."""
+def make_loss(mode, emp_win, emp_raw_win, dt_ms, tr_s, lam_amp=0.5):
+    """tr_s in SECONDS."""
 
     def loss_fn(e_vol, e_seq):
         if mode == "current":
@@ -114,13 +132,16 @@ def make_loss(mode, emp_win, emp_raw_win, dt_ms, tr_ms, lam_amp=0.5):
         elif mode == "sym_win":
             pred, tgt = zscore(e_vol), zscore(emp_raw_win)
         elif mode == "gscale":
-            pred = e_vol / (np.std(e_vol) + 1e-8)
-            tgt = emp_win
+            pred, tgt = e_vol / (np.std(e_vol) + 1e-8), emp_win
+        elif mode == "raw":
+            # no prediction normalisation at all: the only variant in which a
+            # pure gain on the drive is directly observable
+            pred, tgt = e_vol, emp_raw_win
         elif mode == "balloon_pr":
-            bold = bold_forward_jax(rescale_per_region(e_seq), dt_ms, tr_ms / 1000.0)
+            bold = bold_forward_jax(rescale_per_region(e_seq), dt_ms, tr_s)
             pred, tgt = zscore(bold), zscore(emp_raw_win[: bold.shape[0]])
         elif mode == "balloon_gs":
-            bold = bold_forward_jax(rescale_shared(e_seq), dt_ms, tr_ms / 1000.0)
+            bold = bold_forward_jax(rescale_shared(e_seq), dt_ms, tr_s)
             pred, tgt = zscore(bold), zscore(emp_raw_win[: bold.shape[0]])
         elif mode == "amp":
             pred, tgt = zscore(e_vol), zscore(emp_raw_win)
@@ -135,7 +156,7 @@ def make_loss(mode, emp_win, emp_raw_win, dt_ms, tr_ms, lam_amp=0.5):
 
 
 def null_fraction(de, e_vol):
-    """Fraction of de that lies in span{1, e_r} per region (z-score null space)."""
+    """Fraction of de in span{1, e_r} per region (the per-region z-score null space)."""
     resid_sq, tot_sq = 0.0, 0.0
     for r in range(de.shape[1]):
         d = onp.asarray(de[:, r])
@@ -153,16 +174,17 @@ def main():
     ap.add_argument("--sc", required=True)
     ap.add_argument("--lengths", required=True)
     ap.add_argument("--ts1", required=True)
-    ap.add_argument("--params", default=None, help="trained params.pkl (else init)")
+    ap.add_argument("--params", default=None)
     ap.add_argument("--out", default="runs/wb_probe")
     ap.add_argument("--dt", type=float, default=2.0)
     ap.add_argument("--dt-train", type=float, default=100.0)
-    ap.add_argument("--tr", type=float, default=2.0)
+    ap.add_argument("--tr", type=float, default=2.0, help="TR in seconds")
     ap.add_argument("--v-c", type=float, default=5.0)
     ap.add_argument("--d-model", type=int, default=16)
     ap.add_argument("--win", type=int, default=64)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--modes", default="current,sym_win,gscale,balloon_pr,balloon_gs,amp")
+    ap.add_argument("--modes", default="current,sym_win,gscale,raw,balloon_pr,balloon_gs,amp")
+    ap.add_argument("--g-scan", default="0.5,1.0,1.5,2.09,3.0,4.0")
     args = ap.parse_args()
 
     C, lags, L = load_connectome(args.sc, args.lengths, args.dt, args.v_c, "sqrt99")
@@ -195,7 +217,6 @@ def main():
     emp_z_wins = zscore(ts1)[:n_win * args.win].reshape(n_win, args.win, N)
 
     def full_carry():
-        # mirror wb_train.full_carry exactly: M from init_ct_mhsa is (B=1, N, H=N, Dv, Dk)
         return (np.zeros((1, N, N, d, d)), np.zeros((N, d)), np.ones((N, 1)),
                 np.zeros((N, d)))
 
@@ -204,63 +225,85 @@ def main():
     emp_win, emp_raw = emp_z_wins[0], emp_raw_wins[0]
 
     out = {"params_source": src, "N": N, "win": args.win,
-           "dt_train": args.dt_train, "tr": args.tr, "modes": {}}
+           "dt_train": args.dt_train, "tr": args.tr,
+           "learned": {k: float(v) for k, v in params.items()
+                       if k not in ("W_q", "W_y")},
+           "modes": {}, "g_scan": {}}
+    os.makedirs(args.out, exist_ok=True)
 
-    e_vol, e_seq = window_forward(params, carry, kw, C, hp0, args.win, args.dt_train)
-    e_vol = jax.lax.stop_gradient(e_vol)
-    e_seq = jax.lax.stop_gradient(e_seq)
-    out["e_vol_stats"] = {
-        "mean": float(e_vol.mean()), "std": float(e_vol.std()),
-        "min": float(e_vol.min()), "max": float(e_vol.max()),
-        "per_region_std_of_mean": float(e_vol.mean(0).std()),
+    def save():
+        with open(os.path.join(args.out, "probe.json"), "w") as f:
+            json.dump(out, f, indent=1)
+
+    # --- diagnostics + G pushforward (headline result, printed first)
+    e_vol, e_seq, diag = window_forward(params, carry, kw, C, hp0, args.win,
+                                        args.dt_train, with_diag=True)
+    e_vol_s = jax.lax.stop_gradient(e_vol)
+    e_seq_s = jax.lax.stop_gradient(e_seq)
+    aff_rms, noise_rms = float(diag[0]), float(diag[1])
+    out["diag"] = {
+        "aff_rms": aff_rms, "noise_rms": noise_rms,
+        "snr_aff_over_noise": aff_rms / (noise_rms + 1e-30),
+        "e_vol_mean": float(e_vol.mean()), "e_vol_std": float(e_vol.std()),
     }
+    print(f"[diag] aff_rms={aff_rms:.4e} noise_rms={noise_rms:.4e} "
+          f"snr={aff_rms/(noise_rms+1e-30):.4f}", flush=True)
 
-    # --- localisation: does d(e_vol)/d(G) lie in the z-score null space?
     def fwd_G(g):
         p = dict(params)
         p["G_rel"] = g
         return window_forward(p, carry, kw, C, hp0, args.win, args.dt_train)[0]
 
     de = jax.jvp(fwd_G, (params["G_rel"],), (np.asarray(1.0),))[1]
-    nf, dn = null_fraction(de, e_vol)
+    nf, dn = null_fraction(de, onp.asarray(e_vol_s))
     out["G_pushforward"] = {
-        "null_frac": nf,
-        "norm": dn,
-        "rel_norm": dn / (float(e_vol.std()) + 1e-30),
+        "null_frac": nf, "norm": dn,
+        "rel_to_e_vol_std": dn / (float(e_vol_s.std()) + 1e-30),
         "note": "null_frac ~1 => d(e_vol)/d(G) is a per-region affine change, "
-                "exactly annihilated by the per-region z-score",
+                "exactly annihilated by per-region normalisation",
     }
+    print(f"[G] ||d(e_vol)/dG||={dn:.4e} null_frac={nf:.4f} "
+          f"(rel to e_vol std {dn/(float(e_vol_s.std())+1e-30):.4f})", flush=True)
+    save()
 
-    # --- per-mode loss + gradient norms
-    for mode in args.modes.split(","):
+    # --- loss vs G scan (flat => unidentifiable)
+    gvals = [float(x) for x in args.g_scan.split(",")]
+    for mode in ("current", "gscale"):
         loss_fn = make_loss(mode, emp_win, emp_raw, args.dt_train, args.tr)
-
-        def total(p):
+        row = {}
+        for g in gvals:
+            p = dict(params)
+            p["G_rel"] = np.asarray(g)
             ev, es = window_forward(p, carry, kw, C, hp0, args.win, args.dt_train)
-            return loss_fn(ev, es)
+            row[g] = float(loss_fn(ev, es))
+        out["g_scan"][mode] = row
+        print(f"[gscan:{mode}] " + " ".join(f"G={g}:{v:.5f}" for g, v in row.items()),
+              flush=True)
+    save()
 
-        val, grads = jax.value_and_grad(total)(params)
-        gnorm = {k: float(np.sqrt(np.sum(np.asarray(g) ** 2)))
-                 for k, g in grads.items()}
-        out["modes"][mode] = {
-            "loss": float(val),
-            "grad_norm": gnorm,
-            "grad_rel_to_param": {
-                k: float(np.sqrt(np.sum(np.asarray(grads[k]) ** 2))
-                         / (float(np.abs(np.asarray(params[k])).mean()) + 1e-12))
-                for k in ("W_q", "W_y", "kv_scale", "G_rel", "log_tau",
-                          "log_sigma", "log_noise_tc")},
-        }
-        print(f"[{mode}] loss={float(val):.5f} "
-              f"|gWq|={gnorm['W_q']:.3e} |gWy|={gnorm['W_y']:.3e} "
-              f"|gkv|={gnorm['kv_scale']:.3e} |gG|={gnorm['G_rel']:.3e} "
-              f"|gtau|={gnorm['log_tau']:.3e} |gsig|={gnorm['log_sigma']:.3e} "
-              f"|gtc|={gnorm['log_noise_tc']:.3e}", flush=True)
+    # --- per-mode loss + gradient norms (isolated: one bad mode can't kill the run)
+    for mode in args.modes.split(","):
+        try:
+            loss_fn = make_loss(mode, emp_win, emp_raw, args.dt_train, args.tr)
 
-    print(f"G pushforward null_frac={nf:.4f} (norm {dn:.4e})", flush=True)
-    os.makedirs(args.out, exist_ok=True)
-    with open(os.path.join(args.out, "probe.json"), "w") as f:
-        json.dump(out, f, indent=1)
+            def total(p):
+                ev, es = window_forward(p, carry, kw, C, hp0, args.win, args.dt_train)
+                return loss_fn(ev, es)
+
+            val, grads = jax.value_and_grad(total)(params)
+            gnorm = {k: float(np.sqrt(np.sum(np.asarray(g) ** 2)))
+                     for k, g in grads.items()}
+            out["modes"][mode] = {"loss": float(val), "grad_norm": gnorm}
+            print(f"[{mode}] loss={float(val):.5f} "
+                  f"|gWq|={gnorm['W_q']:.3e} |gWy|={gnorm['W_y']:.3e} "
+                  f"|gkv|={gnorm['kv_scale']:.3e} |gG|={gnorm['G_rel']:.3e} "
+                  f"|gtau|={gnorm['log_tau']:.3e} |gsig|={gnorm['log_sigma']:.3e} "
+                  f"|gtc|={gnorm['log_noise_tc']:.3e}", flush=True)
+        except Exception as exc:  # noqa: BLE001 - report, keep going
+            out["modes"][mode] = {"error": f"{type(exc).__name__}: {exc}"}
+            print(f"[{mode}] FAILED: {type(exc).__name__}: {exc}", flush=True)
+        save()
+
     print("WB_PROBE_DONE", flush=True)
 
 
