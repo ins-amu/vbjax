@@ -158,7 +158,7 @@ def optimise_ic(src, tsfc, dt_ms, tr_s, steps, lr=0.01, per_region=False, *,
     best_ic = ics
     hist_steps, hist_vals = [], []
     win = max(1, int(round(0.25 * steps)))
-    tail_ics = []
+    ics_hist = []
     t0 = time.time()
     done = 0
     for t in range(1, steps + 1):
@@ -174,8 +174,7 @@ def optimise_ic(src, tsfc, dt_ms, tr_s, steps, lr=0.01, per_region=False, *,
         improved = vals > best_val
         best_val = np.where(improved, vals, best_val)
         best_ic = np.where(improved.reshape(-1, 1, 1), ics, best_ic)
-        if t > steps - win:
-            tail_ics.append(ics)
+        ics_hist.append(ics)
         if t == 1 or t % log_every == 0:
             hist_steps.append(t)
             hist_vals.append([float(x) for x in vals])
@@ -183,7 +182,9 @@ def optimise_ic(src, tsfc, dt_ms, tr_s, steps, lr=0.01, per_region=False, *,
         if time_budget_s and (time.time() - t0) > time_budget_s:
             break
 
-    mean_ic = np.mean(np.stack(tail_ics, 0), 0)
+    # final IC = mean of the iterates over the last 25% of the (completed) steps
+    n_tail = max(1, min(win, len(ics_hist)))
+    mean_ic = np.mean(np.stack(ics_hist[-n_tail:], 0), 0)
     obj_b = jax.jit(jax.vmap(obj))
     val_mean = [float(x) for x in obj_b(mean_ic)]
     val_best = [float(x) for x in obj_b(best_ic)]
@@ -193,6 +194,7 @@ def optimise_ic(src, tsfc, dt_ms, tr_s, steps, lr=0.01, per_region=False, *,
         "per_region": bool(per_region),
         "steps_requested": int(steps), "steps_done": int(done), "lr": float(lr),
         "restarts": int(restarts), "seed": int(seed),
+        "avg_window": int(n_tail),
         "warm_windows": int(warm_windows), "total_windows": int(W),
         "wall_s": round(time.time() - t0, 1),
         "chosen_restart": pick,
