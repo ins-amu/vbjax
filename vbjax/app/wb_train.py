@@ -76,12 +76,16 @@ def rescale_shared(x, lo=0.2, hi=1.0):
 
 
 def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
-                dt_ms, mode="current", tr_ms=2000.0, lam_amp=0.5):
+                dt_ms, mode="current", tr_ms=2000.0, lam_amp=0.5,
+                coupling="ema"):
     """One window: differentiable neural sim + selectable loss.
 
     params: dict(W_q, W_y, kv_scale, G_rel, log_tau, log_sigma, log_noise_tc)
     carry:  (M (N,H,Dv,Dk), n_prev (N,D), y_ema (N,1), y_prev (N,D))
     mode:   loss formulation (see --loss-mode); the shipped default is 'current'
+    coupling: 'ema' = couple through the EMA-normalised output, as
+        wholebrain_fc.simulate does; 'raw' = the historical trainer behaviour
+        (raw y), which decouples the regions once kv_scale collapses
     Returns (new_carry (stop-grad), loss)."""
     N = C.shape[0]
     D = params["W_q"].shape[-1]
@@ -120,8 +124,12 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
         e = e[0].mean(-1)                                    # (N,) prediction error
         rms = np.sqrt(np.mean(y ** 2, axis=-1, keepdims=True))
         y_ema = 0.999 * y_ema + 0.001 * rms
-        y_out = y / (y_ema + 1e-8)
-        return (state.M, noise, y_ema, y), e
+        # Afferent coupling input for the next step. wholebrain_fc.simulate
+        # couples through the EMA-normalised output y_out; coupling through raw
+        # y made the drive ~1e-9 against O(sigma) noise, i.e. the regions were
+        # effectively independent and G_rel had no gradient (~1e-13).
+        y_coupled = y / (y_ema + 1e-8) if coupling == "ema" else y
+        return (state.M, noise, y_ema, y_coupled), e
 
     # Chunked remat: checkpoint at the chunk level (inner scan runs
     # uncheckpointed). Per-step checkpoint over thousands of steps OOMs on the
@@ -232,6 +240,13 @@ def main():
                          "the shipped objective; others are the probe's candidates")
     ap.add_argument("--loss-amp-lambda", type=float, default=0.5,
                     help="weight of the per-region log-std term in --loss-mode amp")
+    ap.add_argument("--coupling", default="ema", choices=["ema", "raw"],
+                    help="afferent coupling input: 'ema' (EMA-normalised output, "
+                         "matches wholebrain_fc.simulate) or 'raw' (historical trainer)")
+    ap.add_argument("--persist-carry", action="store_true",
+                    help="keep (M, noise, y_ema) across iterations instead of "
+                         "restarting cold each one; lets the EMA normaliser and "
+                         "memory converge so the coupling is actually live")
     ap.add_argument("--final-sim-s", type=float, default=600.0)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--eval-only", action="store_true")
@@ -279,7 +294,7 @@ def main():
             c, loss = window_loss(params, c, emp_z_wins[w], emp_raw_wins[w], k_w,
                                   C, lags, L_win, hp0, args.dt_train,
                                   args.loss_mode, args.tr * 1000.0,
-                                  args.loss_amp_lambda)
+                                  args.loss_amp_lambda, args.coupling)
             losses.append(loss)
         return c, np.mean(np.stack(losses))
 
@@ -318,12 +333,22 @@ def main():
     log = []
     last_good = {k: v for k, v in params.items()}
     bad_streak = 0
+    carry = full_carry(params)
+    last_good_carry = carry
+
+    @jax.jit
+    def fwd_only(p, c, kw):
+        """No-grad forward: the persisted carry for the next iteration."""
+        c2, _ = losses_all_windows(p, c, kw)
+        return jax.lax.stop_gradient(c2)
+
     for it in range(iters1 + iters2):
         stage_all = it >= iters1
         cur_opt = opt if stage_all else opt_s
         t0 = time.time()
         key, kw = jax.random.split(key)
-        carry = full_carry(params)
+        if not args.persist_carry:
+            carry = full_carry(params)
 
         def loss_fn(p):
             _, l = losses_all_windows(p, carry, kw)
@@ -341,6 +366,8 @@ def main():
             # Roll back to the last params whose step produced finite grads:
             # the bad gradient was measured *at* the current (post-step) params.
             params = {k: v2 for k, v2 in last_good.items()}
+            if args.persist_carry:
+                carry = last_good_carry   # the bad carry came from bad params
             lr_now = cur_opt.lr
             cur_opt.reset()          # drop any poisoned m/v moment state
             print(f"iter {it:4d}/{args.iters} SKIP non-finite loss/grad "
@@ -358,6 +385,7 @@ def main():
             continue
         bad_streak = 0
         last_good = {k: v2 for k, v2 in params.items()}
+        last_good_carry = carry
         if not stage_all:
             grads = {k: (np.zeros_like(g) if k in ("W_q", "W_y") else g)
                      for k, g in grads.items()}
@@ -365,6 +393,8 @@ def main():
         if gnorm > 1.0:
             grads = {k: g / gnorm for k, g in grads.items()}
         params = cur_opt.step(params, grads)
+        if args.persist_carry:
+            carry = fwd_only(params, carry, kw)
         msg = (f"iter {it:4d}/{args.iters} loss={v:.5f} "
                f"G={float(params['G_rel']):.2f} "
                f"tau={float(np.exp(params['log_tau'])):.1f}s "
