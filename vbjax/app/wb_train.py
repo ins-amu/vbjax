@@ -166,7 +166,7 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
     # fc_match evaluation (bold_forward at fine dt).
     e_vol = e_seq.reshape(win_vols, steps_per_vol, N).mean(axis=1)   # (win_vols, N)
 
-    if mode in ("fcy", "fce", "fcy_noreg", "fc2"):
+    if mode in ("fcy", "fce", "fcy_noreg", "fc2", "fc2r"):
         # FC-shaped objective: the loop gain lives in inter-region covariance,
         # which the per-region temporal MSE never rewards. Region traces: the
         # EMA-normalised output (fcy) or the surprise (fce), FC over the window
@@ -183,6 +183,11 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
         base = np.mean((zscore(e_vol) - zscore(emp_raw_win)) ** 2)
         if mode == "fc2":
             loss = _fc_term(y_seq) + _fc_term(e_seq)
+        elif mode == "fc2r":
+            # fc2 plus a temporal-MSE regulariser: the same FC terms, anchored
+            # to the empirical BOLD trace by the window MSE (weight lam_amp),
+            # to test whether pinning the temporal fit helps or hurts FC.
+            loss = _fc_term(y_seq) + _fc_term(e_seq) + lam_amp * base
         elif mode == "fcy_noreg":
             loss = _fc_term(y_seq)
         elif mode == "fce":
@@ -268,7 +273,7 @@ def main():
     ap.add_argument("--loss-mode", default="current",
                     choices=["current", "sym_win", "gscale", "balloon_pr",
                              "balloon_gs", "amp", "fcy", "fce", "fcy_noreg",
-                             "fc2"],
+                             "fc2", "fc2r"],
                     help="prediction/target normalisation + forward model. 'current' is "
                          "the shipped objective; others are the probe's candidates")
     ap.add_argument("--loss-amp-lambda", type=float, default=0.5,
