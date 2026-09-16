@@ -35,8 +35,13 @@ from vbjax.app.wb_train import zscore, build_mhsa
 # ---------------------------------------------------------------- forward
 
 def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
-                   with_diag=False):
-    """One window. Returns (e_vol (V,N), e_seq (T,N)) and optional diagnostics."""
+                   with_diag=False, coupling="raw"):
+    """One window. Returns (e_vol (V,N), e_seq (T,N)) and optional diagnostics.
+
+    coupling: 'raw' = couple through the raw block output (historical trainer
+    behaviour); 'ema' = couple through the EMA-normalised output, which is what
+    wholebrain_fc.simulate stores in its history buffer.
+    """
     N = C.shape[0]
     D = params["W_q"].shape[-1]
     G = params["G_rel"]
@@ -60,7 +65,7 @@ def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
 
     def neural_step(carry_n, key_t):
         if with_diag:
-            M, n_prev, y_ema, y_prev, s_aff, s_noi, cnt = carry_n
+            M, n_prev, y_ema, y_prev, s_aff, s_noi, s_y, cnt = carry_n
         else:
             M, n_prev, y_ema, y_prev = carry_n
         state = NetworkState(M=M, history=None, step=0)
@@ -73,24 +78,29 @@ def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
         e = e[0].mean(-1)
         rms = np.sqrt(np.mean(y ** 2, axis=-1, keepdims=True))
         y_ema = 0.999 * y_ema + 0.001 * rms
+        # coupling input for the NEXT step. wholebrain_fc.simulate couples
+        # through the EMA-normalised output; the training window historically
+        # coupled through raw y, which is ~1e-9 once kv_scale collapses.
+        y_coupled = y / (y_ema + 1e-8) if coupling == "ema" else y
         if with_diag:
-            return (state.M, noise, y_ema, y,
+            return (state.M, noise, y_ema, y_coupled,
                     s_aff + np.mean(aff ** 2), s_noi + np.mean(noise ** 2),
-                    cnt + 1), e
-        return (state.M, noise, y_ema, y), e
+                    s_y + np.mean(y_coupled ** 2), cnt + 1), e
+        return (state.M, noise, y_ema, y_coupled), e
 
     def chunk_step(carry_c, kc):
         return jax.lax.scan(neural_step, carry_c, kc)
 
-    carry0 = ((M0, n0, fe0, y0, np.zeros(()), np.zeros(()), np.zeros(()))
-              if with_diag else (M0, n0, fe0, y0))
+    carry0 = ((M0, n0, fe0, y0, np.zeros(()), np.zeros(()), np.zeros(()),
+               np.zeros(())) if with_diag else (M0, n0, fe0, y0))
     fin, e_chunks = jax.lax.scan(jax.checkpoint(chunk_step), carry0, keys_c)
     e_seq = e_chunks.reshape(T_int, N)
     e_vol = e_seq.reshape(win_vols, steps_per_vol, N).mean(axis=1)
     if with_diag:
-        aff_rms = np.sqrt(fin[4] / fin[6])
-        noise_rms = np.sqrt(fin[5] / fin[6])
-        return e_vol, e_seq, (aff_rms, noise_rms)
+        aff_rms = np.sqrt(fin[4] / fin[7])
+        noise_rms = np.sqrt(fin[5] / fin[7])
+        y_rms = np.sqrt(fin[6] / fin[7])
+        return e_vol, e_seq, (aff_rms, noise_rms, y_rms)
     return e_vol, e_seq
 
 
@@ -183,7 +193,8 @@ def main():
     ap.add_argument("--d-model", type=int, default=16)
     ap.add_argument("--win", type=int, default=64)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--modes", default="current,sym_win,gscale,raw,balloon_pr,balloon_gs,amp")
+    ap.add_argument("--modes", default="current,balloon_gs")
+    ap.add_argument("--couplings", default="raw,ema")
     ap.add_argument("--g-scan", default="0.5,1.0,1.5,2.09,3.0,4.0")
     args = ap.parse_args()
 
@@ -228,81 +239,90 @@ def main():
            "dt_train": args.dt_train, "tr": args.tr,
            "learned": {k: float(v) for k, v in params.items()
                        if k not in ("W_q", "W_y")},
-           "modes": {}, "g_scan": {}}
+           "coupling": {}, "g_scan": {}, "modes": {}}
     os.makedirs(args.out, exist_ok=True)
 
     def save():
         with open(os.path.join(args.out, "probe.json"), "w") as f:
             json.dump(out, f, indent=1)
 
-    # --- diagnostics + G pushforward (headline result, printed first)
-    e_vol, e_seq, diag = window_forward(params, carry, kw, C, hp0, args.win,
-                                        args.dt_train, with_diag=True)
-    e_vol_s = jax.lax.stop_gradient(e_vol)
-    e_seq_s = jax.lax.stop_gradient(e_seq)
-    aff_rms, noise_rms = float(diag[0]), float(diag[1])
-    out["diag"] = {
-        "aff_rms": aff_rms, "noise_rms": noise_rms,
-        "snr_aff_over_noise": aff_rms / (noise_rms + 1e-30),
-        "e_vol_mean": float(e_vol.mean()), "e_vol_std": float(e_vol.std()),
-    }
-    print(f"[diag] aff_rms={aff_rms:.4e} noise_rms={noise_rms:.4e} "
-          f"snr={aff_rms/(noise_rms+1e-30):.4f}", flush=True)
-
-    def fwd_G(g):
-        p = dict(params)
-        p["G_rel"] = g
-        return window_forward(p, carry, kw, C, hp0, args.win, args.dt_train)[0]
-
-    de = jax.jvp(fwd_G, (params["G_rel"],), (np.asarray(1.0),))[1]
-    nf, dn = null_fraction(de, onp.asarray(e_vol_s))
-    out["G_pushforward"] = {
-        "null_frac": nf, "norm": dn,
-        "rel_to_e_vol_std": dn / (float(e_vol_s.std()) + 1e-30),
-        "note": "null_frac ~1 => d(e_vol)/d(G) is a per-region affine change, "
-                "exactly annihilated by per-region normalisation",
-    }
-    print(f"[G] ||d(e_vol)/dG||={dn:.4e} null_frac={nf:.4f} "
-          f"(rel to e_vol std {dn/(float(e_vol_s.std())+1e-30):.4f})", flush=True)
-    save()
-
-    # --- loss vs G scan (flat => unidentifiable)
     gvals = [float(x) for x in args.g_scan.split(",")]
-    for mode in ("current", "gscale"):
-        loss_fn = make_loss(mode, emp_win, emp_raw, args.dt_train, args.tr)
-        row = {}
-        for g in gvals:
+
+    for coupling in args.couplings.split(","):
+        out["coupling"][coupling] = {}
+        out["g_scan"][coupling] = {}
+
+        # --- diagnostics: is the coupling drive visible against the noise?
+        e_vol, e_seq, diag = window_forward(
+            params, carry, kw, C, hp0, args.win, args.dt_train,
+            with_diag=True, coupling=coupling)
+        e_vol_s = jax.lax.stop_gradient(e_vol)
+        aff_rms, noise_rms, y_rms = (float(diag[0]), float(diag[1]),
+                                     float(diag[2]))
+        out["coupling"][coupling]["diag"] = {
+            "aff_rms": aff_rms, "noise_rms": noise_rms, "y_coupled_rms": y_rms,
+            "snr_aff_over_noise": aff_rms / (noise_rms + 1e-30),
+            "e_vol_mean": float(e_vol.mean()), "e_vol_std": float(e_vol.std()),
+        }
+        print(f"[{coupling}] aff_rms={aff_rms:.4e} noise_rms={noise_rms:.4e} "
+              f"snr={aff_rms/(noise_rms+1e-30):.4f} y_rms={y_rms:.4e}", flush=True)
+
+        # --- G pushforward: magnitude and null-space fraction
+        def fwd_G(g, _c=coupling):
             p = dict(params)
-            p["G_rel"] = np.asarray(g)
-            ev, es = window_forward(p, carry, kw, C, hp0, args.win, args.dt_train)
-            row[g] = float(loss_fn(ev, es))
-        out["g_scan"][mode] = row
-        print(f"[gscan:{mode}] " + " ".join(f"G={g}:{v:.5f}" for g, v in row.items()),
+            p["G_rel"] = g
+            return window_forward(p, carry, kw, C, hp0, args.win,
+                                  args.dt_train, coupling=_c)[0]
+
+        de = jax.jvp(fwd_G, (params["G_rel"],), (np.asarray(1.0),))[1]
+        nf, dn = null_fraction(de, onp.asarray(e_vol_s))
+        out["coupling"][coupling]["G_pushforward"] = {
+            "norm": dn, "null_frac": nf,
+            "rel_to_e_vol_std": dn / (float(e_vol_s.std()) + 1e-30),
+        }
+        print(f"[{coupling}] ||d(e_vol)/dG||={dn:.4e} null_frac={nf:.4f}",
               flush=True)
-    save()
-
-    # --- per-mode loss + gradient norms (isolated: one bad mode can't kill the run)
-    for mode in args.modes.split(","):
-        try:
-            loss_fn = make_loss(mode, emp_win, emp_raw, args.dt_train, args.tr)
-
-            def total(p):
-                ev, es = window_forward(p, carry, kw, C, hp0, args.win, args.dt_train)
-                return loss_fn(ev, es)
-
-            val, grads = jax.value_and_grad(total)(params)
-            gnorm = {k: float(np.sqrt(np.sum(np.asarray(g) ** 2)))
-                     for k, g in grads.items()}
-            out["modes"][mode] = {"loss": float(val), "grad_norm": gnorm}
-            print(f"[{mode}] loss={float(val):.5f} "
-                  f"|gWq|={gnorm['W_q']:.3e} |gWy|={gnorm['W_y']:.3e} "
-                  f"|gkv|={gnorm['kv_scale']:.3e} |gG|={gnorm['G_rel']:.3e} "
-                  f"|gtau|={gnorm['log_tau']:.3e} |gsig|={gnorm['log_sigma']:.3e} "
-                  f"|gtc|={gnorm['log_noise_tc']:.3e}", flush=True)
-        except Exception as exc:  # noqa: BLE001 - report, keep going
-            out["modes"][mode] = {"error": f"{type(exc).__name__}: {exc}"}
-            print(f"[{mode}] FAILED: {type(exc).__name__}: {exc}", flush=True)
         save()
+
+        # --- loss vs G: flat => unidentifiable
+        for mode in ("current", "gscale"):
+            loss_fn = make_loss(mode, emp_win, emp_raw, args.dt_train, args.tr)
+            row = {}
+            for g in gvals:
+                p = dict(params)
+                p["G_rel"] = np.asarray(g)
+                ev, es = window_forward(p, carry, kw, C, hp0, args.win,
+                                        args.dt_train, coupling=coupling)
+                row[g] = float(loss_fn(ev, es))
+            out["g_scan"][coupling][mode] = row
+            print(f"[gscan:{coupling}:{mode}] "
+                  + " ".join(f"G={g}:{v:.5f}" for g, v in row.items()),
+                  flush=True)
+        save()
+
+        # --- per-mode loss + gradient norms (isolated)
+        for mode in args.modes.split(","):
+            key_m = f"{coupling}:{mode}"
+            try:
+                loss_fn = make_loss(mode, emp_win, emp_raw, args.dt_train, args.tr)
+
+                def total(p, _c=coupling, _lf=loss_fn):
+                    ev, es = window_forward(p, carry, kw, C, hp0, args.win,
+                                            args.dt_train, coupling=_c)
+                    return _lf(ev, es)
+
+                val, grads = jax.value_and_grad(total)(params)
+                gnorm = {k: float(np.sqrt(np.sum(np.asarray(g) ** 2)))
+                         for k, g in grads.items()}
+                out["modes"][key_m] = {"loss": float(val), "grad_norm": gnorm}
+                print(f"[{key_m}] loss={float(val):.5f} "
+                      f"|gkv|={gnorm['kv_scale']:.3e} |gG|={gnorm['G_rel']:.3e} "
+                      f"|gtau|={gnorm['log_tau']:.3e} "
+                      f"|gsig|={gnorm['log_sigma']:.3e}", flush=True)
+            except Exception as exc:  # noqa: BLE001
+                out["modes"][key_m] = {"error": f"{type(exc).__name__}: {exc}"}
+                print(f"[{key_m}] FAILED: {type(exc).__name__}: {exc}", flush=True)
+            save()
 
     print("WB_PROBE_DONE", flush=True)
 
