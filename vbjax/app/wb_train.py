@@ -119,7 +119,7 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
         aff = G * np.einsum("ij,jd->id", C, y_prev)
         eps = jax.random.normal(key_t, (N, D))
         noise = noise_a * n_prev + sigma * sq1 * eps
-        x = (aff + noise + p_t)[None]
+        x = (aff + noise + p_t[:, None])[None]
         state, y, e = mhsa_step(mhsa, state, x, hp_eff)
         y = y[0]
         e = e[0].mean(-1)                                    # (N,) prediction error
