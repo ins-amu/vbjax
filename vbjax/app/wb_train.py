@@ -166,21 +166,29 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
     # fc_match evaluation (bold_forward at fine dt).
     e_vol = e_seq.reshape(win_vols, steps_per_vol, N).mean(axis=1)   # (win_vols, N)
 
-    if mode in ("fcy", "fce", "fcy_noreg"):
+    if mode in ("fcy", "fce", "fcy_noreg", "fc2"):
         # FC-shaped objective: the loop gain lives in inter-region covariance,
         # which the per-region temporal MSE never rewards. Region traces: the
         # EMA-normalised output (fcy) or the surprise (fce), FC over the window
         # vs the empirical FC, loss = 1 - Pearson(upper triangles).
-        tr = y_seq if mode != "fce" else e_seq
-        trz = (tr - tr.mean(0)) / (tr.std(0) + 1e-8)
-        fc_sim = trz.T @ trz / tr.shape[0]
-        iu = np.triu_indices(N, 1)
-        fu, tu = fc_sim[iu], aux["fc_emp"][iu]
-        r = (np.mean(fu * tu) - np.mean(fu) * np.mean(tu)) / (
-            np.std(fu) * np.std(tu) + 1e-8)
-        fc_loss = 1.0 - r
+        def _fc_term(tr):
+            trz = (tr - tr.mean(0)) / (tr.std(0) + 1e-8)
+            fc_sim = trz.T @ trz / tr.shape[0]
+            iu = np.triu_indices(N, 1)
+            fu, tu = fc_sim[iu], aux["fc_emp"][iu]
+            r = (np.mean(fu * tu) - np.mean(fu) * np.mean(tu)) / (
+                np.std(fu) * np.std(tu) + 1e-8)
+            return 1.0 - r
+
         base = np.mean((zscore(e_vol) - zscore(emp_raw_win)) ** 2)
-        loss = fc_loss if mode == "fcy_noreg" else fc_loss + lam_amp * base
+        if mode == "fc2":
+            loss = _fc_term(y_seq) + _fc_term(e_seq)
+        elif mode == "fcy_noreg":
+            loss = _fc_term(y_seq)
+        elif mode == "fce":
+            loss = _fc_term(e_seq) + lam_amp * base
+        else:
+            loss = _fc_term(y_seq) + lam_amp * base
     else:
         if mode == "current":
             # as shipped: prediction z-scored per region per window, target globally
@@ -259,7 +267,8 @@ def main():
     ap.add_argument("--iters", type=int, default=200)
     ap.add_argument("--loss-mode", default="current",
                     choices=["current", "sym_win", "gscale", "balloon_pr",
-                             "balloon_gs", "amp", "fcy", "fce", "fcy_noreg"],
+                             "balloon_gs", "amp", "fcy", "fce", "fcy_noreg",
+                             "fc2"],
                     help="prediction/target normalisation + forward model. 'current' is "
                          "the shipped objective; others are the probe's candidates")
     ap.add_argument("--loss-amp-lambda", type=float, default=0.5,
