@@ -38,11 +38,52 @@ def balloon(src, dt_ms, tr_s, ic=None):
     buf, step, sample = make_bold(shape=(N,), dt=dt_ms / 1000.0,
                                   p=bold_default_theta)
     if ic is not None:
-        ic = np.asarray(ic, dtype=np.float32).reshape(4, 1)
+        ic = np.asarray(ic, dtype=np.float32)
+        ic = ic.reshape(4, 1) if ic.size == 4 else ic.reshape(4, N)
         buf = np.broadcast_to(ic, (4, N))
     offline = make_offline(step_fn=step, sample_fn=sample)
     _, bold = jax.lax.scan(offline, buf, windowed)
     return bold
+
+
+def fc_of_ic(ic, src, dt_ms, tr_s, tsfc, iu):
+    """fc_match between the balloon output (from ICs `ic`) and an empirical FC."""
+    bold = balloon(src, dt_ms, tr_s, ic)
+    z = (bold - bold.mean(0)) / (bold.std(0) + 1e-8)
+    fc = z.T @ z / bold.shape[0]
+    fu, tu = fc[iu], tsfc[iu]
+    return (np.mean(fu * tu) - np.mean(fu) * np.mean(tu)) / (
+        np.std(fu) * np.std(tu) + 1e-8)
+
+
+def optimise_ic(src, tsfc, dt_ms, tr_s, steps, lr=0.05, per_region=False):
+    """Gradient-ascent the balloon initial conditions on fc_match (the shipped ICs
+    are only the fixed point of the mean drive; the fluctuating part of the drive
+    leaves room to improve the startup)."""
+    N = src.shape[1]
+    iu = np.triu_indices(N, 1)
+    base = np.asarray([0.0, 1.0, 1.0, 1.0], dtype=np.float32)
+    ic = (np.tile(base.reshape(4, 1), (1, N)) if per_region
+          else base.reshape(4, 1))
+
+    @jax.jit
+    def obj(ic_):
+        return fc_of_ic(ic_, src, dt_ms, tr_s, tsfc, iu)
+
+    m = np.zeros_like(ic)
+    v = np.zeros_like(ic)
+    hist = []
+    for t in range(1, steps + 1):
+        val, g = jax.value_and_grad(obj)(ic)
+        g = np.nan_to_num(g, nan=0.0, posinf=0.0, neginf=0.0)
+        m = 0.9 * m + 0.1 * g
+        v = 0.999 * v + 0.001 * g ** 2
+        ic = ic + lr * (m / (1 - 0.9 ** t)) / (np.sqrt(v / (1 - 0.999 ** t)) + 1e-8)
+        ic = ic.at[2].set(np.clip(ic[2], 1e-3, None))   # v > 0 (v^3.1)
+        ic = ic.at[3].set(np.clip(ic[3], 1e-3, None))   # q > 0
+        if t % 10 == 0 or t == 1:
+            hist.append([t, float(val)])
+    return ic, hist
 
 
 def fixed_point_ic(drive_mean, dt_ms=2.0, t_conv_s=400.0):
@@ -70,6 +111,11 @@ def main():
     ap.add_argument("--d-model", type=int, default=16)
     ap.add_argument("--sim-s", type=float, default=600.0)
     ap.add_argument("--discard-s", type=float, default=60.0)
+    ap.add_argument("--opt-steps", type=int, default=40,
+                    help="Adam steps for gradient-descending the balloon ICs on fc_match")
+    ap.add_argument("--opt-lr", type=float, default=0.05)
+    ap.add_argument("--per-region", action="store_true",
+                    help="optimise one IC set per region instead of one shared set")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
@@ -151,6 +197,26 @@ def main():
             else f"{k}=n/a" for k, v in res.items() if k != "transient"), flush=True)
         print(f"[{name}] IC fixed point (mean over regions) = "
               f"{res['transient']['ic_fixed_point']}", flush=True)
+
+    if args.opt_steps > 0:
+        iu = np.triu_indices(N, 1)
+        ic_opt, hist = optimise_ic(zscore(e_all["subj1"][0]), fc1, args.dt,
+                                   args.tr, args.opt_steps, args.opt_lr,
+                                   args.per_region)
+        o1 = float(fc_of_ic(ic_opt, zscore(e_all["subj1"][0]), args.dt, args.tr,
+                            fc1, iu))
+        o2 = float(fc_of_ic(ic_opt, zscore(e_all["subj2"][0]), args.dt, args.tr,
+                            fc2, iu))
+        d1 = out["variants"]["subj1"]["default"]["fc"]
+        d2 = out["variants"]["subj2"]["default"]["fc"]
+        out["opt_ic"] = {
+            "per_region": bool(args.per_region),
+            "ic_mean_over_regions": [float(x) for x in onp.asarray(ic_opt).mean(-1)],
+            "fc1_fit": o1, "fc2_holdout": o2, "hist": hist}
+        print(f"[opt_ic] fit on subj1: fc1={o1:.4f} (was {d1:.4f}), "
+              f"fc2_holdout={o2:.4f} (was {d2:.4f})", flush=True)
+        print(f"[opt_ic] ICs (mean over regions) = "
+              f"{out['opt_ic']['ic_mean_over_regions']}", flush=True)
 
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "bold_ic.json"), "w") as f:
