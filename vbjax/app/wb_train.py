@@ -77,7 +77,7 @@ def rescale_shared(x, lo=0.2, hi=1.0):
 
 def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
                 dt_ms, mode="current", tr_ms=2000.0, lam_amp=0.5,
-                coupling="ema"):
+                coupling="ema", aux=None):
     """One window: differentiable neural sim + selectable loss.
 
     params: dict(W_q, W_y, kv_scale, G_rel, log_tau, log_sigma, log_noise_tc)
@@ -89,7 +89,7 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
     Returns (new_carry (stop-grad), loss)."""
     N = C.shape[0]
     D = params["W_q"].shape[-1]
-    G = params["G_rel"]
+    G = np.exp(params["log_G"]) if "log_G" in params else params["G_rel"]
     tau_s = np.exp(params["log_tau"])
     sigma = np.exp(params["log_sigma"])
     noise_tc = np.exp(params["log_noise_tc"])
@@ -112,13 +112,14 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
     # (negative-index bounds checks become tracer bool conversions). Delays
     # (ms-scale) are kept in the evaluation simulation; the FC-relevant
     # dynamics live at seconds scale, so this approximation is benign.
-    def neural_step(carry_n, key_t):
+    def neural_step(carry_n, xs_t):
+        key_t, p_t = xs_t
         M, n_prev, y_ema, y_prev = carry_n
         state = NetworkState(M=M, history=None, step=0)
         aff = G * np.einsum("ij,jd->id", C, y_prev)
         eps = jax.random.normal(key_t, (N, D))
         noise = noise_a * n_prev + sigma * sq1 * eps
-        x = (aff + noise)[None]
+        x = (aff + noise + p_t)[None]
         state, y, e = mhsa_step(mhsa, state, x, hp_eff)
         y = y[0]
         e = e[0].mean(-1)                                    # (N,) prediction error
@@ -129,7 +130,7 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
         # y made the drive ~1e-9 against O(sigma) noise, i.e. the regions were
         # effectively independent and G_rel had no gradient (~1e-13).
         y_coupled = y / (y_ema + 1e-8) if coupling == "ema" else y
-        return (state.M, noise, y_ema, y_coupled), e
+        return (state.M, noise, y_ema, y_coupled), (e, np.mean(y_coupled, -1))
 
     # Chunked remat: checkpoint at the chunk level (inner scan runs
     # uncheckpointed). Per-step checkpoint over thousands of steps OOMs on the
@@ -143,14 +144,21 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
         chunk = max(c for c in range(1, chunk + 1) if T_int % c == 0)
     n_chunks = T_int // chunk
     keys_w = jax.random.split(keys, T_int)
+    if aux is not None and aux.get("pulse_sched") is not None:
+        sched = aux["pulse_sched"] * aux.get("pulse_amp", 1.0)
+    else:
+        sched = np.zeros((T_int, N))
+    sched_c = sched.reshape(n_chunks, chunk, N)
     keys_c = keys_w.reshape(n_chunks, chunk, 2)
 
-    def chunk_step(carry_c, keys_chunk):
-        return jax.lax.scan(neural_step, carry_c, keys_chunk)
+    def chunk_step(carry_c, xs_chunk):
+        kc, sc = xs_chunk
+        return jax.lax.scan(neural_step, carry_c, (kc, sc))
 
-    (fM, fn, fe, fyp), e_chunks = jax.lax.scan(
-        jax.checkpoint(chunk_step), (M0, n0, fe0, y0), keys_c)
+    (fM, fn, fe, fyp), (e_chunks, y_chunks) = jax.lax.scan(
+        jax.checkpoint(chunk_step), (M0, n0, fe0, y0), (keys_c, sched_c))
     e_seq = e_chunks.reshape(n_chunks * chunk, N)            # (T_int, N)
+    y_seq = y_chunks.reshape(n_chunks * chunk, N)            # (T_int, N)
 
     # Balloon at dt_train (20 ms) destabilizes (V**alpha NaN) — the training
     # loss fits the NEURAL prediction-error trace: average e within each TR
@@ -158,32 +166,48 @@ def window_loss(params, carry, emp_z_win, emp_raw_win, keys, C, lags, L, hp0,
     # fc_match evaluation (bold_forward at fine dt).
     e_vol = e_seq.reshape(win_vols, steps_per_vol, N).mean(axis=1)   # (win_vols, N)
 
-    if mode == "current":
-        # as shipped: prediction z-scored per region per window, target globally
-        # z-scored -> any per-region affine change of the prediction is invisible
-        pred, tgt = zscore(e_vol), emp_z_win
-    elif mode == "sym_win":
-        pred, tgt = zscore(e_vol), zscore(emp_raw_win)
-    elif mode == "gscale":
-        # one shared scale: per-region amplitude ratios survive
-        pred, tgt = e_vol / (np.std(e_vol) + 1e-8), emp_z_win
-    elif mode in ("balloon_pr", "balloon_gs"):
-        src = (rescale_per_region(e_seq) if mode == "balloon_pr"
-               else rescale_shared(e_seq))
-        bold = bold_forward_jax(src, dt_ms, tr_ms)
-        pred, tgt = zscore(bold), zscore(emp_raw_win[: bold.shape[0]])
-    elif mode == "amp":
-        pred, tgt = zscore(e_vol), zscore(emp_raw_win)
+    if mode in ("fcy", "fce", "fcy_noreg"):
+        # FC-shaped objective: the loop gain lives in inter-region covariance,
+        # which the per-region temporal MSE never rewards. Region traces: the
+        # EMA-normalised output (fcy) or the surprise (fce), FC over the window
+        # vs the empirical FC, loss = 1 - Pearson(upper triangles).
+        tr = y_seq if mode != "fce" else e_seq
+        trz = (tr - tr.mean(0)) / (tr.std(0) + 1e-8)
+        fc_sim = trz.T @ trz / tr.shape[0]
+        iu = np.triu_indices(N, 1)
+        fu, tu = fc_sim[iu], aux["fc_emp"][iu]
+        r = (np.mean(fu * tu) - np.mean(fu) * np.mean(tu)) / (
+            np.std(fu) * np.std(tu) + 1e-8)
+        fc_loss = 1.0 - r
+        base = np.mean((zscore(e_vol) - zscore(emp_raw_win)) ** 2)
+        loss = fc_loss if mode == "fcy_noreg" else fc_loss + lam_amp * base
     else:
-        raise ValueError(f"unknown loss mode {mode!r}")
+        if mode == "current":
+            # as shipped: prediction z-scored per region per window, target globally
+            # z-scored -> any per-region affine change of the prediction is invisible
+            pred, tgt = zscore(e_vol), emp_z_win
+        elif mode == "sym_win":
+            pred, tgt = zscore(e_vol), zscore(emp_raw_win)
+        elif mode == "gscale":
+            # one shared scale: per-region amplitude ratios survive
+            pred, tgt = e_vol / (np.std(e_vol) + 1e-8), emp_z_win
+        elif mode in ("balloon_pr", "balloon_gs"):
+            src = (rescale_per_region(e_seq) if mode == "balloon_pr"
+                   else rescale_shared(e_seq))
+            bold = bold_forward_jax(src, dt_ms, tr_ms)
+            pred, tgt = zscore(bold), zscore(emp_raw_win[: bold.shape[0]])
+        elif mode == "amp":
+            pred, tgt = zscore(e_vol), zscore(emp_raw_win)
+        else:
+            raise ValueError(f"unknown loss mode {mode!r}")
 
-    loss = np.mean((pred - tgt) ** 2)
-    if mode == "amp":
-        # explicit scale term: makes the loop gain observable through the
-        # per-region dispersion, which the z-scored term discards
-        ls_p = np.log(pred.std(0) + 1e-8)
-        ls_t = np.log(tgt.std(0) + 1e-8)
-        loss = loss + lam_amp * np.mean((ls_p - ls_t) ** 2)
+        loss = np.mean((pred - tgt) ** 2)
+        if mode == "amp":
+            # explicit scale term: makes the loop gain observable through the
+            # per-region dispersion, which the z-scored term discards
+            ls_p = np.log(pred.std(0) + 1e-8)
+            ls_t = np.log(tgt.std(0) + 1e-8)
+            loss = loss + lam_amp * np.mean((ls_p - ls_t) ** 2)
     new_carry = (jax.lax.stop_gradient(fM),
                  jax.lax.stop_gradient(fn),
                  jax.lax.stop_gradient(fe),
@@ -235,11 +259,18 @@ def main():
     ap.add_argument("--iters", type=int, default=200)
     ap.add_argument("--loss-mode", default="current",
                     choices=["current", "sym_win", "gscale", "balloon_pr",
-                             "balloon_gs", "amp"],
+                             "balloon_gs", "amp", "fcy", "fce", "fcy_noreg"],
                     help="prediction/target normalisation + forward model. 'current' is "
                          "the shipped objective; others are the probe's candidates")
     ap.add_argument("--loss-amp-lambda", type=float, default=0.5,
-                    help="weight of the per-region log-std term in --loss-mode amp")
+                    help="weight of the per-region log-std term in --loss-mode amp; "
+                         "also the temporal-MSE regulariser weight in the FC modes")
+    ap.add_argument("--log-g", action="store_true",
+                    help="parameterise the loop gain as log_G (better conditioning)")
+    ap.add_argument("--pulse-step", type=int, default=-1,
+                    help="if >= 0, inject an excitation pulse at this in-window step")
+    ap.add_argument("--pulse-amp", type=float, default=1.0)
+    ap.add_argument("--pulse-regions", type=int, default=10)
     ap.add_argument("--coupling", default="ema", choices=["ema", "raw"],
                     help="afferent coupling input: 'ema' (EMA-normalised output, "
                          "matches wholebrain_fc.simulate) or 'raw' (historical trainer)")
@@ -269,15 +300,28 @@ def main():
     mhsa0, _, _ = init_ct_mhsa(hp0, k_m, batch_size=1)
 
     params = {"W_q": mhsa0.W_Q, "W_y": mhsa0.W_Y,
-              "kv_scale": np.asarray(0.15), "G_rel": np.asarray(2.09),
+              "kv_scale": np.asarray(0.15),
               "log_tau": np.asarray(onp.log(36.0)),
               "log_sigma": np.asarray(onp.log(0.18)),
               "log_noise_tc": np.asarray(onp.log(2.0))}
+    if args.log_g:
+        params["log_G"] = np.asarray(onp.log(2.09))
+    else:
+        params["G_rel"] = np.asarray(2.09)
 
     n_win = ts1.shape[0] // args.win
     emp_z_wins = zscore(ts1)[:n_win * args.win].reshape(n_win, args.win, N)
     emp_raw_wins = ts1[:n_win * args.win].reshape(n_win, args.win, N)
     L_win = max(int(lags.max()), 1) + 1
+
+    pulse_sched = None
+    if args.pulse_step >= 0:
+        T_int = args.win * int(round(2000.0 / args.dt_train))
+        _ps = onp.zeros((T_int, N), dtype="f4")
+        _ps[args.pulse_step, :args.pulse_regions] = 1.0
+        pulse_sched = np.asarray(_ps)
+    aux = {"fc_emp": np.asarray(fc1), "pulse_sched": pulse_sched,
+           "pulse_amp": args.pulse_amp}
 
     def full_carry(params):
         _, st, _ = init_ct_mhsa(hp0, key, batch_size=1)
@@ -294,7 +338,7 @@ def main():
             c, loss = window_loss(params, c, emp_z_wins[w], emp_raw_wins[w], k_w,
                                   C, lags, L_win, hp0, args.dt_train,
                                   args.loss_mode, args.tr * 1000.0,
-                                  args.loss_amp_lambda, args.coupling)
+                                  args.loss_amp_lambda, args.coupling, aux)
             losses.append(loss)
         return c, np.mean(np.stack(losses))
 
@@ -305,8 +349,10 @@ def main():
         mhsa = build_mhsa(hp, jax.random.PRNGKey(seed), params["W_q"],
                           params["W_y"], float(params["kv_scale"]))
         from vbjax.app.wholebrain_fc import simulate, bold_forward
+        G_eval = (float(np.exp(params["log_G"])) if "log_G" in params
+                  else float(params["G_rel"]))
         e, _ = simulate(mhsa, np.asarray(C), jax.numpy.asarray(lags), L, hp,
-                        float(params["G_rel"]), sigma, int(T_s * 1000 / args.dt),
+                        G_eval, sigma, int(T_s * 1000 / args.dt),
                         jax.random.PRNGKey(seed),
                         float(np.exp(params["log_noise_tc"])), args.dt, "e")
         e = onp.asarray(e)
@@ -395,8 +441,10 @@ def main():
         params = cur_opt.step(params, grads)
         if args.persist_carry:
             carry = fwd_only(params, carry, kw)
+        G_val = (float(np.exp(params["log_G"])) if "log_G" in params
+                 else float(params["G_rel"]))
         msg = (f"iter {it:4d}/{args.iters} loss={v:.5f} "
-               f"G={float(params['G_rel']):.2f} "
+               f"G={G_val:.2f} "
                f"tau={float(np.exp(params['log_tau'])):.1f}s "
                f"sigma={float(np.exp(params['log_sigma'])):.3f} "
                f"gnorm={gnorm:.2e} lr={cur_opt.lr:.2e} ({time.time()-t0:.1f}s)")
