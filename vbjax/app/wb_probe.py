@@ -66,11 +66,7 @@ def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
     M0, n0, fe0, y0 = carry
     keys_c = jax.random.split(keys, T_int).reshape(n_chunks, chunk, 2)
 
-    def neural_step(carry_n, key_t):
-        if with_diag:
-            M, n_prev, y_ema, y_prev, s_aff, s_noi, s_y, cnt = carry_n
-        else:
-            M, n_prev, y_ema, y_prev = carry_n
+    def step_core(M, n_prev, y_ema, y_prev, key_t):
         state = NetworkState(M=M, history=None, step=0)
         aff = G * np.einsum("ij,jd->id", C, y_prev)
         eps = jax.random.normal(key_t, (N, D))
@@ -85,11 +81,25 @@ def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
         # through the EMA-normalised output; the training window historically
         # coupled through raw y, which is ~1e-9 once kv_scale collapses.
         y_coupled = y / (y_ema + 1e-8) if coupling == "ema" else y
+        return (state.M, noise, y_ema, y_coupled), e, (
+            np.mean(aff ** 2), np.mean(noise ** 2), np.mean(y_coupled ** 2))
+
+    def neural_step(carry_n, key_t):
         if with_diag:
-            return (state.M, noise, y_ema, y_coupled,
-                    s_aff + np.mean(aff ** 2), s_noi + np.mean(noise ** 2),
-                    s_y + np.mean(y_coupled ** 2), cnt + 1), e
-        return (state.M, noise, y_ema, y_coupled), e
+            M, n_prev, y_ema, y_prev, s_aff, s_noi, s_y, cnt = carry_n
+        else:
+            M, n_prev, y_ema, y_prev = carry_n
+        (M2, noi, yem, ycp), e, (a2, n2, y2) = step_core(
+            M, n_prev, y_ema, y_prev, key_t)
+        if with_diag:
+            return (M2, noi, yem, ycp, s_aff + a2, s_noi + n2, s_y + y2,
+                    cnt + 1), e
+        return (M2, noi, yem, ycp), e
+
+    def burnin_step(c, key_t):
+        # plain-carry step for the warm-up (independent of with_diag)
+        out, e, _ = step_core(c[0], c[1], c[2], c[3], key_t)
+        return out, e
 
     def chunk_step(carry_c, kc):
         return jax.lax.scan(neural_step, carry_c, kc)
@@ -98,10 +108,8 @@ def window_forward(params, carry, keys, C, hp0, win_vols, dt_ms, chunk=25,
         # warm-up (no gradient): converge M, noise and y_ema to their stationary
         # regime so the differentiable window starts from a realistic state
         bk = jax.random.split(jax.random.fold_in(keys, 99), burnin)
-        burnin_scan = jax.jit(
-            lambda c, k: jax.lax.scan(neural_step, c, k)[0])
-        M0, n0, fe0, y0 = jax.lax.stop_gradient(
-            burnin_scan((M0, n0, fe0, y0), bk))
+        fin_b, _ = jax.lax.scan(burnin_step, (M0, n0, fe0, y0), bk)
+        M0, n0, fe0, y0 = jax.lax.stop_gradient(fin_b)
 
     carry0 = ((M0, n0, fe0, y0, np.zeros(()), np.zeros(()), np.zeros(()),
                np.zeros(())) if with_diag else (M0, n0, fe0, y0))
