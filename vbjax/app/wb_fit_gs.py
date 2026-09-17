@@ -92,7 +92,7 @@ def slice_stats(vals):
 
 def search_score(bold, ts_fc, win, tol, cap):
     """Lenient 20%-of-ref settled-window fc_match (SEARCH stage only)."""
-    W, ref, W_unc = settled_window(bold, win, tol, cap)
+    W, _rolling, ref, W_unc = settled_window(bold, win, tol, cap)
     W = int(W)
     return {"W": W, "cap_binds": bool(W_unc > W), "ref": float(ref),
             "fc_match": fc_match(fc_from_ts(bold[W:]), ts_fc),
