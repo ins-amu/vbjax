@@ -44,6 +44,7 @@ import numpy as onp
 import jax
 import jax.numpy as np
 
+from vbjax import make_bold, bold_default_theta, make_offline
 from vbjax.ct_mhsa import Hyperparameters
 from vbjax.app.wholebrain_fc import (load_connectome, simulate, bold_forward,
                                      fc_from_ts, fc_match)
@@ -51,6 +52,21 @@ from vbjax.app.wb_train import build_mhsa, zscore
 from vbjax.app.wb_eval_std import settled_window, settled_window_strict
 
 SHAPE_KEYS = ("W_q", "W_y", "kv_scale", "log_tau", "log_noise_tc")
+
+
+def _bold_scan(signal, dt_ms, tr_s):
+    """wholebrain_fc.bold_forward's body verbatim (default ICs = bold_default_theta,
+    one offline_sample per TR) minus the trailing onp.asarray, so it can be jitted
+    once and reused across the whole grid."""
+    T, N = signal.shape
+    every = int(round(tr_s * 1000.0 / dt_ms))
+    W = T // every
+    windowed = signal[:W * every].reshape(W, every, N)
+    bold_buf, bold_step, bold_sample = make_bold(
+        shape=(N,), dt=dt_ms / 1000.0, p=bold_default_theta)
+    offline = make_offline(step_fn=bold_step, sample_fn=bold_sample)
+    _, bold = jax.lax.scan(offline, bold_buf, windowed)
+    return bold
 
 
 def load_shape_params(path):
@@ -175,7 +191,7 @@ def main():
 
         return jax.jit(run)
 
-    bold_jit = jax.jit(lambda sig: bold_forward(sig, a.dt, a.tr))
+    bold_jit = jax.jit(lambda sig: _bold_scan(sig, a.dt, a.tr))
 
     def bold_at(sim, G, sigma):
         """One point: simulate -> zscore(e) (wb_eval_std convention) -> balloon."""
