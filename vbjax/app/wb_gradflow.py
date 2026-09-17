@@ -197,10 +197,14 @@ def main():
 
     g_aff = jax.grad(fi)(aff_true)          # reverse demand, per step/region
 
-    def aff_of(g):
-        return f(with_g(g), carry0, kk, args.burnin)[1]["aff"]
+    # ONE forward-mode pass yields every stage tangent: the drive supply
+    # (daff/dG), the readout (d(e_vol)/dG) and the stage log-sensitivities.
+    def stages_all(g):
+        st = f(with_g(g), carry0, kk, args.burnin)[1]
+        return (st["aff"], st["x"], st["e"], st["e_vol"], st["y"], st["M"])
 
-    daff = jax.jvp(aff_of, (gv,), (np.asarray(1.0),))[1]   # forward supply
+    val_s, tang_s = jax.jvp(stages_all, (gv,), (np.asarray(1.0),))
+    daff = onp.asarray(tang_s[0])                          # forward supply
     out["dLdaff_norm"] = float(np.sqrt(np.sum(g_aff ** 2)))
     out["daffdG_norm"] = float(np.sqrt(np.sum(daff ** 2)))
     contrib = onp.asarray(g_aff) * onp.asarray(daff)
@@ -217,18 +221,15 @@ def main():
     out["direct_part"] = direct
     out["recursive_part"] = float(per_step.sum()) - direct
 
-    def stage(name):
-        return lambda g: f(with_g(g), carry0, kk, args.burnin)[1][name]
-
     sens = {}
-    for name in ("aff", "x", "e", "e_vol", "y", "M"):
-        try:
-            sens[name] = log_sens(stage(name), gv)
-        except Exception as exc:  # noqa: BLE001
-            sens[name] = f"error: {type(exc).__name__}: {exc}"
+    for name, vv, tt in zip(("aff", "x", "e", "e_vol", "y", "M"),
+                            val_s, tang_s):
+        nv = float(np.sqrt(np.sum(vv ** 2)) + 1e-30)
+        nt = float(np.sqrt(np.sum(tt ** 2)) + 1e-30)
+        sens[name] = nt / nv * abs(float(gv))          # dlog||stage||/dlogG
     out["log_sens_stages"] = sens
 
-    de = jax.jvp(stage("e_vol"), (gv,), (np.asarray(1.0),))[1]
+    de = tang_s[3]                                          # d(e_vol)/dG
     out["e_vol_null_frac"] = null_frac(de, onp.asarray(e_vol))
     out["e_vol_rel_sens"] = (float(np.sqrt(np.sum(de ** 2)))
                              / (float(np.sqrt(np.sum(e_vol ** 2))) + 1e-30))
