@@ -504,7 +504,19 @@ def main():
     ap.add_argument("--freeze-sigma", action="store_true",
                     help="zero the log_sigma gradient in every iteration (both "
                          "stages) so sigma stays at its initialised value "
-                         "log(0.18) and cannot absorb the drive-norm slack")
+                         "log(--sigma-init, default 0.18) and cannot absorb the "
+                         "drive-norm slack")
+    ap.add_argument("--freeze-g", action="store_true",
+                    help="zero the G gradient in every iteration (both stages) "
+                         "so G stays at its initialised value (--g-init); use "
+                         "it when G was fitted on the FC metric outside BPTT "
+                         "(vbjax/app/wb_fit_gs.py), where it is identifiable")
+    ap.add_argument("--g-init", type=float, default=None,
+                    help="initial/pinned loop gain G (default 2.09; with "
+                         "--log-g it sets log_G=log(g_init))")
+    ap.add_argument("--sigma-init", type=float, default=None,
+                    help="initial/pinned noise sigma (default 0.18); with "
+                         "--freeze-sigma this is exactly the value sigma keeps")
     ap.add_argument("--attrib-json", default=None,
                     help="diagnostic mode: run the stage attribution of dL/dG on "
                          "the --params checkpoint (same metric set as "
@@ -533,20 +545,36 @@ def main():
     k_m, _ = jax.random.split(key)
     mhsa0, _, _ = init_ct_mhsa(hp0, k_m, batch_size=1)
 
+    # --g-init/--sigma-init inject the stage-1 (FC-fit) values; the frozen
+    # value is exactly the injected one, printed below and in every iter line.
+    g_init = 2.09 if args.g_init is None else float(args.g_init)
+    sigma_init = 0.18 if args.sigma_init is None else float(args.sigma_init)
+    if g_init <= 0.0 or sigma_init <= 0.0:
+        raise SystemExit(f"--g-init/--sigma-init must be > 0 "
+                         f"(got {g_init}, {sigma_init})")
     params = {"W_q": mhsa0.W_Q, "W_y": mhsa0.W_Y,
               "kv_scale": np.asarray(0.15),
               "log_tau": np.asarray(onp.log(36.0)),
-              "log_sigma": np.asarray(onp.log(0.18)),
+              "log_sigma": np.asarray(onp.log(sigma_init)),
               "log_noise_tc": np.asarray(onp.log(2.0))}
     if args.log_g:
-        params["log_G"] = np.asarray(onp.log(2.09))
+        params["log_G"] = np.asarray(onp.log(g_init))
     else:
-        params["G_rel"] = np.asarray(2.09)
+        params["G_rel"] = np.asarray(g_init)
     if args.drive_norm:
         params["drive_beta"] = np.asarray(1.0)
+    g_key = "log_G" if args.log_g else "G_rel"
+    print(f"[init] G init/pin={g_init:.6f} (key={g_key})  "
+          f"sigma init/pin={sigma_init:.6f} "
+          f"(log_sigma={float(onp.log(sigma_init)):.6f})  "
+          f"freeze_g={bool(args.freeze_g)} freeze_sigma={bool(args.freeze_sigma)}",
+          flush=True)
+    if args.freeze_g:
+        print(f"[init] freeze-g ON: {g_key} gradient zeroed in BOTH stages; "
+              f"G stays at {g_init:.6f}", flush=True)
     if args.freeze_sigma:
-        print(f"[init] freeze-sigma ON: log_sigma pinned at "
-              f"{float(onp.log(0.18)):.6f} (sigma=0.18)", flush=True)
+        print(f"[init] freeze-sigma ON: log_sigma gradient zeroed in BOTH "
+              f"stages; sigma stays at {sigma_init:.6f}", flush=True)
     if args.drive_norm:
         print(f"[init] drive-norm ON: drive_beta="
               f"{float(params['drive_beta']):.4f}, sigma*beta="
@@ -698,6 +726,12 @@ def main():
             # sigma is held at its initialised value in BOTH stages so the
             # drive-normalisation slack cannot be absorbed into the noise level.
             grads = {k: (np.zeros_like(g) if k == "log_sigma" else g)
+                     for k, g in grads.items()}
+        if args.freeze_g:
+            # G is fitted on the FC metric outside BPTT (wb_fit_gs.py) and held
+            # exactly at --g-init here; no BPTT gradient flows to it.
+            g_key = "log_G" if "log_G" in grads else "G_rel"
+            grads = {k: (np.zeros_like(g) if k == g_key else g)
                      for k, g in grads.items()}
         gnorm = float(np.sqrt(sum(float(np.sum(g ** 2)) for g in grads.values())))
         if gnorm > 1.0:
