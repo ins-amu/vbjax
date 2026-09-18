@@ -53,23 +53,48 @@ def load_connectome(sc_path: str, lengths_path: str, dt: float, v_c: float,
     return W.astype("f4"), lags, Lmax + 1
 
 
+def _regional(v, N):
+    """Broadcast a scalar or a per-region (N,) value to an (N, 1) column.
+
+    Per-region sigma / noise time constant / noise mixing is what lets a
+    spatially structured noise model be expressed without touching the scan.
+    """
+    return np.reshape(np.broadcast_to(np.asarray(v, dtype="f4"), (N,)), (N, 1))
+
+
 def make_sim_fn(C: jax.Array, lags: jax.Array, L: int, hp: Hyperparameters,
-                G: float, sigma: float, noise_a: float, bold_src: str):
+                G: float, sigma, noise_a, bold_src: str,
+                collect_grams: bool = False, noise_mix=None):
     """Jitted whole-brain scan. Carry = (state, history (L, N, D) of past outputs,
-    AR(1) noise state). noise_a: OU-like coefficient; bold_src in {'e','y','ey'}"""
+    AR(1) noise state, gram accumulators). noise_a: OU-like coefficient; bold_src
+    in {'e','y','ey'}.
+
+    `sigma` and `noise_a` may be scalars or per-region (N,) arrays (per-region
+    noise amplitude / correlation time). `noise_mix` (N,N) replaces the i.i.d.
+    per-region noise innovation by `noise_mix @ eps`, i.e. it gives the injected
+    noise a spatial covariance `noise_mix @ noise_mix.T` instead of the identity.
+    With `collect_grams` the carry accumulates the time-averaged cross-region
+    cosine similarity of aff (coupling drive), x (block input) and y (block
+    output) — a direct read-out of how close each stage is to a single
+    scalar-gain common mode."""
     N = C.shape[0]
     D = hp.d_model
     ar = np.arange(N)
+    sig = _regional(sigma, N)
+    na = _regional(noise_a, N)
+    mix = None if noise_mix is None else np.asarray(noise_mix, dtype="f4")
 
     def step(carry, key_t):
-        state, history, n_prev, y_ema = carry
+        state, history, n_prev, y_ema, gram_a, gram_x, gram_y = carry
         t = state.step
         idx = (t - lags) % L                       # (N, N)
         y_hist = history[idx, ar, :]               # (N, N, D) y_j(t - lags[i,j])
         aff = G * np.einsum("ij,ijd->id", C, y_hist)          # delayed afferent prediction
         # AR(1) (OU-like) noise, stationary variance sigma^2
         eps = jax.random.normal(key_t, (N, D))
-        noise = noise_a * n_prev + sigma * np.sqrt(1.0 - noise_a ** 2) * eps
+        if mix is not None:
+            eps = mix @ eps
+        noise = na * n_prev + sig * np.sqrt(1.0 - na ** 2) * eps
         x = (aff + noise)[None, :, :]              # (B=1, N, D)
         state, y, surprise = mhsa_step(wb_mhsa, state, x, hp)  # y (1,N,D), surprise (1,N,H)
         y = y[0]
@@ -82,7 +107,14 @@ def make_sim_fn(C: jax.Array, lags: jax.Array, L: int, hp: Hyperparameters,
         y_out = y / (y_ema + 1e-8)
         history = history.at[t % L].set(y_out)
         state = state._replace(step=t + 1)
-        return (state, history, noise, y_ema), (y_out, e)
+        if collect_grams:
+            def cs(a):
+                return a / (np.linalg.norm(a, axis=-1, keepdims=True) + 1e-8)
+            an, xn, yn = cs(aff), cs(x[0]), cs(y)
+            gram_a = gram_a + an @ an.T
+            gram_x = gram_x + xn @ xn.T
+            gram_y = gram_y + yn @ yn.T
+        return (state, history, noise, y_ema, gram_a, gram_x, gram_y), (y_out, e)
 
     wb_mhsa = None  # closed over via build() below
     def build(mhsa_params):
@@ -93,16 +125,32 @@ def make_sim_fn(C: jax.Array, lags: jax.Array, L: int, hp: Hyperparameters,
 
 
 def simulate(mhsa_params, C, lags, L, hp, G, sigma, T, key,
-             noise_tc_s: float = 2.0, dt_ms: float = 2.0, bold_src: str = "e"):
-    """Run T integration steps; returns e (T, N) local prediction errors, y (T, N, D)."""
+             noise_tc_s=2.0, dt_ms: float = 2.0, bold_src: str = "e",
+             collect_grams: bool = False, want_y: bool = True, noise_mix=None):
+    """Run T integration steps; returns e (T, N) local prediction errors, y (T, N, D).
+
+    `sigma` and `noise_tc_s` may be scalars or per-region (N,) arrays; `noise_mix`
+    (N,N) gives the injected noise a spatial covariance instead of the identity.
+    With collect_grams=True returns (e, y, grams) where grams (3, N, N) is the
+    time-averaged cross-region cosine similarity of aff, x and y.
+    """
     N = C.shape[0]
     _, state, _ = init_ct_mhsa(hp, key, batch_size=1)   # zero memory, no lags (we manage history)
     history = np.zeros((L, N, hp.d_model))
     keys = jax.random.split(jax.random.fold_in(key, 1), T)
-    noise_a = float(onp.exp(-(dt_ms / 1000.0) / max(noise_tc_s, 1e-6)))
-    sim = make_sim_fn(C, lags, L, hp, G, sigma, noise_a, bold_src)(mhsa_params)
-    (fs, _, _, _), (y_seq, e_seq) = sim((state, history, np.zeros((N, hp.d_model)),
-                                         np.ones((N, 1))), keys)
+    noise_a = onp.exp(-(dt_ms / 1000.0) /
+                      onp.maximum(onp.asarray(noise_tc_s, dtype=float), 1e-6))
+    sim = make_sim_fn(C, lags, L, hp, G, sigma, noise_a, bold_src,
+                      collect_grams, noise_mix)(mhsa_params)
+    zero = np.zeros((N, N))
+    (fs, _, _, _, gram_a, gram_x, gram_y), (y_seq, e_seq) = sim(
+        (state, history, np.zeros((N, hp.d_model)), np.ones((N, 1)),
+         zero, zero, zero), keys)
+    if not want_y:
+        y_seq = None
+    if collect_grams:
+        grams = onp.asarray(np.stack([gram_a, gram_x, gram_y], 0)) / float(T)
+        return e_seq, y_seq, grams
     return e_seq, y_seq
 
 
