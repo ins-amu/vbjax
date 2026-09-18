@@ -229,6 +229,29 @@ def main():
                         "gain is not a pure nuisance parameter -- it is under-determined by a single subject's\n"
                         "FC, not invisible.  That is the thread worth pulling next.", "fs": 12.5, "color": ACCENT}])
 
+        slide(pdf, "The simulated FC is a global mode — and it is not the noise",
+              [{"text": "Diagnostic over the cohort (job 4828980): the simulated FC stays almost rank-1 under EVERY\n"
+                        "noise intervention tried, so the 'the noise is i.i.d. per region' explanation is dead.",
+                "fs": 12.5},
+               {"kind": "table",
+                "data": [["condition (all at G = 4.0)", "eig_sim top-1", "eig_emp top-1", "within-max", "block_corr", "fc"],
+                         ["sigma = 0.05  (anchor)", "97.9", "18.5", "0.997", "0.352", "0.102"],
+                         ["sigma = 0.30", "96.3", "19.2", "0.986", "0.175", "0.100"],
+                         ["sigma = 1.00", "95.5", "19.2", "0.985", "0.012", "0.019"],
+                         ["baseline-std variant", "99.3", "19.2", "0.998", "0.432", "0.208"],
+                         ["noise variant 2", "94.8", "19.2", "0.997", "0.349", "0.125"],
+                         ["region-scaled empirical noise", "99.1", "19.2", "0.999", "0.455", "0.192"]],
+                "rect": [0.06, 0.34, 0.88, 0.34], "fs": 10},
+               {"text": "In every condition the readout e is 92-99% correlated ACROSS REGIONS, and cos(x, aff) ~ 0.85:\n"
+                        "the readout carries almost no region-specific information. The readout common mode is\n"
+                        "the strongest remaining candidate, but it is entangled with the coupling drive.", "fs": 12},
+               {"kind": "rule"},
+               {"text": "Untested and decisive: does LOWERING G grade the spectrum?  Filed as the next card.\n"
+                        "Also note the trap this exposed: the baseline-std and empirical-noise conditions RAISE\n"
+                        "the scalar (fc 0.208, block_corr 0.46-0.58) while leaving the rank-1 structure untouched —\n"
+                        "exactly the failure mode the low-rank diagnostics exist to catch.", "fs": 12,
+                "color": ACCENT}])
+
         slide(pdf, "Status, caveats, next steps",
               [{"text": "Established: the machinery is correct and the metric is fair; the certified winner is\n"
                         "ema_yout (fc1 +0.081 / fc2 +0.179); G's unidentifiability has a measured mechanism.", "fs": 12.5},
