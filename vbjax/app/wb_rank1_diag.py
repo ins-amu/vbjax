@@ -195,7 +195,9 @@ def main():
     print(f"[params] tau_s={shape['tau_s']:.2f} noise_tc={shape['noise_tc']:.2f} "
           f"kv_scale={float(shape['kv_scale']):.4f} "
           f"sigma_ckpt={float(onp.exp(onp.asarray(p['log_sigma']))):.4f} "
-          f"G_ckpt={float(onp.exp(onp.asarray(p['log_G']))):.4f}", flush=True)
+          f"G_ckpt={(float(onp.exp(onp.asarray(p['log_G']))) if 'log_G' in p else float(onp.asarray(p['G_rel']))):.4f} "
+          f"G_key={'log_G' if 'log_G' in p else 'G_rel'} "
+          f"keys={sorted(p.keys())}", flush=True)
 
     fcs = [fc_of(bold[k]) for k in range(K)]
     bstd = bold[:K_FIT].std(axis=1).mean(0)          # (N,) fit-cohort per-region std
