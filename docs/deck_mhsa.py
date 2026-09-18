@@ -246,7 +246,9 @@ def main():
                         "the readout carries almost no region-specific information. The readout common mode is\n"
                         "the strongest remaining candidate, but it is entangled with the coupling drive.", "fs": 12},
                {"kind": "rule"},
-               {"text": "Untested and decisive: does LOWERING G grade the spectrum?  Filed as the next card.\n"
+               {"text": "Result of the G test (extended sweep, job 4828987): the objective PEAKS near G = 4 with small sigma and is
+flat/noisy elsewhere (top combos 0.15-0.17 at 1200 s, sd 0.08-0.11) — a broad optimum, not a point.
+The simulated spectrum stays rank-1 at EVERY G tested, and block agreement is WORSE at G = 16 (0.222 vs 0.357).\n"
                         "Also note the trap this exposed: the baseline-std and empirical-noise conditions RAISE\n"
                         "the scalar (fc 0.208, block_corr 0.46-0.58) while leaving the rank-1 structure untouched —\n"
                         "exactly the failure mode the low-rank diagnostics exist to catch.", "fs": 12,
