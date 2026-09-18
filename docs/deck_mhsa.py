@@ -192,16 +192,42 @@ def main():
                {"text": "Consistent with the reference pipeline: wholebrain_fc.py never learns G — it SWEEPS\n"
                         "G and selects by fc_match, a stationary, amplitude-sensitive statistic.", "fs": 12.5}])
 
-        slide(pdf, "Plan: two-stage fit (running now)",
-              [{"text": "Stage 1 — outer loop on the FC metric, no gradients\n"
-                        "    grid G in {0.5 ... 4.0} x sigma in {0.05 ... 0.30}, shape parameters fixed;\n"
-                        "    score with a settled window, confirm the top 5 with the certified rule.\n\n"
-                        "Stage 2 — BPTT on the shape controls only\n"
-                        "    freeze G and sigma at the stage-1 values; train W_q, W_y, kv_scale, tau\n"
-                        "    (the parameters that demonstrably move) on the per-region MSE loss.\n\n"
-                        "Decisive question for stage 1: is certified fc_match actually SENSITIVE to G?\n"
-                        "If it is flat in G, the two-stage idea fails and G must be treated as a fixed\n"
-                        "biophysical constant rather than a fitted parameter.", "fs": 12.5}])
+        slide(pdf, "Two-stage test: stage 1 (G, sigma on FC, no gradients)",
+              [{"text": "Shape parameters frozen from ema_yout; G in {0.5 ... 4.0} x sigma in {0.05 ... 0.30}.\n"
+                        "Search scored on a settled window (600 s, 20% rule); top 5 re-scored with the\n"
+                        "certified rule (2400 s, strict, no cap).", "fs": 12.5},
+               {"kind": "table",
+                "data": [["(G, sigma)", "lenient fc1 (search)", "certified fc1", "certified fc2"],
+                         ["2.0 / 0.05", "0.298", "-0.046", "+0.101"],
+                         ["4.0 / 0.15", "0.254", "-0.019", "+0.084"],
+                         ["2.0 / 0.10", "0.227", "+0.012", "+0.026"],
+                         ["2.5 / 0.10", "0.217", "-0.008", "+0.047"],
+                         ["3.0 / 0.15", "0.206", "+0.021", "-0.041"]],
+                "rect": [0.06, 0.40, 0.80, 0.26], "fs": 10.5},
+               {"text": "Sensitivity (certified fc1, subj1) at sigma = 0.15 across G:\n"
+                        "    0.5 +0.074 | 1.0 +0.085 | 1.5 +0.098 | 2.0 +0.074 | 2.5 +0.023 | 3.0 +0.021 | 4.0 -0.019\n"
+                        "    sd 0.040, span 0.117  ->  fc_match is NOT flat in G (3-4x the seed scatter)\n"
+                        "At G = 3.0 across sigma: sd 0.042, span 0.129  ->  sigma is observable too.\n\n"
+                        "BUT the holdout subject peaks at G = 4, not at subj1's G = 1.5: the metric MOVES G,\n"
+                        "it does not PIN it.  And the lenient search ranks the certified winner LAST.", "fs": 12}],
+              footer="Stage 1 took ~1 h on one GPU; the sweep is cheap because it needs no gradients.")
+
+        slide(pdf, "Two-stage test: stage 2 and verdict (NO)",
+              [{"kind": "table",
+                "data": [["arm", "final loss", "frozen G / sigma", "cert fc1", "cert fc2", "mean"],
+                         ["BPTT, seed 1234", "1.998", "1.5 / 0.15", "+0.017", "+0.214", "+0.116"],
+                         ["BPTT, seed 7", "2.003", "1.5 / 0.15", "-0.015", "+0.043", "+0.014"],
+                         ["ema_yout (re-scored)", "-", "2.23 / 0.19", "+0.081", "+0.179", "+0.130"],
+                         ["stage-1 only (no BPTT)", "-", "1.5 / 0.15", "+0.098", "+0.026", "+0.062"]],
+                "rect": [0.06, 0.55, 0.86, 0.24], "fs": 10.5},
+               {"text": "Verdict: the two-stage split does NOT beat ema_yout (best arm mean 0.116 vs 0.130),\n"
+                        "and both BPTT arms collapse on subj1 (fc1 +0.017 / -0.015).  Freezing G is sound,\n"
+                        "but choosing it on FC is not: the optimum flips between subjects, so the choice is\n"
+                        "a coin flip on the holdout.  Stage-1-only (no BPTT) is worse still (mean 0.062).", "fs": 12.5},
+               {"kind": "rule"},
+               {"text": "What it DOES establish: fc_match is genuinely sensitive to G and to sigma, so the loop\n"
+                        "gain is not a pure nuisance parameter -- it is under-determined by a single subject's\n"
+                        "FC, not invisible.  That is the thread worth pulling next.", "fs": 12.5, "color": ACCENT}])
 
         slide(pdf, "Status, caveats, next steps",
               [{"text": "Established: the machinery is correct and the metric is fair; the certified winner is\n"
@@ -214,10 +240,12 @@ def main():
                         "  - attribution used one window per config (three configs agreed).", "fs": 12.5},
                {"kind": "rule"},
                {"text": "Next\n"
-                        "  1. finish stage 1/2 and re-score with the certified metric;\n"
-                        "  2. more seeds on the winning recipe;\n"
-                        "  3. retire the dead knobs and register the certified metric as the standard;\n"
-                        "  4. look closely at the best model's FC vs empirical FC (regional structure).",
+                        "  1. look at the REGIONAL structure, not the scalar: fc_match is one number over\n"
+                        "     4950 edges, and a 0.2 upper-triangle correlation can hide good structure;\n"
+                        "  2. fit G/sigma with BOTH subjects in the objective (the flip says one subject\n"
+                        "     under-determines G) -- or report G as a range, not a point;\n"
+                        "  3. more seeds on the ema_yout recipe to bound its spread;\n"
+                        "  4. retire the dead knobs; register the certified metric as the standard.",
                 "fs": 12.5, "color": ACCENT}])
     print("wrote", out)
 
