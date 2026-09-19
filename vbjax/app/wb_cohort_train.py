@@ -107,8 +107,7 @@ def main():
         zw = zscore(ts)[:n_win * a.win].reshape(n_win, a.win, N)
         rw = ts[:n_win * a.win].reshape(n_win, a.win, N)
         subj.append((C, lags, l, zw, rw, n_win, np.asarray(fc_of(ts))))
-        print(f"[cohort_bptt] fit subj {k}: n_win={n_win} "
-              f"fc1={float(fc_of(ts)):.4f}", flush=True)
+        print(f"[cohort_bptt] fit subj {k}: n_win={n_win}", flush=True)
 
     # per-subject persisted carry (matching ema_yout's --persist-carry)
     def full_carry():
