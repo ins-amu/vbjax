@@ -95,7 +95,7 @@ def main():
     print(f"[cohort_bptt] BPTT targets: {list(TRAINABLE)}", flush=True)
     print(f"[cohort_bptt] frozen: G={a.g_init} (G_rel)  "
           f"sigma={a.sigma_init}  noise_tc="
-          f"{float(np.asarray(frozen['log_noise_tc']).exp()):.4f}s", flush=True)
+          f"{float(np.exp(np.asarray(frozen['log_noise_tc']))):.4f}s", flush=True)
     for k, v in trainable.items():
         av = np.asarray(v)
         print(f"  {k}: shape={av.shape} "
