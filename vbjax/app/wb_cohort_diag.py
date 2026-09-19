@@ -49,13 +49,7 @@ key = jax.random.PRNGKey(seed)
 _, st, _ = init_ct_mhsa(hp0, key, batch_size=1)
 carry = (st.M, np.zeros((N, d)), np.ones((N, 1)), np.zeros((N, d)), np.ones((N, 1)))
 
-def ws(kw, wi=0):
-    fc_emp = None
-    from vbjax.app.wholebrain_fc import fc_from_ts
-    aux = {"fc_emp": np.asarray(fc_from_ts(ts)), "pulse_sched": None, "pulse_amp": 0.0}
-    return window_loss(params, carry, zw[wi], rw[wi], kw, C, lags, L, hp0,
-                       dt_train, "current", tr * 1000.0, 0.5, "ema", aux, False)
-
+from vbjax.app.wholebrain_fc import fc_from_ts
 kw = jax.random.fold_in(key, 0)
 val, grads = jax.value_and_grad(
     lambda pp: window_loss(pp, carry, zw[0], rw[0], kw, C, lags, L, hp0,
