@@ -8,15 +8,19 @@ window the single-subject trainer uses (vbjax.app.wb_train.window_loss).
 
 It starts from a supplied SHAPE checkpoint (the one the cohort fit used,
 wb_arm_ema_yout), overwrites G and sigma with the frozen cohort values, and
-BPTTs W_q/W_y/kv_scale/log_tau over the FIT subjects, chaining the carry across
+BPTTs the four shape controls over the FIT subjects, chaining the carry across
 windows within each subject and persisting it across iterations (--persist-carry
 semantics, the config that made coupling live). log_noise_tc and G/sigma are
 pinned (the card lists exactly the four shape controls); drive-norm is NOT used
 (it was falsified).
 
+Freezing is structural: gradients are computed ONLY with respect to the four
+trainable keys (the frozen values are constants in the forward), so a
+non-finite gradient on a frozen key can never poison a step.
+
 The trained checkpoint is evaluated OUTSIDE this driver with the certified
-2400 s strict rule and the low-rank structural metrics, both via the single-point
-confirm path of wb_cohort_fit.py on the HELD-OUT split (see the runner).
+2400 s strict rule and the low-rank structural metrics, both via
+wb_cohort_score.py on the HELD-OUT split (see the runner).
 
   python -m vbjax.app.wb_cohort_train --cohort ~/mhsa_e0/data/kb_cohort \
       --params ~/mhsa_e0/runs_persist/wb_arm_ema_yout/params.pkl \
@@ -29,12 +33,11 @@ import jax
 import jax.numpy as np
 
 from vbjax.ct_mhsa import Hyperparameters, init_ct_mhsa
-from vbjax.app.wb_train import Adam, window_loss, zscore, build_mhsa
+from vbjax.app.wb_train import Adam, window_loss, zscore
 from vbjax.app.wb_cohort_fit import load_cohort, fc_of
 
-# Keys held exactly at their frozen values in BOTH the momentum state and the
-# params dict; the driver only ever optimises the four shape controls.
-FROZEN = {"G_rel", "log_G", "log_sigma", "log_noise_tc"}
+# The four shape controls that are BPTT'd. Everything else is a frozen constant.
+TRAINABLE = ("W_q", "W_y", "kv_scale", "log_tau")
 
 
 def main():
@@ -73,20 +76,27 @@ def main():
           f"loss_mode={a.loss_mode} coupling={a.coupling} iters={a.iters} "
           f"lr={a.lr}", flush=True)
 
-    # ---- shape checkpoint init, force pinned G parameterisation (G_rel)
+    # ---- shape checkpoint init; separate TRAINABLE from FROZEN constants
     with open(a.params, "rb") as f:
         base = pickle.load(f)
-    params = {}
-    for k in ("W_q", "W_y", "kv_scale", "log_tau", "log_noise_tc"):
+    trainable = {}
+    for k in TRAINABLE:
         if k not in base:
             raise SystemExit(f"shape checkpoint missing {k!r}")
-        params[k] = np.asarray(base[k])
-    params["log_sigma"] = np.asarray(onp.log(a.sigma_init))
-    params.pop("log_G", None)
-    params["G_rel"] = np.asarray(a.g_init)
+        trainable[k] = np.asarray(base[k])
+    frozen = {
+        "log_sigma": np.asarray(onp.log(a.sigma_init)),
+        "log_noise_tc": np.asarray(base["log_noise_tc"]),
+        "G_rel": np.asarray(a.g_init),
+    }
+    params = dict(trainable); params.update(frozen)
 
     print(f"[cohort_bptt] init shape from {a.params}", flush=True)
-    for k, v in params.items():
+    print(f"[cohort_bptt] BPTT targets: {list(TRAINABLE)}", flush=True)
+    print(f"[cohort_bptt] frozen: G={a.g_init} (G_rel)  "
+          f"sigma={a.sigma_init}  noise_tc="
+          f"{float(np.asarray(frozen['log_noise_tc']).exp()):.4f}s", flush=True)
+    for k, v in trainable.items():
         av = np.asarray(v)
         print(f"  {k}: shape={av.shape} "
               f"val={'%.5g' % float(av) if av.ndim == 0 else 'matrix'}",
@@ -101,12 +111,12 @@ def main():
     subj = []          # per subject: (C, lags, L, z_wins, raw_wins, n_win, fc_emp)
     for k in fit:
         C = np.asarray(Cs[k]); lags = np.asarray(Ls[k])
-        l = int(lags.max()) + 1
+        L = int(lags.max()) + 1
         ts = bold[k]
         n_win = ts.shape[0] // a.win
         zw = zscore(ts)[:n_win * a.win].reshape(n_win, a.win, N)
         rw = ts[:n_win * a.win].reshape(n_win, a.win, N)
-        subj.append((C, lags, l, zw, rw, n_win, np.asarray(fc_of(ts))))
+        subj.append((C, lags, L, zw, rw, n_win, np.asarray(fc_of(ts))))
         print(f"[cohort_bptt] fit subj {k}: n_win={n_win}", flush=True)
 
     # per-subject persisted carry (matching ema_yout's --persist-carry)
@@ -126,7 +136,7 @@ def main():
                            a.loss_amp_lambda, a.coupling, aux, False)
 
     def forward_all(p_in, carries_in):
-        """Stop-grad carries after chaining every window of every fit subject."""
+        """Chain every window of every fit subject; stop-grad the carries."""
         keys = jax.random.split(jax.random.PRNGKey(a.seed), len(fit))
         out = []
         for i in range(len(fit)):
@@ -154,63 +164,77 @@ def main():
 
     fwd_all = jax.jit(forward_all)
 
-    # Adam only sees the trainable (shape) keys; frozen keys never enter it.
-    trainable = {k: v for k, v in params.items() if k not in FROZEN}
+    # ---- training loop: gradients ONLY w.r.t. the shape keys
     opt = Adam(trainable, lr=a.lr)
+    last_good_t = {k: v for k, v in trainable.items()}
+    last_good_car = list(carries)
+    bad_streak = 0
+    BAD_TO_HALVE = 3
+    MIN_LR = 1e-6
     log = []
+
+    def merge(tt):
+        pp = dict(tt); pp.update(frozen)
+        return pp
 
     t_start = time.time()
     for it in range(a.iters):
         t0 = time.time()
-        key, _ = jax.random.split(jax.random.PRNGKey(a.seed))
         val, grads = jax.value_and_grad(
-            lambda pp: loss_fn(pp, tuple(carries)))(params)
+            lambda tt: loss_fn(merge(tt), tuple(carries)))(trainable)
         v = float(val)
         finite = bool(onp.isfinite(v)) and all(
             bool(onp.isfinite(onp.asarray(g)).all()) for g in grads.values())
         if not finite:
-            print(f"iter {it:4d} SKIP non-finite loss={v} ({time.time()-t0:.1f}s)",
-                  flush=True)
+            # mirror wb_train recovery: roll back, reset Adam, halve lr
+            trainable = {k: vv for k, vv in last_good_t.items()}
+            carries = list(last_good_car)
+            opt.reset()
+            lr_now = opt.lr
+            if bad_streak >= BAD_TO_HALVE:
+                opt.lr = max(lr_now * 0.5, MIN_LR)
+                bad_streak = 0
+                print(f"iter {it:4d} {BAD_TO_HALVE} bad steps -> lr={opt.lr:.2e}",
+                      flush=True)
+            else:
+                bad_streak += 1
+            print(f"iter {it:4d} SKIP non-finite loss={v} restore, "
+                  f"bad_streak={bad_streak} lr={opt.lr:.2e} "
+                  f"({time.time()-t0:.1f}s)", flush=True)
             log.append({"iter": it, "skipped": True, "loss": None})
             continue
-        # pin the frozen keys' gradients to zero so they cannot move
-        for k in FROZEN:
-            if k in grads:
-                grads[k] = np.zeros_like(grads[k])
+        bad_streak = 0
+        last_good_t = {k: vv for k, vv in trainable.items()}
+        last_good_car = list(carries)
         gnorm = float(np.sqrt(sum(float(np.sum(g ** 2)) for g in grads.values())))
         if gnorm > 1.0:
             grads = {k: g / gnorm for k, g in grads.items()}
-        # update only the trainable sub-dict with Adam
-        g_trainable = {k: grads[k] for k in trainable}
-        new_train = opt.step(trainable, g_trainable)
-        params = {k: (new_train[k] if k in new_train else params[k])
-                  for k in params}
-        trainable = new_train
+        trainable = opt.step(trainable, grads)
         # persist carry (stop-grad forward) for the next iteration
-        carries = list(fwd_all(params, tuple(carries)))
-        G_val = float(np.asarray(params["G_rel"]))
+        carries = list(fwd_all(merge(trainable), tuple(carries)))
+        G_val = float(np.asarray(frozen["G_rel"]))
         msg = (f"iter {it:4d}/{a.iters} loss={v:.5f} "
                f"G={G_val:.3f}(frozen) "
-               f"tau={float(np.asarray(np.exp(params['log_tau']))):.1f}s "
-               f"sigma={float(np.asarray(np.exp(params['log_sigma']))):.4f}(frozen) "
-               f"kv_scale={float(np.asarray(params['kv_scale'])):.4f} "
+               f"tau={float(np.asarray(np.exp(trainable['log_tau']))):.1f}s "
+               f"sigma={float(np.asarray(np.exp(frozen['log_sigma']))):.4f}(frozen) "
+               f"kv_scale={float(np.asarray(trainable['kv_scale'])):.4f} "
                f"gnorm={gnorm:.2e} ({time.time()-t0:.1f}s)")
         print(msg, flush=True)
         log.append({"iter": it, "loss": v, "gnorm": gnorm,
-                    "kv_scale": float(np.asarray(params['kv_scale'])),
-                    "tau_s": float(np.asarray(np.exp(params['log_tau']))),
-                    "G": G_val, "sigma": float(np.asarray(np.exp(params['log_sigma'])))})
+                    "kv_scale": float(np.asarray(trainable['kv_scale'])),
+                    "tau_s": float(np.asarray(np.exp(trainable['log_tau']))),
+                    "G": G_val, "sigma": float(np.asarray(np.exp(frozen['log_sigma'])))})
         os.makedirs(a.out, exist_ok=True)
         with open(os.path.join(a.out, "log.json"), "w") as f:
             json.dump(log, f, indent=1)
         with open(os.path.join(a.out, "params_ckpt.pkl"), "wb") as f:
-            pickle.dump(params, f)
+            pickle.dump(merge(trainable), f)
 
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "params.pkl"), "wb") as f:
-        pickle.dump(params, f)
+        pickle.dump(merge(trainable), f)
     with open(os.path.join(a.out, "results.json"), "w") as f:
-        json.dump({"learned": {k: float(np.asarray(v)) for k, v in params.items()
+        json.dump({"learned": {k: float(np.asarray(v)) for k, v in trainable.items()
                                if np.asarray(v).ndim == 0},
                    "shape_frozen_G": a.g_init, "shape_frozen_sigma": a.sigma_init,
                    "loss_mode": a.loss_mode, "iters": a.iters,
