@@ -8,15 +8,21 @@ window the single-subject trainer uses (vbjax.app.wb_train.window_loss).
 
 It starts from a supplied SHAPE checkpoint (the one the cohort fit used,
 wb_arm_ema_yout), overwrites G and sigma with the frozen cohort values, and
-BPTTs the four shape controls over the FIT subjects, chaining the carry across
-windows within each subject and persisting it across iterations (--persist-carry
-semantics, the config that made coupling live). log_noise_tc and G/sigma are
-pinned (the card lists exactly the four shape controls); drive-norm is NOT used
-(it was falsified).
+BPTTs the four shape controls over the FIT subjects, with the carry persisted
+across iterations (--persist-carry semantics, the config that made coupling
+live). log_noise_tc and G/sigma are pinned (the card lists exactly the four
+shape controls); drive-norm is NOT used (it was falsified).
 
 Freezing is structural: gradients are computed ONLY with respect to the four
-trainable keys (the frozen values are constants in the forward), so a
-non-finite gradient on a frozen key can never poison a step.
+trainable keys (the frozen values are constants in the forward).
+
+Robustness: window_loss returns a stop-grad carry, so every window is an
+independent gradient term. Measured (wb_cohort_diag): a single data segment can
+NaN its scalar-channel (kv_scale/log_tau) gradient even though the forward loss
+is finite (subject 0 window 3, at every (G, sigma)). We therefore compute
+gradients per window and average only over non-finite windows, so one
+pathological segment cannot stop all training. The persisted carry is advanced
+with the *post-step* params via a single forward pass each iteration.
 
 The trained checkpoint is evaluated OUTSIDE this driver with the certified
 2400 s strict rule and the low-rank structural metrics, both via
@@ -89,7 +95,10 @@ def main():
         "log_noise_tc": np.asarray(base["log_noise_tc"]),
         "G_rel": np.asarray(a.g_init),
     }
-    params = dict(trainable); params.update(frozen)
+
+    def merge(tt):
+        pp = dict(tt); pp.update(frozen)
+        return pp
 
     print(f"[cohort_bptt] init shape from {a.params}", flush=True)
     print(f"[cohort_bptt] BPTT targets: {list(TRAINABLE)}", flush=True)
@@ -108,7 +117,8 @@ def main():
                           steps_per_token=1, sigma_a=0.0)
 
     fit = list(range(min(a.k_fit_train, K)))
-    subj = []          # per subject: (C, lags, L, z_wins, raw_wins, n_win, fc_emp)
+    # windows[(i, wi)] = (C, lags, L, zw_win, rw_win, fc_emp, kw)
+    windows = {}
     for k in fit:
         C = np.asarray(Cs[k]); lags = np.asarray(Ls[k])
         L = int(lags.max()) + 1
@@ -116,8 +126,14 @@ def main():
         n_win = ts.shape[0] // a.win
         zw = zscore(ts)[:n_win * a.win].reshape(n_win, a.win, N)
         rw = ts[:n_win * a.win].reshape(n_win, a.win, N)
-        subj.append((C, lags, L, zw, rw, n_win, np.asarray(fc_of(ts))))
+        fc_emp = np.asarray(fc_of(ts))
+        for wi in range(n_win):
+            kw = jax.random.fold_in(jax.random.PRNGKey(a.seed + k), wi)
+            windows[(k, wi)] = (C, lags, L, zw[wi], rw[wi], fc_emp, kw)
         print(f"[cohort_bptt] fit subj {k}: n_win={n_win}", flush=True)
+    n_subj = len(fit)
+    n_win = bold.shape[1] // a.win
+    win_index = [(i, wi) for i in fit for wi in range(n_win)]
 
     # per-subject persisted carry (matching ema_yout's --persist-carry)
     def full_carry():
@@ -125,105 +141,88 @@ def main():
         _, st, _ = init_ct_mhsa(hp0, key, batch_size=1)
         return (st.M, np.zeros((N, d)), np.ones((N, 1)),
                 np.zeros((N, d)), np.ones((N, 1)))
-    carries = [full_carry() for _ in fit]
+    carries = {i: full_carry() for i in fit}
 
-    # ---- one window of one subject
-    def ws_window(p_in, carry, si, wi, kw):
-        C, lags, L, zw, rw, _, fc_emp = subj[si]
+    # ---- one window (data passed as args so the jit key is shape-only and the
+    # compile is reused across every window of identical shapes)
+    def _one_window(pp, carry, C, lags, L, zw_win, rw_win, fc_emp, kw):
         aux = {"fc_emp": fc_emp, "pulse_sched": None, "pulse_amp": 0.0}
-        return window_loss(p_in, carry, zw[wi], rw[wi], kw, C, lags, L, hp0,
-                           a.dt_train, a.loss_mode, a.tr * 1000.0,
-                           a.loss_amp_lambda, a.coupling, aux, False)
+        c2, l = window_loss(merge(pp), carry, zw_win, rw_win, kw, C, lags, L,
+                            hp0, a.dt_train, a.loss_mode, a.tr * 1000.0,
+                            a.loss_amp_lambda, a.coupling, aux, False)
+        return l, jax.lax.stop_gradient(c2)
 
-    def forward_all(p_in, carries_in):
-        """Chain every window of every fit subject; stop-grad the carries."""
-        keys = jax.random.split(jax.random.PRNGKey(a.seed), len(fit))
-        out = []
-        for i in range(len(fit)):
-            c = carries_in[i]
-            nw = subj[i][5]
-            for wi in range(nw):
-                k_w = jax.random.fold_in(keys[i], wi)
-                c, _ = ws_window(p_in, c, i, wi, k_w)
-            out.append(jax.lax.stop_gradient(c))
-        return tuple(out)
+    val_loss = jax.jit(lambda pp, c, C, lags, L, z, r, f, kw: _one_window(
+        pp, c, C, lags, L, z, r, f, kw)[0])
 
-    def loss_fn(p_in, carries_in):
-        keys = jax.random.split(jax.random.PRNGKey(a.seed), len(fit))
-        total = np.asarray(0.0)
-        n_total = 0
-        for i in range(len(fit)):
+    def forward_all(pp, carries_in):
+        """Advance every persisted carry with the given params."""
+        out = {}
+        for i in fit:
             c = carries_in[i]
-            nw = subj[i][5]
-            for wi in range(nw):
-                k_w = jax.random.fold_in(keys[i], wi)
-                c, l = ws_window(p_in, c, i, wi, k_w)
-                total = total + l
-                n_total += 1
-        return total / n_total
+            for wi in range(n_win):
+                C, lags, L, z, r, f, kw = windows[(i, wi)]
+                _, c = _one_window(pp, c, C, lags, L, z, r, f, kw)
+            out[i] = jax.lax.stop_gradient(c)
+        return out
 
     fwd_all = jax.jit(forward_all)
 
-    # ---- training loop: gradients ONLY w.r.t. the shape keys
+    # ---- training loop: per-window grads, keep only finite windows
     opt = Adam(trainable, lr=a.lr)
-    last_good_t = {k: v for k, v in trainable.items()}
-    last_good_car = list(carries)
-    bad_streak = 0
-    BAD_TO_HALVE = 3
-    MIN_LR = 1e-6
     log = []
-
-    def merge(tt):
-        pp = dict(tt); pp.update(frozen)
-        return pp
 
     t_start = time.time()
     for it in range(a.iters):
         t0 = time.time()
-        val, grads = jax.value_and_grad(
-            lambda tt: loss_fn(merge(tt), tuple(carries)))(trainable)
-        v = float(val)
-        finite = bool(onp.isfinite(v)) and all(
-            bool(onp.isfinite(onp.asarray(g)).all()) for g in grads.values())
-        if not finite:
-            # mirror wb_train recovery: roll back, reset Adam, halve lr
-            trainable = {k: vv for k, vv in last_good_t.items()}
-            carries = list(last_good_car)
-            opt.reset()
-            lr_now = opt.lr
-            if bad_streak >= BAD_TO_HALVE:
-                opt.lr = max(lr_now * 0.5, MIN_LR)
-                bad_streak = 0
-                print(f"iter {it:4d} {BAD_TO_HALVE} bad steps -> lr={opt.lr:.2e}",
-                      flush=True)
+        acc = {k: np.zeros_like(v) for k, v in trainable.items()}
+        n_finite = 0
+        sum_loss = 0.0
+        bad = []
+        for (i, wi) in win_index:
+            C, lags, L, z, r, f, kw = windows[(i, wi)]
+            c = carries[i]
+            v, g = jax.value_and_grad(val_loss)(trainable, c, C, lags, L, z,
+                                                r, f, kw)
+            vf = float(v)
+            gf = all(bool(onp.isfinite(onp.asarray(g[k])).all())
+                     for k in g) and onp.isfinite(vf)
+            if gf:
+                for k in acc:
+                    acc[k] = acc[k] + g[k]
+                n_finite += 1
+                sum_loss += vf
             else:
-                bad_streak += 1
-            print(f"iter {it:4d} SKIP non-finite loss={v} restore, "
-                  f"bad_streak={bad_streak} lr={opt.lr:.2e} "
-                  f"({time.time()-t0:.1f}s)", flush=True)
-            log.append({"iter": it, "skipped": True, "loss": None})
+                bad.append((i, wi, vf))
+        n_win_total = len(win_index)
+        if n_finite == 0:
+            print(f"iter {it:4d}/{a.iters} ALL {n_win_total} windows non-finite "
+                  f"- skip ({time.time()-t0:.1f}s)", flush=True)
+            log.append({"iter": it, "skipped": True, "loss": None,
+                        "n_finite": 0, "n_windows": n_win_total})
             continue
-        bad_streak = 0
-        last_good_t = {k: vv for k, vv in trainable.items()}
-        last_good_car = list(carries)
+        v = sum_loss / n_finite
+        grads = {k: acc[k] / n_finite for k in acc}
         gnorm = float(np.sqrt(sum(float(np.sum(g ** 2)) for g in grads.values())))
         if gnorm > 1.0:
             grads = {k: g / gnorm for k, g in grads.items()}
         trainable = opt.step(trainable, grads)
-        # persist carry (stop-grad forward) for the next iteration
-        carries = list(fwd_all(merge(trainable), tuple(carries)))
+        carries = fwd_all(merge(trainable), carries)
         G_val = float(np.asarray(frozen["G_rel"]))
         msg = (f"iter {it:4d}/{a.iters} loss={v:.5f} "
                f"G={G_val:.3f}(frozen) "
                f"tau={float(np.asarray(np.exp(trainable['log_tau']))):.1f}s "
                f"sigma={float(np.asarray(np.exp(frozen['log_sigma']))):.4f}(frozen) "
                f"kv_scale={float(np.asarray(trainable['kv_scale'])):.4f} "
-               f"gnorm={gnorm:.2e} ({time.time()-t0:.1f}s)")
+               f"gnorm={gnorm:.2e} kept={n_finite}/{n_win_total} "
+               f"({time.time()-t0:.1f}s)")
         print(msg, flush=True)
         log.append({"iter": it, "loss": v, "gnorm": gnorm,
                     "kv_scale": float(np.asarray(trainable['kv_scale'])),
                     "tau_s": float(np.asarray(np.exp(trainable['log_tau']))),
-                    "G": G_val, "sigma": float(np.asarray(np.exp(frozen['log_sigma'])))})
+                    "G": G_val, "sigma": float(np.asarray(np.exp(frozen['log_sigma']))),
+                    "n_finite": n_finite, "n_windows": n_win_total,
+                    "skipped_windows": bad})
         os.makedirs(a.out, exist_ok=True)
         with open(os.path.join(a.out, "log.json"), "w") as f:
             json.dump(log, f, indent=1)
